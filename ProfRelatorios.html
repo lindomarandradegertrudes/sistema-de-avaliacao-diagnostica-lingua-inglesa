@@ -1,0 +1,255 @@
+<!-- Etapa 4: aba Relatórios do painel do professor (incluída em Professor.html) -->
+<style>
+  .dist { display: flex; height: 18px; border-radius: 6px; overflow: hidden; background: var(--borda); min-width: 160px; }
+  .dist span { display: block; height: 100%; }
+  .cor-Iniciante { background: #ff8787; }
+  .cor-Básico { background: #ffd43b; }
+  .cor-Intermediário { background: #74c0fc; }
+  .cor-Avançado { background: #69db7c; }
+  .legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: .85rem; color: var(--suave); }
+  .legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .topico-linha { display: grid; grid-template-columns: 1fr 200px 70px 90px; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--borda); }
+  .topico-linha .barra { margin: 0; height: 10px; }
+  .topico-linha .barra i.baixo { background: var(--perigo); }
+  .topico-linha .barra i.medio { background: #fab005; }
+  @media (max-width: 640px) { .topico-linha { grid-template-columns: 1fr 90px 50px; } .topico-linha .n { display: none; } }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .kpi .valor { font-size: 1.6rem; font-weight: 700; }
+  .grafico svg { width: 100%; height: auto; display: block; }
+  #impressao * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+</style>
+
+<section id="aba-relatorios" class="pilha" hidden>
+  <div class="linha">
+    <div class="chips" id="rel-vistas">
+      <button class="btn ativa" data-vista="turmas">Comparativo das turmas</button>
+      <button class="btn" data-vista="topicos">Tópicos com mais erros</button>
+      <button class="btn" data-vista="aluno">Evolução por aluno</button>
+    </div>
+    <span class="espaco"></span>
+    <button class="btn" id="rel-imprimir">Imprimir / PDF</button>
+    <button class="btn primario" id="rel-exportar">Exportar para planilha</button>
+  </div>
+  <div id="rel-exportado" class="link-box" hidden></div>
+
+  <!-- Comparativo -->
+  <div id="rel-turmas" class="pilha" data-titulo="Comparativo das turmas">
+    <div class="legenda" id="rel-legenda"></div>
+    <div id="rel-series" class="pilha"></div>
+    <div class="cartao">
+      <h3>Média por mês <span class="suave pequeno">(média das avaliações feitas em cada mês)</span></h3>
+      <div class="tabela-rolagem" id="rel-meses"></div>
+    </div>
+  </div>
+
+  <!-- Tópicos -->
+  <div id="rel-topicos" class="pilha" data-titulo="Tópicos com mais erros" hidden>
+    <div class="linha">
+      <select id="rel-top-serie" style="width:auto"></select>
+      <span class="suave pequeno">Do menor para o maior acerto. Considera respostas online e provas impressas lançadas com letras.</span>
+    </div>
+    <div class="cartao" id="rel-top-lista"></div>
+  </div>
+
+  <!-- Aluno -->
+  <div id="rel-aluno" class="pilha" data-titulo="Evolução do aluno" hidden>
+    <div class="linha">
+      <select id="rel-al-turma" style="width:auto"></select>
+      <select id="rel-al-aluno" style="flex:1;min-width:220px"></select>
+    </div>
+    <div id="rel-al-conteudo"></div>
+  </div>
+</section>
+
+<script>
+  const rel = { dados: null, vista: 'turmas' };
+  const CORES_NIVEL = { 'Iniciante': '#ff8787', 'Básico': '#ffd43b', 'Intermediário': '#74c0fc', 'Avançado': '#69db7c' };
+
+  function configurarRelatorios() {
+    document.querySelector('.abas button[data-aba="relatorios"]').addEventListener('click', carregarRelatorios);
+    $('rel-vistas').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button[data-vista]');
+      if (!b) return;
+      rel.vista = b.dataset.vista;
+      document.querySelectorAll('#rel-vistas button').forEach((x) => x.classList.toggle('ativa', x === b));
+      ['turmas', 'topicos', 'aluno'].forEach((v) => ($('rel-' + v).hidden = v !== rel.vista));
+    });
+    $('rel-top-serie').addEventListener('change', renderTopicos);
+    $('rel-al-turma').addEventListener('change', preencherAlunosRel);
+    $('rel-al-aluno').addEventListener('change', carregarAlunoRel);
+    $('rel-imprimir').addEventListener('click', imprimirRelatorio);
+    $('rel-exportar').addEventListener('click', (ev) => comBotao(ev.target, async () => {
+      $('rel-exportado').hidden = false;
+      $('rel-exportado').textContent = 'Criando planilha no seu Drive…';
+      try {
+        const url = await chamar('profExportarPlanilha');
+        $('rel-exportado').innerHTML = `<span style="flex:1">Planilha criada no seu Google Drive.</span><a class="btn mini" href="${esc(url)}" target="_blank" rel="noopener">Abrir planilha</a>`;
+      } catch (e) {
+        $('rel-exportado').hidden = true;
+        throw e;
+      }
+    }));
+    $('rel-top-serie').innerHTML = opcoesSerie(false);
+    $('rel-al-turma').innerHTML = opcoesTurma(false);
+  }
+
+  async function carregarRelatorios() {
+    $('rel-series').innerHTML = '<div class="carregando">Carregando…</div>';
+    try {
+      rel.dados = await chamar('profRelatorioGeral');
+    } catch (e) {
+      $('rel-series').innerHTML = `<div class="cartao vazio" style="color:var(--perigo)">Erro ao carregar: ${esc(e.message)}</div>`;
+      return;
+    }
+    renderComparativo();
+    renderTopicos();
+    preencherAlunosRel();
+  }
+
+  // ---------- Comparativo ----------
+  function barraNiveis(niveis, total) {
+    if (!total) return '<span class="suave pequeno">sem avaliações</span>';
+    return `<div class="dist" title="${rel.dados.niveis.map((n) => n + ': ' + niveis[n]).join(' · ')}">${rel.dados.niveis
+      .filter((n) => niveis[n]).map((n) => `<span class="cor-${n}" style="width:${(niveis[n] / total) * 100}%"></span>`).join('')}</div>`;
+  }
+
+  function renderComparativo() {
+    const d = rel.dados;
+    $('rel-legenda').innerHTML = d.niveis.map((n) => `<span><i class="cor-${n}"></i>${n}</span>`).join('');
+    const series = [...new Set(d.turmas.map((t) => t.serie))];
+    $('rel-series').innerHTML = series.map((s) => {
+      const turmas = d.turmas.filter((t) => t.serie === s);
+      const soma = { alunos: 0, avaliados: 0, niveis: {} };
+      d.niveis.forEach((n) => (soma.niveis[n] = 0));
+      let somaMedias = 0;
+      turmas.forEach((t) => {
+        soma.alunos += t.alunos; soma.avaliados += t.avaliados;
+        d.niveis.forEach((n) => (soma.niveis[n] += t.niveis[n]));
+        if (t.media != null) somaMedias += t.media * t.avaliados;
+      });
+      const mediaSerie = soma.avaliados ? Math.round((somaMedias / soma.avaliados) * 10) / 10 : null;
+      const linha = (nome, t, media, forte) => `<tr${forte ? ' style="font-weight:600"' : ''}>
+        <td>${esc(nome)}</td><td>${t.avaliados}/${t.alunos}</td>
+        <td>${media != null ? media + '%' : '—'}</td>
+        <td style="width:40%">${barraNiveis(t.niveis, t.avaliados)}</td>
+        <td class="suave pequeno">${d.niveis.map((n) => t.niveis[n]).join(' / ')}</td></tr>`;
+      return `<div class="cartao tabela-rolagem"><h3>${esc(s)} ano</h3>
+        <table><thead><tr><th>Turma</th><th>Avaliados</th><th>Média</th><th>Níveis</th><th>Ini / Bás / Int / Av</th></tr></thead>
+        <tbody>${turmas.map((t) => linha(t.turma, t, t.media)).join('')}${linha('Total da série', soma, mediaSerie, true)}</tbody></table></div>`;
+    }).join('');
+
+    const meses = [...new Set(d.turmas.flatMap((t) => t.evolucao.map((e) => e.mes)))].sort();
+    $('rel-meses').innerHTML = meses.length
+      ? `<table><thead><tr><th>Turma</th>${meses.map((m) => `<th>${esc(m)}</th>`).join('')}</tr></thead><tbody>${d.turmas.map((t) =>
+          `<tr><td>${esc(t.turma)}</td>${meses.map((m) => {
+            const e = t.evolucao.find((x) => x.mes === m);
+            return `<td>${e ? e.media + '%' : '<span class="suave">—</span>'}</td>`;
+          }).join('')}</tr>`).join('')}</tbody></table>`
+      : '<p class="vazio">Nenhuma avaliação registrada ainda.</p>';
+  }
+
+  // ---------- Tópicos ----------
+  function renderTopicos() {
+    if (!rel.dados) return;
+    const serie = $('rel-top-serie').value;
+    const lista = rel.dados.topicos.filter((t) => t.serie === serie).sort((a, b) => a.percentual - b.percentual);
+    $('rel-top-lista').innerHTML = lista.length ? `<h3>${esc(serie)} ano</h3>` + lista.map((t) => `
+      <div class="topico-linha">
+        <span>${esc(t.topico)}</span>
+        <div class="barra"><i class="${t.percentual < 50 ? 'baixo' : t.percentual < 70 ? 'medio' : ''}" style="width:${t.percentual}%"></i></div>
+        <strong>${t.percentual}%</strong>
+        <span class="suave pequeno n">${t.acertos}/${t.respostas} acertos</span>
+      </div>`).join('') + '<p class="suave pequeno">Vermelho: abaixo de 50% · Amarelo: 50–69% · Azul: 70% ou mais.</p>'
+      : '<p class="vazio">Ainda não há respostas com detalhe por questão para esta série.</p>';
+  }
+
+  // ---------- Aluno ----------
+  function preencherAlunosRel() {
+    const turma = $('rel-al-turma').value;
+    const alunos = estado.alunos.filter((a) => a.turma === turma).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    $('rel-al-aluno').innerHTML = '<option value="">Selecione o aluno…</option>' +
+      alunos.map((a) => `<option value="${esc(a.email)}">${esc(a.nome)}${a.nivel ? ' – ' + esc(a.nivel) : ''}</option>`).join('');
+    $('rel-al-conteudo').innerHTML = alunos.length ? '' : '<div class="cartao vazio">Nenhum aluno nesta turma.</div>';
+  }
+
+  async function carregarAlunoRel() {
+    const email = $('rel-al-aluno').value;
+    if (!email) { $('rel-al-conteudo').innerHTML = ''; return; }
+    $('rel-al-conteudo').innerHTML = '<div class="carregando">Carregando…</div>';
+    try {
+      renderAlunoRel(await chamar('profEvolucaoAluno', email));
+    } catch (e) {
+      $('rel-al-conteudo').innerHTML = '';
+    }
+  }
+
+  function graficoEvolucao(av, faixas) {
+    const L = 640, A = 240, m = { e: 36, d: 16, t: 14, b: 36 };
+    const w = L - m.e - m.d, h = A - m.t - m.b;
+    const x = (i) => m.e + (av.length === 1 ? w / 2 : (i * w) / (av.length - 1));
+    const y = (v) => m.t + h - (v / 100) * h;
+    const faixasSvg = [
+      [0, faixas.basico, CORES_NIVEL['Iniciante']], [faixas.basico, faixas.intermediario, CORES_NIVEL['Básico']],
+      [faixas.intermediario, faixas.avancado, CORES_NIVEL['Intermediário']], [faixas.avancado, 100, CORES_NIVEL['Avançado']],
+    ].map(([de, ate, cor]) => `<rect x="${m.e}" y="${y(ate)}" width="${w}" height="${y(de) - y(ate)}" fill="${cor}" opacity=".18"/>`).join('');
+    const eixo = [0, 25, 50, 75, 100].map((v) =>
+      `<text x="${m.e - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#667085">${v}%</text>`).join('');
+    const linha = (campo) => av.map((a, i) => `${i ? 'L' : 'M'}${x(i)},${y(a[campo])}`).join(' ');
+    const pontos = av.map((a, i) => `<circle cx="${x(i)}" cy="${y(a.percentual)}" r="4.5" fill="#3b5bdb"><title>${esc(a.titulo)}: ${a.percentual}%</title></circle>`).join('');
+    const ancora = (i) => (av.length === 1 ? 'middle' : i === 0 ? 'start' : i === av.length - 1 ? 'end' : 'middle');
+    const rotulos = av.map((a, i) => `<text x="${x(i)}" y="${A - 14}" text-anchor="${ancora(i)}" font-size="11" fill="#667085">${esc(a.mes)}</text>`).join('');
+    return `<svg viewBox="0 0 ${L} ${A}" role="img" aria-label="Evolução das notas">
+      ${faixasSvg}${eixo}
+      <path d="${linha('mediaAcumulada')}" fill="none" stroke="#1f2430" stroke-width="2" stroke-dasharray="5 4"/>
+      <path d="${linha('percentual')}" fill="none" stroke="#3b5bdb" stroke-width="2.5"/>
+      ${pontos}${rotulos}
+    </svg>
+    <div class="legenda"><span><i style="background:#3b5bdb"></i>Nota de cada avaliação</span><span><i style="background:#1f2430"></i>Média acumulada (define o nível)</span>
+      ${rel.dados.niveis.map((n) => `<span><i class="cor-${n}" style="opacity:.6"></i>${n}</span>`).join('')}</div>`;
+  }
+
+  function renderAlunoRel(a) {
+    if (!a.avaliacoes.length) {
+      $('rel-al-conteudo').innerHTML = `<div class="cartao vazio">${esc(a.nome)} ainda não fez nenhuma avaliação.</div>`;
+      return;
+    }
+    const primeira = a.avaliacoes[0].percentual, ultima = a.avaliacoes[a.avaliacoes.length - 1].percentual;
+    const variacao = Math.round((ultima - primeira) * 10) / 10;
+    $('rel-al-conteudo').innerHTML = `
+      <div class="pilha">
+        <div class="kpis">
+          <div class="cartao kpi"><div class="suave pequeno">Aluno</div><strong>${esc(a.nome)}</strong><div class="suave pequeno">${esc(a.turma)}</div></div>
+          <div class="cartao kpi"><div class="suave pequeno">Nível atual</div><div class="valor"><span class="selo ${esc(a.nivel)}">${esc(a.nivel)}</span></div></div>
+          <div class="cartao kpi"><div class="suave pequeno">Média</div><div class="valor">${a.media}%</div></div>
+          <div class="cartao kpi"><div class="suave pequeno">Da 1ª à última avaliação</div><div class="valor" style="color:${variacao >= 0 ? 'var(--ok)' : 'var(--perigo)'}">${variacao > 0 ? '+' : ''}${variacao} pts</div></div>
+        </div>
+        <div class="cartao grafico"><h3>Evolução</h3>${graficoEvolucao(a.avaliacoes, rel.dados.faixas)}</div>
+        <div class="cartao tabela-rolagem"><h3>Avaliações</h3>
+          <table><thead><tr><th>Mês</th><th>Avaliação</th><th>Acertos</th><th>Nota</th><th>Média acumulada</th><th>Nível</th></tr></thead>
+          <tbody>${a.avaliacoes.map((v) => `<tr><td>${esc(v.mes)}</td><td>${esc(v.titulo)} <span class="suave pequeno">(${v.origem === 'online' ? 'online' : 'impresso'})</span></td>
+            <td>${v.pontuacao}/${v.total}</td><td>${v.percentual}%</td><td>${v.mediaAcumulada}%</td><td><span class="selo ${esc(v.nivel)}">${esc(v.nivel)}</span></td></tr>`).join('')}</tbody></table></div>
+        <div class="cartao"><h3>Desempenho por tópico</h3>${a.topicos.length ? a.topicos.map((t) => `
+          <div class="topico-linha">
+            <span>${esc(t.topico)}</span>
+            <div class="barra"><i class="${t.percentual < 50 ? 'baixo' : t.percentual < 70 ? 'medio' : ''}" style="width:${t.percentual}%"></i></div>
+            <strong>${t.percentual}%</strong>
+            <span class="suave pequeno n">${t.acertos}/${t.respostas}</span>
+          </div>`).join('') : '<p class="vazio">Sem detalhe por questão (avaliações lançadas só com o número de acertos).</p>'}</div>
+      </div>`;
+  }
+
+  // ---------- Impressão ----------
+  function imprimirRelatorio() {
+    const vista = $('rel-' + rel.vista);
+    const copia = vista.cloneNode(true);
+    copia.hidden = false;
+    copia.querySelectorAll('select, button, .linha > .suave').forEach((el) => el.remove());
+    let subtitulo = '';
+    if (rel.vista === 'topicos') subtitulo = $('rel-top-serie').value + ' ano';
+    $('impressao').innerHTML = `<h2>${esc(vista.dataset.titulo)}${subtitulo ? ' – ' + esc(subtitulo) : ''}</h2>
+      <p style="font-size:10pt">Língua Inglesa · gerado em ${new Date().toLocaleString('pt-BR')}</p>`;
+    $('impressao').appendChild(copia);
+    document.body.classList.add('imprimindo');
+    setTimeout(() => { window.print(); document.body.classList.remove('imprimindo'); }, 50);
+  }
+</script>

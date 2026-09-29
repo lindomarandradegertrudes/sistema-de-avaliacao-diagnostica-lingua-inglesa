@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <?!= incluir('Estilo'); ?>
+  <style>
+    .selo { display: inline-block; font-size: .78rem; font-weight: 600; padding: 2px 9px; border-radius: 99px; background: var(--borda); white-space: nowrap; }
+    .selo.Iniciante { background: #ffe3e3; color: #c92a2a; }
+    .selo.Básico { background: #fff3bf; color: #a05a00; }
+    .selo.Intermediário { background: #d0ebff; color: #1864ab; }
+    .selo.Avançado { background: #d3f9d8; color: #2b8a3e; }
+    .selo.rascunho { background: #f1f3f5; color: #495057; }
+    .selo.aberto { background: #d3f9d8; color: #2b8a3e; }
+    .selo.encerrado { background: #e9ecef; color: #868e96; }
+
+    .questao { border: 1px solid var(--borda); border-radius: var(--raio); padding: 16px; background: #fff; }
+    .questao-topo { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+    .questao-topo strong { font-size: 1rem; }
+    .alt { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+    .alt input[type=radio] { width: auto; }
+    .alt .letra { width: 22px; font-weight: 700; color: var(--suave); }
+    .grade-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 640px) { .grade-2 { grid-template-columns: 1fr; } }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chips .btn.ativa { background: var(--primaria); color: #fff; border-color: var(--primaria); }
+    .barra-q { display: grid; grid-template-columns: 40px 1fr 140px 60px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--borda); font-size: .9rem; }
+    .barra-q .barra { margin: 0; height: 10px; }
+    .barra-q .barra i.baixo { background: var(--perigo); }
+    td input.lanc { width: 170px; font-family: monospace; text-transform: uppercase; }
+
+    #impressao { display: none; }
+    @media print {
+      body.imprimindo > *:not(#impressao) { display: none !important; }
+      body.imprimindo { background: #fff; }
+      #impressao { display: block; font: 12pt/1.45 Arial, sans-serif; color: #000; }
+      #impressao .cab { border: 1px solid #000; padding: 8px 10px; margin-bottom: 12px; }
+      #impressao .cab div { margin: 4px 0; }
+      #impressao .q { margin: 0 0 14px; break-inside: avoid; }
+      #impressao .apoio { border-left: 3px solid #999; padding: 4px 10px; margin: 6px 0; font-style: italic; white-space: pre-wrap; }
+      #impressao ol.alts { list-style: upper-alpha; margin: 4px 0 0 22px; padding: 0; }
+      #impressao .quebra { break-before: page; }
+      #impressao table { border-collapse: collapse; }
+      #impressao td, #impressao th { border: 1px solid #000; padding: 3px 8px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">Grupos de Inglês <span>Painel do professor</span></div>
+    <div class="suave pequeno"><?= email ?></div>
+  </header>
+
+  <nav class="abas">
+    <button data-aba="turmas" class="ativa">Turmas</button>
+    <button data-aba="alunos">Alunos</button>
+    <button data-aba="questionarios">Questionários</button>
+    <button data-aba="grupos">Grupos</button>
+    <button data-aba="relatorios">Relatórios</button>
+    <button data-aba="config">Configurações</button>
+  </nav>
+
+  <main>
+    <div id="carregando" class="carregando">Carregando…</div>
+
+    <!-- Turmas -->
+    <section id="aba-turmas" class="pilha" hidden>
+      <div class="cartao">
+        <h3>Link para os alunos</h3>
+        <p class="suave pequeno">Envie este link às turmas. No primeiro acesso, cada aluno informa nome e turma; o e-mail escolar é registrado automaticamente.</p>
+        <div class="link-box"><code id="link"></code><button class="btn mini" id="copiar-link">Copiar</button></div>
+        <p id="aviso-cadastro" class="pequeno" style="color:var(--perigo)" hidden>Cadastro de novos alunos está fechado (veja Configurações).</p>
+      </div>
+      <div class="linha"><h2 style="margin:0">Turmas</h2><span class="espaco"></span><span class="suave" id="total-alunos"></span></div>
+      <div id="series" class="pilha"></div>
+    </section>
+
+    <!-- Alunos -->
+    <section id="aba-alunos" class="pilha" hidden>
+      <div class="linha">
+        <select id="filtro-turma"></select>
+        <input id="busca" type="search" placeholder="Buscar por nome ou e-mail" style="flex:1;min-width:200px">
+        <button class="btn primario" id="novo-aluno">+ Adicionar aluno</button>
+      </div>
+      <div class="cartao">
+        <p class="suave pequeno" id="contagem" style="margin-top:0"></p>
+        <div class="tabela-rolagem">
+          <table>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Turma</th><th>Nível</th><th>Média</th><th></th></tr></thead>
+            <tbody id="lista-alunos"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Questionários -->
+    <section id="aba-questionarios" hidden>
+      <!-- Lista -->
+      <div id="q-lista" class="pilha">
+        <div class="linha">
+          <select id="q-filtro-serie"></select>
+          <span class="espaco"></span>
+          <button class="btn" id="q-importar">Importar JSON</button>
+          <button class="btn primario" id="q-novo">+ Novo questionário</button>
+        </div>
+        <div class="cartao tabela-rolagem">
+          <table>
+            <thead><tr><th>Título</th><th>Série</th><th>Tipo</th><th>Mês</th><th>Status</th><th>Respostas</th><th></th></tr></thead>
+            <tbody id="q-tabela"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Editor -->
+      <div id="q-editor" class="pilha" hidden>
+        <div class="linha">
+          <button class="btn" data-voltar>← Voltar</button>
+          <h2 style="margin:0" id="ed-titulo-tela">Questionário</h2>
+          <span class="espaco"></span>
+          <button class="btn" id="ed-imprimir">Imprimir prova</button>
+          <button class="btn primario" id="ed-salvar">Salvar</button>
+        </div>
+        <p id="ed-bloqueado" class="cartao pequeno" style="color:var(--perigo)" hidden>Este questionário já tem respostas: as questões e a série não podem mais ser alteradas.</p>
+        <div class="cartao">
+          <div class="grade-2">
+            <div class="campo"><label for="ed-titulo">Título</label><input id="ed-titulo" placeholder="ex.: Diagnóstico 7º ano – 2026"></div>
+            <div class="grade-2">
+              <div class="campo"><label for="ed-tipo">Tipo</label>
+                <select id="ed-tipo"><option value="diagnostico">Diagnóstico</option><option value="mensal">Mensal</option></select></div>
+              <div class="campo"><label for="ed-serie">Série</label><select id="ed-serie"></select></div>
+            </div>
+          </div>
+          <div class="grade-2" style="margin-top:14px">
+            <div class="campo"><label for="ed-mes">Mês de referência</label><input id="ed-mes" type="month"></div>
+            <div class="campo"><label for="ed-qtd">Quantidade de questões (para a IA)</label><input id="ed-qtd" type="number" min="3" max="25" value="10"></div>
+          </div>
+          <div class="campo" style="margin-top:14px">
+            <label for="ed-conteudo">Conteúdo do mês</label>
+            <textarea id="ed-conteudo" rows="4" placeholder="Cole aqui o conteúdo/expectativas trabalhados (ex.: Simple past – verbos regulares; leitura de biografias; preposições in/on/at)."></textarea>
+          </div>
+          <div class="linha" style="margin-top:12px">
+            <button class="btn" id="ed-gerar">✨ Gerar questões com IA</button>
+            <button class="btn" id="ed-importar-q">Colar questões (JSON)</button>
+            <span class="suave pequeno" id="ed-ia-status"></span>
+          </div>
+        </div>
+        <div class="linha"><h3 style="margin:0">Questões <span class="suave" id="ed-contagem"></span></h3><span class="espaco"></span>
+          <button class="btn" id="ed-add">+ Questão</button></div>
+        <div id="ed-questoes" class="pilha"></div>
+      </div>
+
+      <!-- Resultados -->
+      <div id="q-resultados" class="pilha" hidden>
+        <div class="linha">
+          <button class="btn" data-voltar>← Voltar</button>
+          <h2 style="margin:0" id="res-titulo"></h2>
+          <span class="espaco"></span>
+          <button class="btn" id="res-imprimir">Imprimir prova</button>
+          <button class="btn" id="res-gabarito">Imprimir gabarito</button>
+        </div>
+        <div class="chips" id="res-turmas"></div>
+        <div class="cartao">
+          <p class="suave pequeno" style="margin-top:0">Para provas impressas, digite as letras marcadas pelo aluno em ordem (ex.: <code>ABDCA…</code>, use <code>-</code> para questão em branco) ou apenas o número de acertos. Letras permitem a análise por questão.</p>
+          <div class="tabela-rolagem">
+            <table>
+              <thead><tr><th>Nome</th><th>Situação</th><th>Acertos</th><th>%</th><th>Lançar impresso</th><th></th></tr></thead>
+              <tbody id="res-tabela"></tbody>
+            </table>
+          </div>
+          <div class="rodape-modal"><button class="btn primario" id="res-salvar">Salvar lançamentos</button></div>
+        </div>
+        <div class="cartao">
+          <h3>Acerto por questão <span class="suave pequeno">(todas as turmas da série)</span></h3>
+          <div id="res-questoes"></div>
+        </div>
+      </div>
+    </section>
+
+    <?!= incluir('ProfGrupos'); ?>
+    <?!= incluir('ProfRelatorios'); ?>
+
+    <!-- Configurações -->
+    <section id="aba-config" class="pilha" hidden>
+      <form id="form-config" class="cartao">
+        <h2>Configurações</h2>
+        <div class="campo">
+          <label for="cfg-dominio">Domínio dos e-mails da escola</label>
+          <input id="cfg-dominio" placeholder="ex.: edu.joinville.sc.gov.br">
+          <p class="suave pequeno">Somente contas terminadas em @domínio poderão se cadastrar. Deixe vazio para aceitar qualquer conta.</p>
+        </div>
+        <div class="campo">
+          <label for="cfg-professores">Professores com acesso ao painel</label>
+          <textarea id="cfg-professores" rows="2" placeholder="email1@escola, email2@escola"></textarea>
+        </div>
+        <div class="campo">
+          <label for="cfg-cadastro">Cadastro de novos alunos</label>
+          <select id="cfg-cadastro"><option value="SIM">Aberto</option><option value="NÃO">Fechado</option></select>
+        </div>
+        <div class="campo">
+          <label>Faixas de nível (média % mínima)</label>
+          <div class="linha">
+            <span class="suave pequeno">Iniciante: abaixo de Básico</span>
+            <span class="pequeno">Básico</span><input id="cfg-b" type="number" min="1" max="100" style="width:80px">
+            <span class="pequeno">Intermediário</span><input id="cfg-i" type="number" min="1" max="100" style="width:80px">
+            <span class="pequeno">Avançado</span><input id="cfg-a" type="number" min="1" max="100" style="width:80px">
+          </div>
+        </div>
+        <div class="rodape-modal"><button class="btn primario" type="submit">Salvar</button></div>
+      </form>
+
+      <form id="form-api" class="cartao">
+        <h2>Geração de questões com IA</h2>
+        <p class="suave pequeno">Opcional. Com uma chave da API da Anthropic (console.anthropic.com), o botão "Gerar questões com IA" cria o questionário a partir do conteúdo do mês. O custo é cobrado pela Anthropic, por uso. A chave fica guardada no script, não na planilha.</p>
+        <p>Situação: <strong id="api-status"></strong></p>
+        <div class="campo"><label for="api-chave">Nova chave</label><input id="api-chave" type="password" autocomplete="off" placeholder="sk-ant-…"></div>
+        <div class="rodape-modal">
+          <button class="btn perigo" type="button" id="api-remover">Remover chave</button>
+          <button class="btn primario" type="submit">Salvar chave</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <div id="impressao"></div>
+
+  <dialog id="modal-aluno">
+    <form id="form-aluno" method="dialog">
+      <h2 id="modal-titulo">Aluno</h2>
+      <input type="hidden" id="al-original">
+      <div class="campo"><label for="al-nome">Nome completo</label><input id="al-nome" required></div>
+      <div class="campo"><label for="al-email">E-mail escolar</label><input id="al-email" type="email" required></div>
+      <div class="campo"><label for="al-turma">Turma</label><select id="al-turma" required></select></div>
+      <div class="rodape-modal">
+        <button class="btn" type="button" data-fechar>Cancelar</button>
+        <button class="btn primario" type="submit">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="modal-json">
+    <form id="form-json" method="dialog">
+      <h2 id="json-titulo">Importar JSON</h2>
+      <p class="suave pequeno" id="json-ajuda"></p>
+      <textarea id="json-texto" rows="12" style="font-family:monospace;font-size:.8rem"></textarea>
+      <div class="rodape-modal">
+        <button class="btn" type="button" data-fechar>Cancelar</button>
+        <button class="btn primario" type="submit">Importar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    const estado = { resumo: null, alunos: [], questionarios: [], edicao: null, resultados: null, turmaRes: '' };
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const LETRAS = ['A', 'B', 'C', 'D', 'E'];
+    const TIPOS = { diagnostico: 'Diagnóstico', mensal: 'Mensal' };
+    const STATUS = { rascunho: 'Rascunho', aberto: 'Aberto', encerrado: 'Encerrado' };
+    const DIFS = { facil: 'Fácil', media: 'Média', dificil: 'Difícil' };
+
+    function chamar(fn, ...args) {
+      return new Promise((ok, falha) => {
+        google.script.run
+          .withSuccessHandler(ok)
+          .withFailureHandler((e) => { avisar(e.message, true); falha(e); })[fn](...args);
+      });
+    }
+
+    let temporizador;
+    function avisar(texto, erro) {
+      let el = document.querySelector('.aviso');
+      if (!el) { el = document.createElement('div'); document.body.appendChild(el); }
+      el.className = 'aviso' + (erro ? ' erro' : '');
+      el.textContent = texto;
+      clearTimeout(temporizador);
+      temporizador = setTimeout(() => el.remove(), erro ? 7000 : 3000);
+    }
+
+    async function comBotao(botao, fn) {
+      botao.disabled = true;
+      try { return await fn(); } catch (e) { /* aviso já exibido */ } finally { botao.disabled = false; }
+    }
+
+    document.querySelectorAll('[data-fechar]').forEach((b) => b.addEventListener('click', () => b.closest('dialog').close()));
+
+    // ---------- Navegação ----------
+    function abrirAba(nome) {
+      document.querySelectorAll('.abas button[data-aba]').forEach((b) => b.classList.toggle('ativa', b.dataset.aba === nome));
+      document.querySelectorAll('main > section').forEach((s) => (s.hidden = s.id !== 'aba-' + nome));
+    }
+    document.querySelectorAll('.abas button[data-aba]').forEach((b) => b.addEventListener('click', () => abrirAba(b.dataset.aba)));
+
+    function opcoesSerie(incluirTodas) {
+      return (incluirTodas ? '<option value="">Todas as séries</option>' : '') +
+        estado.resumo.series.map((s) => `<option value="${esc(s)}">${esc(s)} ano</option>`).join('');
+    }
+
+    // ---------- Turmas ----------
+    function renderTurmas() {
+      const r = estado.resumo;
+      $('link').textContent = r.link || 'Publique o sistema para gerar o link.';
+      $('aviso-cadastro').hidden = r.config.cadastro_aberto !== 'NÃO';
+      $('total-alunos').textContent = r.totalAlunos + ' alunos cadastrados';
+      $('series').innerHTML = r.series.map((serie) => {
+        const turmas = r.turmas.filter((t) => t.serie === serie);
+        return `<div><h3>${esc(serie)} ano</h3><div class="grade">${turmas.map((t) => `
+          <div class="cartao turma" data-turma="${esc(t.turma)}">
+            <div class="suave pequeno">Turma</div>
+            <div class="linha"><strong style="font-size:1.1rem">${esc(t.turma)}</strong><span class="espaco"></span>
+              <span class="num">${t.total}</span><span class="suave">/ ${r.maxPorTurma}</span></div>
+            <div class="barra"><i style="width:${Math.min(100, (t.total / r.maxPorTurma) * 100)}%"></i></div>
+          </div>`).join('')}</div></div>`;
+      }).join('');
+      document.querySelectorAll('.turma').forEach((c) => c.addEventListener('click', () => {
+        $('filtro-turma').value = c.dataset.turma;
+        renderAlunos();
+        abrirAba('alunos');
+      }));
+    }
+
+    $('copiar-link').addEventListener('click', () => {
+      navigator.clipboard.writeText($('link').textContent).then(() => avisar('Link copiado.'));
+    });
+
+    // ---------- Alunos ----------
+    function opcoesTurma(incluirTodas) {
+      const r = estado.resumo;
+      return (incluirTodas ? '<option value="">Todas as turmas</option>' : '') +
+        r.series.map((s) => `<optgroup label="${esc(s)} ano">${r.turmas.filter((t) => t.serie === s)
+          .map((t) => `<option value="${esc(t.turma)}">${esc(t.turma)}</option>`).join('')}</optgroup>`).join('');
+    }
+
+    function renderAlunos() {
+      const turma = $('filtro-turma').value;
+      const termo = $('busca').value.trim().toLowerCase();
+      const lista = estado.alunos
+        .filter((a) => !turma || a.turma === turma)
+        .filter((a) => !termo || a.nome.toLowerCase().includes(termo) || a.email.includes(termo))
+        .sort((a, b) => a.turma.localeCompare(b.turma) || a.nome.localeCompare(b.nome, 'pt-BR'));
+      $('contagem').textContent = lista.length + (lista.length === 1 ? ' aluno' : ' alunos');
+      $('lista-alunos').innerHTML = lista.length ? lista.map((a) => `
+        <tr>
+          <td>${esc(a.nome)}</td>
+          <td class="suave">${esc(a.email)}</td>
+          <td>${esc(a.turma)}</td>
+          <td>${a.nivel ? `<span class="selo ${esc(a.nivel)}">${esc(a.nivel)}</span>` : '<span class="suave pequeno">sem avaliação</span>'}</td>
+          <td class="suave">${a.media !== null && a.media !== undefined ? a.media + '% <span class="pequeno">(' + a.avaliacoes + ')</span>' : ''}</td>
+          <td class="acoes">
+            <button class="btn mini" data-editar="${esc(a.email)}">Editar</button>
+            <button class="btn mini perigo" data-excluir="${esc(a.email)}">Excluir</button>
+          </td>
+        </tr>`).join('') : '<tr><td colspan="6" class="vazio">Nenhum aluno encontrado.</td></tr>';
+    }
+
+    $('filtro-turma').addEventListener('change', renderAlunos);
+    $('busca').addEventListener('input', renderAlunos);
+
+    $('lista-alunos').addEventListener('click', async (ev) => {
+      const editar = ev.target.dataset.editar;
+      const excluir = ev.target.dataset.excluir;
+      if (editar) abrirModalAluno(estado.alunos.find((a) => a.email === editar));
+      if (excluir) {
+        const aluno = estado.alunos.find((a) => a.email === excluir);
+        if (!confirm(`Excluir o cadastro de ${aluno.nome} (${aluno.turma})?\n\nAs respostas antigas ficam guardadas e voltam a valer se o aluno se cadastrar de novo.`)) return;
+        await comBotao(ev.target, async () => {
+          estado.alunos = await chamar('profExcluirAluno', excluir);
+          await atualizarResumo();
+          avisar('Cadastro excluído.');
+        });
+      }
+    });
+
+    function abrirModalAluno(aluno) {
+      $('modal-titulo').textContent = aluno ? 'Editar aluno' : 'Adicionar aluno';
+      $('al-original').value = aluno ? aluno.email : '';
+      $('al-nome').value = aluno ? aluno.nome : '';
+      $('al-email').value = aluno ? aluno.email : '';
+      $('al-turma').value = aluno ? aluno.turma : ($('filtro-turma').value || estado.resumo.turmas[0].turma);
+      $('modal-aluno').showModal();
+    }
+    $('novo-aluno').addEventListener('click', () => abrirModalAluno(null));
+
+    $('form-aluno').addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      comBotao(ev.submitter, async () => {
+        estado.alunos = await chamar('profSalvarAluno', {
+          emailOriginal: $('al-original').value,
+          nome: $('al-nome').value,
+          email: $('al-email').value,
+          turma: $('al-turma').value,
+        });
+        $('modal-aluno').close();
+        await atualizarResumo();
+        avisar('Aluno salvo.');
+      });
+    });
+
+    // ---------- Questionários: lista ----------
+    function telaQuestionarios(qual) {
+      ['q-lista', 'q-editor', 'q-resultados'].forEach((id) => ($(id).hidden = id !== qual));
+      window.scrollTo(0, 0);
+    }
+    document.querySelectorAll('[data-voltar]').forEach((b) => b.addEventListener('click', async () => {
+      telaQuestionarios('q-lista');
+      await recarregarQuestionarios();
+    }));
+
+    async function recarregarQuestionarios() {
+      estado.questionarios = await chamar('profListarQuestionarios');
+      renderQuestionarios();
+    }
+
+    function renderQuestionarios() {
+      const serie = $('q-filtro-serie').value;
+      const lista = estado.questionarios.filter((q) => !serie || q.serie === serie);
+      $('q-tabela').innerHTML = lista.length ? lista.map((q) => {
+        const acaoStatus = q.status === 'rascunho' ? ['aberto', 'Liberar para alunos']
+          : q.status === 'aberto' ? ['encerrado', 'Encerrar'] : ['aberto', 'Reabrir'];
+        return `<tr>
+          <td><strong>${esc(q.titulo)}</strong><div class="suave pequeno">${q.questoes.length} questões</div></td>
+          <td>${esc(q.serie)}</td>
+          <td>${TIPOS[q.tipo] || esc(q.tipo)}</td>
+          <td>${esc(q.mes)}</td>
+          <td><span class="selo ${esc(q.status)}">${STATUS[q.status] || esc(q.status)}</span></td>
+          <td>${q.respostas}</td>
+          <td class="acoes">
+            <button class="btn mini" data-acao="status" data-id="${q.id}" data-novo="${acaoStatus[0]}">${acaoStatus[1]}</button>
+            <button class="btn mini" data-acao="resultados" data-id="${q.id}">Resultados</button>
+            <button class="btn mini" data-acao="editar" data-id="${q.id}">Editar</button>
+            <button class="btn mini perigo" data-acao="excluir" data-id="${q.id}">Excluir</button>
+          </td>
+        </tr>`;
+      }).join('') : '<tr><td colspan="7" class="vazio">Nenhum questionário ainda. Crie um novo ou importe um JSON.</td></tr>';
+    }
+    $('q-filtro-serie').addEventListener('change', renderQuestionarios);
+
+    $('q-tabela').addEventListener('click', async (ev) => {
+      const b = ev.target.closest('button[data-acao]');
+      if (!b) return;
+      const q = estado.questionarios.find((x) => x.id === b.dataset.id);
+      if (b.dataset.acao === 'editar') abrirEditor(q);
+      if (b.dataset.acao === 'resultados') comBotao(b, () => abrirResultados(q.id));
+      if (b.dataset.acao === 'status') {
+        if (b.dataset.novo === 'aberto' && !confirm(`Liberar "${q.titulo}" para todos os alunos do ${q.serie} ano?`)) return;
+        comBotao(b, async () => {
+          estado.questionarios = await chamar('profAlterarStatus', q.id, b.dataset.novo);
+          renderQuestionarios();
+          avisar('Status atualizado.');
+        });
+      }
+      if (b.dataset.acao === 'excluir') {
+        const aviso = q.respostas ? `\n\nATENÇÃO: as ${q.respostas} respostas deste questionário também serão apagadas e os níveis recalculados.` : '';
+        if (!confirm(`Excluir "${q.titulo}"?${aviso}`)) return;
+        comBotao(b, async () => {
+          estado.questionarios = await chamar('profExcluirQuestionario', q.id);
+          renderQuestionarios();
+          estado.alunos = await chamar('profListarAlunos');
+          renderAlunos();
+          avisar('Questionário excluído.');
+        });
+      }
+    });
+
+    // ---------- Importar JSON ----------
+    let modoJson = 'lista';
+    function abrirJson(modo) {
+      modoJson = modo;
+      $('json-titulo').textContent = modo === 'lista' ? 'Importar questionário(s)' : 'Colar questões';
+      $('json-ajuda').textContent = modo === 'lista'
+        ? 'Cole o JSON de um questionário ou de uma lista de questionários (como os diagnósticos preparados no chat). Cada um vira um rascunho.'
+        : 'Cole o JSON com as questões. Elas substituem as questões atuais deste editor (nada é salvo até você clicar em Salvar).';
+      $('json-texto').value = '';
+      $('modal-json').showModal();
+    }
+    $('q-importar').addEventListener('click', () => abrirJson('lista'));
+    $('ed-importar-q').addEventListener('click', () => abrirJson('editor'));
+
+    $('form-json').addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const texto = $('json-texto').value.trim();
+      if (modoJson === 'lista') {
+        comBotao(ev.submitter, async () => {
+          const n = await chamar('profImportarQuestionarios', texto);
+          $('modal-json').close();
+          await recarregarQuestionarios();
+          avisar(n + (n === 1 ? ' questionário importado' : ' questionários importados') + ' como rascunho.');
+        });
+        return;
+      }
+      try {
+        const dados = JSON.parse(texto);
+        const questoes = Array.isArray(dados) ? dados : dados.questoes;
+        if (!Array.isArray(questoes)) throw new Error('não encontrei a lista de questões');
+        const ed = estado.edicao;
+        ed.questoes = questoes.map(normalizarQuestao);
+        if (!Array.isArray(dados)) {
+          if (dados.titulo && !$('ed-titulo').value) $('ed-titulo').value = dados.titulo;
+          if (dados.serie) $('ed-serie').value = dados.serie;
+          if (dados.tipo) $('ed-tipo').value = dados.tipo;
+        }
+        $('modal-json').close();
+        renderQuestoesEditor();
+        avisar(questoes.length + ' questões coladas. Revise e clique em Salvar.');
+      } catch (e) {
+        avisar('JSON inválido: ' + e.message, true);
+      }
+    });
+
+    // ---------- Editor ----------
+    function normalizarQuestao(q) {
+      const alternativas = Array.isArray(q.alternativas) ? q.alternativas.slice(0, 5).map(String) : ['', '', '', ''];
+      while (alternativas.length < 4) alternativas.push('');
+      return {
+        texto_apoio: q.texto_apoio || '', enunciado: q.enunciado || '', alternativas,
+        correta: Number.isInteger(q.correta) ? q.correta : 0, topico: q.topico || '', dificuldade: q.dificuldade || 'media',
+      };
+    }
+
+    function abrirEditor(q) {
+      estado.edicao = q
+        ? { id: q.id, respostas: q.respostas, questoes: q.questoes.map(normalizarQuestao) }
+        : { id: '', respostas: 0, questoes: [] };
+      $('ed-titulo-tela').textContent = q ? 'Editar questionário' : 'Novo questionário';
+      $('ed-titulo').value = q ? q.titulo : '';
+      $('ed-tipo').value = q ? q.tipo : 'mensal';
+      $('ed-serie').value = q ? q.serie : ($('q-filtro-serie').value || estado.resumo.series[0]);
+      $('ed-mes').value = q ? q.mes : new Date().toISOString().slice(0, 7);
+      $('ed-conteudo').value = q ? q.conteudo : '';
+      $('ed-qtd').value = q && q.tipo === 'diagnostico' ? 15 : 10;
+      $('ed-ia-status').textContent = '';
+      renderQuestoesEditor();
+      telaQuestionarios('q-editor');
+    }
+    $('q-novo').addEventListener('click', () => abrirEditor(null));
+
+    function renderQuestoesEditor() {
+      const ed = estado.edicao;
+      const bloqueado = ed.respostas > 0;
+      $('ed-bloqueado').hidden = !bloqueado;
+      $('ed-serie').disabled = bloqueado;
+      ['ed-gerar', 'ed-importar-q', 'ed-add'].forEach((id) => ($(id).disabled = bloqueado));
+      $('ed-contagem').textContent = `(${ed.questoes.length})`;
+      const dis = bloqueado ? 'disabled' : '';
+      $('ed-questoes').innerHTML = ed.questoes.length ? ed.questoes.map((q, i) => `
+        <div class="questao" data-q="${i}">
+          <div class="questao-topo">
+            <strong>${i + 1}.</strong>
+            <input data-campo="topico" value="${esc(q.topico)}" placeholder="Tópico (ex.: Verb to be)" style="flex:1;min-width:160px" ${dis}>
+            <select data-campo="dificuldade" style="width:auto" ${dis}>${Object.keys(DIFS).map((d) =>
+              `<option value="${d}" ${q.dificuldade === d ? 'selected' : ''}>${DIFS[d]}</option>`).join('')}</select>
+            <button class="btn mini perigo" data-remover="${i}" ${dis}>Remover</button>
+          </div>
+          <textarea data-campo="texto_apoio" rows="2" placeholder="Texto de apoio (opcional)" ${dis}>${esc(q.texto_apoio)}</textarea>
+          <textarea data-campo="enunciado" rows="2" placeholder="Enunciado" style="margin-top:8px" ${dis}>${esc(q.enunciado)}</textarea>
+          ${q.alternativas.map((a, j) => `
+            <label class="alt" style="font-weight:400">
+              <input type="radio" name="correta-${i}" value="${j}" ${q.correta === j ? 'checked' : ''} ${dis} title="Alternativa correta">
+              <span class="letra">${LETRAS[j]}</span>
+              <input data-alt="${j}" value="${esc(a)}" placeholder="Alternativa ${LETRAS[j]}" ${dis}>
+            </label>`).join('')}
+        </div>`).join('') : '<div class="cartao vazio">Nenhuma questão. Gere com IA, cole um JSON ou adicione manualmente.</div>';
+    }
+
+    $('ed-questoes').addEventListener('input', (ev) => {
+      const card = ev.target.closest('[data-q]');
+      if (!card) return;
+      const q = estado.edicao.questoes[Number(card.dataset.q)];
+      if (ev.target.dataset.campo) q[ev.target.dataset.campo] = ev.target.value;
+      if (ev.target.dataset.alt) q.alternativas[Number(ev.target.dataset.alt)] = ev.target.value;
+    });
+    $('ed-questoes').addEventListener('change', (ev) => {
+      const card = ev.target.closest('[data-q]');
+      if (!card) return;
+      const q = estado.edicao.questoes[Number(card.dataset.q)];
+      if (ev.target.type === 'radio') q.correta = Number(ev.target.value);
+      if (ev.target.dataset.campo) q[ev.target.dataset.campo] = ev.target.value;
+    });
+    $('ed-questoes').addEventListener('click', (ev) => {
+      const i = ev.target.dataset.remover;
+      if (i === undefined) return;
+      if (!confirm(`Remover a questão ${Number(i) + 1}?`)) return;
+      estado.edicao.questoes.splice(Number(i), 1);
+      renderQuestoesEditor();
+    });
+    $('ed-add').addEventListener('click', () => {
+      estado.edicao.questoes.push(normalizarQuestao({}));
+      renderQuestoesEditor();
+      $('ed-questoes').lastElementChild.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    function dadosEditor() {
+      return {
+        id: estado.edicao.id,
+        titulo: $('ed-titulo').value,
+        tipo: $('ed-tipo').value,
+        serie: $('ed-serie').value,
+        mes: $('ed-mes').value,
+        conteudo: $('ed-conteudo').value,
+        questoes: estado.edicao.questoes,
+      };
+    }
+
+    $('ed-salvar').addEventListener('click', (ev) => comBotao(ev.target, async () => {
+      estado.edicao.id = await chamar('profSalvarQuestionario', dadosEditor());
+      await recarregarQuestionarios();
+      avisar('Questionário salvo.');
+    }));
+
+    $('ed-gerar').addEventListener('click', (ev) => {
+      if (!estado.resumo.temChaveApi) {
+        avisar('Cadastre a chave da API em Configurações, ou peça as questões no chat e use "Colar questões".', true);
+        return;
+      }
+      if (estado.edicao.questoes.length && !confirm('Substituir as questões atuais pelas geradas pela IA?')) return;
+      $('ed-ia-status').textContent = 'Gerando… pode levar até 1 minuto.';
+      comBotao(ev.target, async () => {
+        try {
+          const questoes = await chamar('profGerarQuestoesIA', {
+            tipo: $('ed-tipo').value, serie: $('ed-serie').value, conteudo: $('ed-conteudo').value, quantidade: $('ed-qtd').value,
+          });
+          estado.edicao.questoes = questoes.map(normalizarQuestao);
+          renderQuestoesEditor();
+          $('ed-ia-status').textContent = 'Questões geradas. Revise antes de salvar.';
+        } catch (e) {
+          $('ed-ia-status').textContent = '';
+          throw e;
+        }
+      });
+    });
+
+    $('ed-imprimir').addEventListener('click', () => imprimir(dadosEditor(), false));
+
+    // ---------- Resultados ----------
+    async function abrirResultados(id) {
+      estado.resultados = await chamar('profResultados', id);
+      if (!estado.resultados.turmas.includes(estado.turmaRes)) estado.turmaRes = estado.resultados.turmas[0];
+      renderResultados();
+      telaQuestionarios('q-resultados');
+    }
+
+    function renderResultados() {
+      const r = estado.resultados;
+      $('res-titulo').textContent = `${r.questionario.titulo} · ${r.questionario.serie} ano`;
+      $('res-turmas').innerHTML = r.turmas.map((t) => {
+        const alunos = r.alunos.filter((a) => a.turma === t);
+        const feitos = alunos.filter((a) => a.resposta).length;
+        return `<button class="btn ${t === estado.turmaRes ? 'ativa' : ''}" data-turma="${esc(t)}">${esc(t)} <span class="pequeno">${feitos}/${alunos.length}</span></button>`;
+      }).join('');
+      const alunos = r.alunos.filter((a) => a.turma === estado.turmaRes).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      $('res-tabela').innerHTML = alunos.length ? alunos.map((a) => {
+        const x = a.resposta;
+        return `<tr>
+          <td>${esc(a.nome)}</td>
+          <td>${x ? `<span class="selo ${x.origem === 'online' ? 'aberto' : 'rascunho'}">${x.origem === 'online' ? 'Online' : 'Impresso'}</span>` : '<span class="suave pequeno">pendente</span>'}</td>
+          <td>${x ? x.pontuacao + '/' + x.total : ''}</td>
+          <td>${x ? x.percentual + '%' : ''}</td>
+          <td><input class="lanc" data-email="${esc(a.email)}" data-nome="${esc(a.nome)}" placeholder="${x && x.marcadas ? esc(x.marcadas) : 'letras ou nº'}"></td>
+          <td class="acoes">${x ? `<button class="btn mini perigo" data-apagar="${esc(a.email)}">Apagar</button>` : ''}</td>
+        </tr>`;
+      }).join('') : '<tr><td colspan="6" class="vazio">Nenhum aluno cadastrado nesta turma.</td></tr>';
+
+      $('res-questoes').innerHTML = r.porQuestao.map((q) => {
+        const pct = q.respostas ? Math.round((q.acertos / q.respostas) * 100) : null;
+        return `<div class="barra-q">
+          <strong>${q.numero}</strong>
+          <span>${esc(q.topico)}</span>
+          <div class="barra"><i class="${pct !== null && pct < 50 ? 'baixo' : ''}" style="width:${pct || 0}%"></i></div>
+          <span class="suave">${pct === null ? '—' : pct + '%'}</span>
+        </div>`;
+      }).join('') + '<p class="suave pequeno">Considera respostas online e impressas lançadas com letras.</p>';
+    }
+
+    $('res-turmas').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button[data-turma]');
+      if (!b) return;
+      estado.turmaRes = b.dataset.turma;
+      renderResultados();
+    });
+
+    $('res-salvar').addEventListener('click', (ev) => {
+      const lancamentos = [...document.querySelectorAll('#res-tabela input.lanc')]
+        .filter((i) => i.value.trim())
+        .map((i) => ({ email: i.dataset.email, nome: i.dataset.nome, valor: i.value }));
+      if (!lancamentos.length) { avisar('Nada para salvar: preencha a coluna "Lançar impresso".', true); return; }
+      comBotao(ev.target, async () => {
+        estado.resultados = await chamar('profLancarRespostas', estado.resultados.questionario.id, lancamentos);
+        renderResultados();
+        estado.alunos = await chamar('profListarAlunos');
+        renderAlunos();
+        avisar(lancamentos.length + ' lançamento(s) salvo(s).');
+      });
+    });
+
+    $('res-tabela').addEventListener('click', (ev) => {
+      const email = ev.target.dataset.apagar;
+      if (!email) return;
+      if (!confirm('Apagar a resposta deste aluno? Ele poderá responder de novo (online) ou você poderá lançar outra vez.')) return;
+      comBotao(ev.target, async () => {
+        estado.resultados = await chamar('profExcluirResposta', estado.resultados.questionario.id, email);
+        renderResultados();
+        estado.alunos = await chamar('profListarAlunos');
+        renderAlunos();
+      });
+    });
+
+    $('res-imprimir').addEventListener('click', () => imprimir(estado.resultados.questionario, false));
+    $('res-gabarito').addEventListener('click', () => imprimir(estado.resultados.questionario, true));
+
+    // ---------- Impressão ----------
+    function imprimir(q, gabarito) {
+      const nl = (s) => esc(s).replace(/\n/g, '<br>');
+      const titulo = esc(q.titulo || 'Questionário');
+      let html;
+      if (gabarito) {
+        html = `<h2>Gabarito – ${titulo} (${esc(q.serie)} ano)</h2>
+          <table><tr><th>Questão</th>${q.questoes.map((_, i) => `<th>${i + 1}</th>`).join('')}</tr>
+          <tr><th>Resposta</th>${q.questoes.map((x) => `<td><strong>${LETRAS[x.correta]}</strong></td>`).join('')}</tr></table>
+          <p>Sequência para lançar no sistema: <strong style="font-family:monospace">${q.questoes.map((x) => LETRAS[x.correta]).join('')}</strong></p>
+          <ol>${q.questoes.map((x) => `<li>${esc(x.topico)} (${DIFS[x.dificuldade] || ''})</li>`).join('')}</ol>`;
+      } else {
+        html = `<div class="cab">
+            <div><strong>${titulo}</strong> – Língua Inglesa – ${esc(q.serie)} ano</div>
+            <div>Nome: ____________________________________________ Turma: ________ Data: ___/___/______</div>
+          </div>
+          <p><em>Leia com atenção e marque apenas uma alternativa em cada questão.</em></p>
+          ${q.questoes.map((x, i) => `<div class="q">
+            <strong>${i + 1}.</strong>
+            ${x.texto_apoio ? `<div class="apoio">${nl(x.texto_apoio)}</div>` : ''}
+            <div>${nl(x.enunciado)}</div>
+            <ol class="alts">${x.alternativas.map((a) => `<li>${esc(a)}</li>`).join('')}</ol>
+          </div>`).join('')}
+          <div class="quebra">
+            <h3>Folha de respostas – ${titulo}</h3>
+            <p>Nome: ____________________________________________ Turma: ________</p>
+            <table><tr><th>Questão</th>${q.questoes.map((_, i) => `<th>${i + 1}</th>`).join('')}</tr>
+            <tr><th>Resposta</th>${q.questoes.map(() => '<td>&nbsp;&nbsp;&nbsp;</td>').join('')}</tr></table>
+          </div>`;
+      }
+      $('impressao').innerHTML = html;
+      document.body.classList.add('imprimindo');
+      setTimeout(() => {
+        window.print();
+        document.body.classList.remove('imprimindo');
+      }, 50);
+    }
+
+    // ---------- Configurações ----------
+    function renderConfig() {
+      const c = estado.resumo.config;
+      $('cfg-dominio').value = c.dominio;
+      $('cfg-professores').value = c.professores;
+      $('cfg-cadastro').value = c.cadastro_aberto === 'NÃO' ? 'NÃO' : 'SIM';
+      $('cfg-b').value = c.faixa_basico;
+      $('cfg-i').value = c.faixa_intermediario;
+      $('cfg-a').value = c.faixa_avancado;
+      $('api-status').textContent = estado.resumo.temChaveApi ? 'chave configurada ✅' : 'sem chave (use a opção de colar questões)';
+    }
+
+    $('form-config').addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      comBotao(ev.submitter, async () => {
+        estado.resumo = await chamar('profSalvarConfig', {
+          dominio: $('cfg-dominio').value,
+          professores: $('cfg-professores').value,
+          cadastro_aberto: $('cfg-cadastro').value,
+          faixa_basico: $('cfg-b').value,
+          faixa_intermediario: $('cfg-i').value,
+          faixa_avancado: $('cfg-a').value,
+        });
+        estado.alunos = await chamar('profListarAlunos');
+        renderTudo();
+        avisar('Configurações salvas.');
+      });
+    });
+
+    async function salvarChave(botao, chave) {
+      await comBotao(botao, async () => {
+        estado.resumo.temChaveApi = await chamar('profSalvarChaveApi', chave);
+        $('api-chave').value = '';
+        renderConfig();
+        avisar(estado.resumo.temChaveApi ? 'Chave salva.' : 'Chave removida.');
+      });
+    }
+    $('form-api').addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      if (!$('api-chave').value.trim()) { avisar('Cole a chave antes de salvar.', true); return; }
+      salvarChave(ev.submitter, $('api-chave').value);
+    });
+    $('api-remover').addEventListener('click', (ev) => {
+      if (confirm('Remover a chave da API?')) salvarChave(ev.target, '');
+    });
+
+    // ---------- Inicialização ----------
+    async function atualizarResumo() {
+      estado.resumo = await chamar('profResumo');
+      renderTurmas();
+      renderAlunos();
+    }
+
+    function renderTudo() {
+      renderTurmas();
+      renderAlunos();
+      renderConfig();
+      renderQuestionarios();
+    }
+
+    (async function iniciar() {
+      try {
+        const [resumo, alunos, questionarios] = await Promise.all([
+          chamar('profResumo'), chamar('profListarAlunos'), chamar('profListarQuestionarios'),
+        ]);
+        Object.assign(estado, { resumo, alunos, questionarios });
+        $('filtro-turma').innerHTML = opcoesTurma(true);
+        $('al-turma').innerHTML = opcoesTurma(false);
+        $('q-filtro-serie').innerHTML = opcoesSerie(true);
+        $('ed-serie').innerHTML = opcoesSerie(false);
+        renderTudo();
+        configurarGrupos();
+        configurarRelatorios();
+        $('carregando').hidden = true;
+        abrirAba('turmas');
+      } catch (e) {
+        $('carregando').textContent = 'Erro ao carregar: ' + e.message;
+      }
+    })();
+  </script>
+</body>
+</html>

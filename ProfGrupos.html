@@ -1,0 +1,279 @@
+<!-- Etapa 3: aba Grupos do painel do professor (incluída em Professor.html) -->
+<style>
+  .grupos-grade { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .grupo-card h3 { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .grupo-card.excedido { border-color: var(--perigo); }
+  .membro { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--borda); font-size: .9rem; }
+  .membro .nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .membro select { width: auto; padding: 3px 6px; font-size: .8rem; }
+  .composicao { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+  .info-grupos { background: var(--primaria-clara); border-radius: 8px; padding: 10px 12px; }
+</style>
+
+<section id="aba-grupos" hidden>
+  <!-- Visão geral do mês -->
+  <div id="gr-geral" class="pilha">
+    <div class="linha">
+      <h2 style="margin:0">Grupos do mês</h2>
+      <input id="gr-mes" type="month" style="width:auto">
+      <span class="espaco"></span>
+      <span class="suave pequeno">Os alunos veem sempre os grupos mais recentes da turma.</span>
+    </div>
+    <div class="cartao tabela-rolagem">
+      <table>
+        <thead><tr><th>Turma</th><th>Alunos</th><th>Avaliados</th><th>Situação no mês</th><th></th></tr></thead>
+        <tbody id="gr-tabela"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Turma -->
+  <div id="gr-turma" class="pilha" hidden>
+    <div class="linha">
+      <button class="btn" id="gr-voltar">← Voltar</button>
+      <h2 style="margin:0" id="gr-titulo"></h2>
+      <span class="espaco"></span>
+      <button class="btn" id="gr-imprimir">Imprimir grupos</button>
+    </div>
+    <div class="info-grupos pequeno" id="gr-info"></div>
+    <div class="linha">
+      <button class="btn" id="gr-sugerir">✨ Gerar sugestão</button>
+      <button class="btn" id="gr-manter">Manter grupos atuais neste mês</button>
+      <span class="espaco"></span>
+      <span class="suave pequeno" id="gr-estado"></span>
+      <button class="btn primario" id="gr-aplicar">Aplicar grupos</button>
+    </div>
+    <div id="gr-grupos" class="grupos-grade"></div>
+    <div class="cartao" id="gr-fora-box">
+      <h3>Fora dos grupos</h3>
+      <p class="suave pequeno" style="margin-top:0">Alunos sem nenhuma avaliação aguardam o teste. Alunos já avaliados que ainda não estão em um grupo também aparecem aqui — use "Mover para…" para encaixá-los.</p>
+      <div id="gr-fora"></div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Estado da aba: dados da turma aberta e o rascunho de grupos (lista de listas de e-mails).
+  const gr = { resumo: [], turma: null, rascunho: [], alterado: false };
+  const ABREV = { 'Iniciante': 'Ini', 'Básico': 'Bás', 'Intermediário': 'Int', 'Avançado': 'Av' };
+
+  function mesHoje() { return new Date().toISOString().slice(0, 7); }
+
+  function configurarGrupos() {
+    $('gr-mes').value = mesHoje();
+    $('gr-mes').addEventListener('change', carregarResumoGrupos);
+    document.querySelector('.abas button[data-aba="grupos"]').addEventListener('click', () => {
+      if (!$('gr-geral').hidden) carregarResumoGrupos();
+    });
+    $('gr-tabela').addEventListener('click', (ev) => {
+      const t = ev.target.dataset.abrirTurma;
+      if (t) comBotao(ev.target, () => abrirTurmaGrupos(t));
+    });
+    $('gr-voltar').addEventListener('click', () => {
+      if (gr.alterado && !confirm('Sair sem aplicar? As mudanças deste rascunho serão perdidas.')) return;
+      $('gr-turma').hidden = true;
+      $('gr-geral').hidden = false;
+      carregarResumoGrupos();
+    });
+    $('gr-sugerir').addEventListener('click', () => {
+      if (gr.alterado && !confirm('Descartar o rascunho atual e gerar outra sugestão?')) return;
+      gr.rascunho = sugerirGrupos(gr.turma.alunos, gr.turma.maxGrupo);
+      gr.alterado = true;
+      renderTurmaGrupos();
+    });
+    $('gr-manter').addEventListener('click', (ev) => {
+      if (!confirm(`Manter os grupos de ${gr.turma.mesVigente} também em ${gr.turma.mes}?`)) return;
+      comBotao(ev.target, async () => {
+        const vigentes = gr.turma.grupos.map((g) => g.membros);
+        gr.turma = await chamar('profSalvarGrupos', gr.turma.turma, gr.turma.mes, vigentes);
+        carregarRascunho();
+        avisar('Grupos mantidos para este mês.');
+      });
+    });
+    $('gr-aplicar').addEventListener('click', (ev) => {
+      const problema = validarRascunho();
+      if (problema) { avisar(problema, true); return; }
+      comBotao(ev.target, async () => {
+        gr.turma = await chamar('profSalvarGrupos', gr.turma.turma, gr.turma.mes, gr.rascunho);
+        carregarRascunho();
+        avisar('Grupos aplicados. Os alunos já veem o novo grupo.');
+      });
+    });
+    $('gr-imprimir').addEventListener('click', imprimirGrupos);
+    $('gr-grupos').addEventListener('change', moverAluno);
+    $('gr-fora').addEventListener('change', moverAluno);
+  }
+
+  // ---------- Visão geral ----------
+  async function carregarResumoGrupos() {
+    $('gr-tabela').innerHTML = '<tr><td colspan="5" class="carregando">Carregando…</td></tr>';
+    try {
+      gr.resumo = await chamar('profGruposResumo', $('gr-mes').value || mesHoje());
+    } catch (e) {
+      $('gr-tabela').innerHTML = `<tr><td colspan="5" class="vazio" style="color:var(--perigo)">Erro ao carregar: ${esc(e.message)}</td></tr>`;
+      return;
+    }
+    $('gr-tabela').innerHTML = gr.resumo.map((t) => {
+      const situacao = t.definido
+        ? `<span class="selo aberto">Definido</span> <span class="suave pequeno">${esc(t.aplicado_em)}</span>`
+        : t.ultimoMes
+          ? `<span class="selo rascunho">Pendente</span> <span class="suave pequeno">em vigor: grupos de ${esc(t.ultimoMes)}</span>`
+          : '<span class="selo encerrado">Sem grupos</span>';
+      return `<tr>
+        <td><strong>${esc(t.turma)}</strong></td>
+        <td>${t.alunos}</td>
+        <td>${t.avaliados}${t.alunos > t.avaliados ? ` <span class="suave pequeno">(${t.alunos - t.avaliados} aguardando)</span>` : ''}</td>
+        <td>${situacao}</td>
+        <td class="acoes"><button class="btn mini" data-abrir-turma="${esc(t.turma)}">Abrir</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ---------- Turma ----------
+  async function abrirTurmaGrupos(turma) {
+    gr.turma = await chamar('profGruposTurma', turma, $('gr-mes').value || mesHoje());
+    carregarRascunho();
+    $('gr-geral').hidden = true;
+    $('gr-turma').hidden = false;
+    window.scrollTo(0, 0);
+  }
+
+  function carregarRascunho() {
+    gr.rascunho = gr.turma.grupos.map((g) => g.membros.slice());
+    gr.alterado = false;
+    renderTurmaGrupos();
+  }
+
+  function alunoPorEmail(email) { return gr.turma.alunos.find((a) => a.email === email); }
+
+  function mediaGrupo(emails) {
+    const medias = emails.map((e) => alunoPorEmail(e)).filter((a) => a && a.media != null).map((a) => a.media);
+    return medias.length ? Math.round((medias.reduce((s, m) => s + m, 0) / medias.length) * 10) / 10 : null;
+  }
+
+  function validarRascunho() {
+    const grupos = gr.rascunho.filter((g) => g.length);
+    if (!grupos.length) return 'Não há grupos para aplicar. Clique em "Gerar sugestão".';
+    const grande = grupos.findIndex((g) => g.length > gr.turma.maxGrupo);
+    if (grande !== -1) return `O grupo ${grande + 1} passou do limite de ${gr.turma.maxGrupo} alunos.`;
+    return '';
+  }
+
+  function renderTurmaGrupos() {
+    const t = gr.turma;
+    gr.rascunho = gr.rascunho.filter((g) => g.length);
+    $('gr-titulo').textContent = `Grupos – ${t.turma} · ${t.mes}`;
+    $('gr-info').innerHTML = t.definidoNoMes
+      ? `Grupos <strong>definidos para ${esc(t.mes)}</strong>. Você pode gerar uma nova sugestão ou ajustar e aplicar de novo.`
+      : t.mesVigente
+        ? `Ainda não há decisão para ${esc(t.mes)}. Em vigor: <strong>grupos de ${esc(t.mesVigente)}</strong>. Escolha <em>Manter grupos atuais</em> ou gere e aplique novos grupos.`
+        : 'Esta turma ainda não tem grupos. Clique em <strong>Gerar sugestão</strong>.';
+    $('gr-manter').hidden = !t.mesVigente || t.definidoNoMes;
+    $('gr-estado').textContent = gr.alterado ? 'Rascunho não aplicado' : '';
+
+    const opcoes = (atual) => `<select data-mover><option value="">Mover para…</option>${gr.rascunho.map((_, i) =>
+      i === atual ? '' : `<option value="${i}">Grupo ${i + 1}</option>`).join('')}<option value="novo">Novo grupo</option>${atual === -1 ? '' : '<option value="fora">Fora dos grupos</option>'}</select>`;
+
+    const linhaAluno = (email, grupo) => {
+      const a = alunoPorEmail(email);
+      if (!a) return '';
+      return `<div class="membro" data-email="${esc(email)}">
+        <span class="nome" title="${esc(a.nome)}">${esc(a.nome)}</span>
+        ${a.nivel ? `<span class="selo ${esc(a.nivel)}">${ABREV[a.nivel] || esc(a.nivel)}</span>` : '<span class="selo">sem teste</span>'}
+        <span class="suave pequeno">${a.media != null ? a.media + '%' : ''}</span>
+        ${opcoes(grupo)}
+      </div>`;
+    };
+
+    $('gr-grupos').innerHTML = gr.rascunho.length ? gr.rascunho.map((g, i) => {
+      const comp = {};
+      g.forEach((e) => { const a = alunoPorEmail(e); const n = a && a.nivel ? a.nivel : 'sem teste'; comp[n] = (comp[n] || 0) + 1; });
+      const media = mediaGrupo(g);
+      return `<div class="cartao grupo-card ${g.length > t.maxGrupo ? 'excedido' : ''}">
+        <h3>Grupo ${i + 1} <span class="suave pequeno">${g.length}/${t.maxGrupo}</span><span class="espaco"></span>
+          <span class="pequeno">${media != null ? 'média ' + media + '%' : ''}</span></h3>
+        <div class="composicao">${Object.keys(comp).map((n) => `<span class="selo ${esc(n)}">${comp[n]} ${ABREV[n] || esc(n)}</span>`).join('')}</div>
+        ${g.map((e) => linhaAluno(e, i)).join('')}
+      </div>`;
+    }).join('') : '<div class="cartao vazio">Nenhum grupo ainda.</div>';
+
+    const dentro = new Set(gr.rascunho.flat());
+    const fora = t.alunos.filter((a) => !dentro.has(a.email))
+      .sort((a, b) => (a.media == null) - (b.media == null) || a.nome.localeCompare(b.nome, 'pt-BR'));
+    $('gr-fora-box').hidden = !fora.length;
+    $('gr-fora').innerHTML = fora.map((a) => linhaAluno(a.email, -1)).join('');
+  }
+
+  function moverAluno(ev) {
+    if (!ev.target.matches('select[data-mover]') || !ev.target.value) return;
+    const email = ev.target.closest('[data-email]').dataset.email;
+    const destino = ev.target.value;
+    gr.rascunho = gr.rascunho.map((g) => g.filter((e) => e !== email));
+    if (destino === 'novo') gr.rascunho.push([email]);
+    else if (destino !== 'fora') gr.rascunho[Number(destino)].push(email);
+    gr.alterado = true;
+    renderTurmaGrupos();
+  }
+
+  // ---------- Sugestão: serpentina + equilíbrio ----------
+  /**
+   * 1. Ordena os alunos avaliados pela média (com pequena variação aleatória para gerar sugestões diferentes).
+   * 2. Distribui em serpentina (1→N, N→1, …): cada grupo recebe alunos de todas as faixas.
+   * 3. Troca alunos do MESMO nível entre grupos enquanto isso aproximar as médias dos grupos.
+   *    Trocar só dentro do mesmo nível preserva a mistura de níveis criada pela serpentina.
+   */
+  function sugerirGrupos(alunos, max) {
+    const avaliados = alunos.filter((a) => a.media != null)
+      .map((a) => ({ ...a, chave: a.media + (Math.random() - 0.5) * 6 }))
+      .sort((a, b) => b.chave - a.chave);
+    if (!avaliados.length) { avisar('Nenhum aluno desta turma foi avaliado ainda.', true); return []; }
+
+    const n = Math.ceil(avaliados.length / max);
+    const ordemGrupos = [...Array(n).keys()].sort(() => Math.random() - 0.5);
+    const grupos = Array.from({ length: n }, () => []);
+    avaliados.forEach((a, i) => {
+      const volta = Math.floor(i / n);
+      const pos = i % n;
+      grupos[ordemGrupos[volta % 2 === 0 ? pos : n - 1 - pos]].push(a);
+    });
+
+    const media = (g) => g.reduce((s, a) => s + a.media, 0) / g.length;
+    const dispersao = () => {
+      const ms = grupos.map(media);
+      const m = ms.reduce((s, x) => s + x, 0) / ms.length;
+      return ms.reduce((s, x) => s + (x - m) ** 2, 0);
+    };
+    for (let iter = 0; iter < 300; iter++) {
+      let melhor = null;
+      let atual = dispersao();
+      for (let g1 = 0; g1 < n; g1++) for (let g2 = g1 + 1; g2 < n; g2++) {
+        for (let i = 0; i < grupos[g1].length; i++) for (let j = 0; j < grupos[g2].length; j++) {
+          const a = grupos[g1][i], b = grupos[g2][j];
+          if (a.nivel !== b.nivel || a.media === b.media) continue;
+          grupos[g1][i] = b; grupos[g2][j] = a;
+          const d = dispersao();
+          grupos[g1][i] = a; grupos[g2][j] = b;
+          if (d < atual - 1e-9) { atual = d; melhor = [g1, i, g2, j]; }
+        }
+      }
+      if (!melhor) break;
+      const [g1, i, g2, j] = melhor;
+      [grupos[g1][i], grupos[g2][j]] = [grupos[g2][j], grupos[g1][i]];
+    }
+    return grupos.map((g) => g.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((a) => a.email));
+  }
+
+  // ---------- Impressão (só nomes, sem níveis) ----------
+  function imprimirGrupos() {
+    const grupos = gr.rascunho.filter((g) => g.length);
+    if (!grupos.length) { avisar('Não há grupos para imprimir.', true); return; }
+    $('impressao').innerHTML = `<h2>Grupos – ${esc(gr.turma.turma)} – ${esc(gr.turma.mes)}</h2>
+      <div style="columns:2;column-gap:32px">${grupos.map((g, i) => `
+        <div class="q"><strong>Grupo ${i + 1}</strong><ol style="margin:4px 0 0 20px">${g.map((e) => {
+          const a = alunoPorEmail(e);
+          return `<li>${esc(a ? a.nome : e)}</li>`;
+        }).join('')}</ol></div>`).join('')}</div>`;
+    document.body.classList.add('imprimindo');
+    setTimeout(() => { window.print(); document.body.classList.remove('imprimindo'); }, 50);
+  }
+</script>

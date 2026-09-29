@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <?!= incluir('Estilo'); ?>
+  <style>
+    main { max-width: 640px; }
+    .ola { font-size: 1.5rem; }
+    .colega { padding: 10px 12px; border-radius: 8px; background: var(--fundo); margin-top: 8px; }
+    .colega.eu { background: var(--primaria-clara); font-weight: 600; }
+    .pendente { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--borda); border-radius: 10px; margin-top: 8px; }
+    .questao { padding: 18px; }
+    .questao .num { color: var(--primaria); font-weight: 700; }
+    .apoio { background: var(--fundo); border-left: 3px solid var(--primaria); padding: 10px 12px; border-radius: 6px; margin: 10px 0; white-space: pre-wrap; font-style: italic; }
+    .enunciado { white-space: pre-wrap; margin: 8px 0 10px; }
+    .opcao { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--borda); border-radius: 8px; margin-top: 8px; cursor: pointer; font-weight: 400; }
+    .opcao input { width: auto; margin-top: 4px; }
+    .opcao:has(input:checked) { border-color: var(--primaria); background: var(--primaria-clara); }
+    .progresso { position: sticky; top: 0; background: var(--fundo); padding: 10px 0; z-index: 2; }
+  </style>
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">Grupos de Inglês</div>
+    <div class="suave pequeno"><?= email ?></div>
+  </header>
+
+  <main>
+    <div id="carregando" class="carregando">Carregando…</div>
+    <div id="erro" class="cartao" hidden></div>
+
+    <!-- Cadastro -->
+    <form id="cadastro" class="cartao" hidden>
+      <h1 class="ola">Welcome! 👋</h1>
+      <p class="suave">Este é o seu primeiro acesso. Informe seu nome completo e sua turma.</p>
+      <div class="campo"><label for="nome">Nome completo</label><input id="nome" autocomplete="name" required></div>
+      <div class="campo"><label for="turma">Turma</label><select id="turma" required></select></div>
+      <div class="rodape-modal"><button class="btn primario" type="submit">Continuar</button></div>
+    </form>
+
+    <div id="fechado" class="cartao" hidden>
+      <h1 class="ola">Hello! 👋</h1>
+      <p>O cadastro de novos alunos está fechado no momento. Fale com o seu professor.</p>
+    </div>
+
+    <!-- Painel do aluno -->
+    <div id="painel" class="pilha" hidden>
+      <div class="cartao">
+        <h1 class="ola">Hello, <span id="primeiro-nome"></span>! 👋</h1>
+        <p class="suave" style="margin:0"><span id="nome-completo"></span> · Turma <strong id="minha-turma"></strong></p>
+      </div>
+      <div class="cartao">
+        <h2>Questionários</h2>
+        <div id="pendentes"></div>
+      </div>
+      <div class="cartao">
+        <h2>Meu grupo</h2>
+        <div id="meu-grupo"></div>
+      </div>
+      <p class="suave pequeno" style="text-align:center">Algum dado errado? Avise o professor para corrigir.</p>
+    </div>
+
+    <!-- Respondendo -->
+    <form id="quiz" class="pilha" hidden>
+      <div class="progresso linha">
+        <button class="btn" type="button" id="sair">← Voltar</button>
+        <strong id="quiz-titulo" style="flex:1"></strong>
+        <span class="suave" id="quiz-progresso"></span>
+      </div>
+      <div id="quiz-questoes" class="pilha"></div>
+      <div class="rodape-modal"><button class="btn primario" type="submit" id="enviar">Enviar respostas</button></div>
+    </form>
+
+    <div id="enviado" class="cartao" hidden style="text-align:center">
+      <h1 class="ola">Great job! ✅</h1>
+      <p>Suas respostas foram enviadas.</p>
+      <button class="btn primario" id="voltar-inicio">Voltar ao início</button>
+    </div>
+  </main>
+
+  <dialog id="confirmar">
+    <h2>Confira seus dados</h2>
+    <p>Nome: <strong id="conf-nome"></strong><br>Turma: <strong id="conf-turma"></strong></p>
+    <p class="suave pequeno">Depois de confirmar, só o professor poderá alterar.</p>
+    <div class="rodape-modal">
+      <button class="btn" id="voltar">Corrigir</button>
+      <button class="btn primario" id="confirmar-btn">Confirmar</button>
+    </div>
+  </dialog>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const LETRAS = ['A', 'B', 'C', 'D', 'E'];
+    let estadoAtual = null;
+    let quizAtual = null;
+
+    function chamar(fn, ...args) {
+      return new Promise((ok, falha) => google.script.run.withSuccessHandler(ok).withFailureHandler(falha)[fn](...args));
+    }
+
+    function mostrar(id) {
+      ['carregando', 'erro', 'cadastro', 'fechado', 'painel', 'quiz', 'enviado'].forEach((x) => ($(x).hidden = x !== id));
+      window.scrollTo(0, 0);
+    }
+
+    function mostrarErro(msg) {
+      $('erro').innerHTML = `<h2>Ops!</h2><p>${esc(msg)}</p>`;
+      mostrar('erro');
+    }
+
+    function render(estado) {
+      estadoAtual = estado;
+      if (!estado.aluno) {
+        const series = [...new Set(estado.turmas.map((t) => t.serie))];
+        $('turma').innerHTML = '<option value="">Selecione…</option>' + series.map((s) =>
+          `<optgroup label="${esc(s)} ano">${estado.turmas.filter((t) => t.serie === s)
+            .map((t) => `<option value="${esc(t.turma)}">${esc(t.turma)}</option>`).join('')}</optgroup>`).join('');
+        mostrar(estado.cadastroAberto ? 'cadastro' : 'fechado');
+        return;
+      }
+
+      $('primeiro-nome').textContent = estado.aluno.nome.split(' ')[0];
+      $('nome-completo').textContent = estado.aluno.nome;
+      $('minha-turma').textContent = estado.aluno.turma;
+
+      $('pendentes').innerHTML = estado.questionarios.length
+        ? estado.questionarios.map((q) => `
+            <div class="pendente">
+              <div style="flex:1"><strong>${esc(q.titulo)}</strong><div class="suave pequeno">${q.total} questões</div></div>
+              <button class="btn primario" data-abrir="${esc(q.id)}">Responder</button>
+            </div>`).join('')
+        : '<p class="vazio" style="padding:8px 0">Nenhum questionário pendente. 🎉</p>';
+
+      const g = estado.grupo;
+      $('meu-grupo').innerHTML = g
+        ? `<p class="suave pequeno">Grupo ${esc(g.grupo)}</p>${g.colegas.map((n) =>
+            `<div class="colega ${n === estado.aluno.nome ? 'eu' : ''}">${esc(n)}</div>`).join('')}`
+        : '<p class="vazio" style="padding:8px 0">Os grupos ainda não foram formados.</p>';
+      mostrar('painel');
+    }
+
+    // ---------- Cadastro ----------
+    $('cadastro').addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      $('conf-nome').textContent = $('nome').value.trim().replace(/\s+/g, ' ');
+      $('conf-turma').textContent = $('turma').value;
+      $('confirmar').showModal();
+    });
+    $('voltar').addEventListener('click', () => $('confirmar').close());
+    $('confirmar-btn').addEventListener('click', async () => {
+      const botao = $('confirmar-btn');
+      botao.disabled = true;
+      try {
+        const estado = await chamar('alunoCadastrar', $('nome').value, $('turma').value);
+        $('confirmar').close();
+        render(estado);
+      } catch (e) {
+        $('confirmar').close();
+        alert(e.message);
+      } finally { botao.disabled = false; }
+    });
+
+    // ---------- Questionário ----------
+    $('pendentes').addEventListener('click', async (ev) => {
+      const id = ev.target.dataset.abrir;
+      if (!id) return;
+      ev.target.disabled = true;
+      try {
+        quizAtual = await chamar('alunoAbrirQuestionario', id);
+        renderQuiz();
+      } catch (e) {
+        alert(e.message);
+      } finally { ev.target.disabled = false; }
+    });
+
+    function renderQuiz() {
+      $('quiz-titulo').textContent = quizAtual.titulo;
+      $('quiz-questoes').innerHTML = quizAtual.questoes.map((q, i) => `
+        <div class="cartao questao">
+          <span class="num">Questão ${i + 1}</span>
+          ${q.texto_apoio ? `<div class="apoio">${esc(q.texto_apoio)}</div>` : ''}
+          <div class="enunciado">${esc(q.enunciado)}</div>
+          ${q.alternativas.map((a, j) => `
+            <label class="opcao"><input type="radio" name="q${i}" value="${j}"><span><strong>${LETRAS[j]})</strong> ${esc(a)}</span></label>`).join('')}
+        </div>`).join('');
+      atualizarProgresso();
+      mostrar('quiz');
+    }
+
+    function marcadas() {
+      return quizAtual.questoes.map((_, i) => {
+        const el = document.querySelector(`input[name="q${i}"]:checked`);
+        return el ? Number(el.value) : null;
+      });
+    }
+
+    function atualizarProgresso() {
+      const feitas = marcadas().filter((m) => m !== null).length;
+      $('quiz-progresso').textContent = `${feitas}/${quizAtual.questoes.length}`;
+    }
+    $('quiz-questoes').addEventListener('change', atualizarProgresso);
+
+    $('sair').addEventListener('click', () => {
+      if (confirm('Sair sem enviar? Suas marcações serão perdidas.')) render(estadoAtual);
+    });
+
+    $('quiz').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const m = marcadas();
+      const faltando = m.map((x, i) => (x === null ? i + 1 : null)).filter(Boolean);
+      if (faltando.length) {
+        alert('Responda todas as questões. Faltam: ' + faltando.join(', '));
+        document.querySelector(`input[name="q${faltando[0] - 1}"]`).closest('.questao').scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+      if (!confirm('Enviar as respostas? Depois de enviar não será possível alterar.')) return;
+      $('enviar').disabled = true;
+      try {
+        estadoAtual = await chamar('alunoResponder', quizAtual.id, m);
+        quizAtual = null;
+        mostrar('enviado');
+      } catch (e) {
+        alert(e.message);
+      } finally { $('enviar').disabled = false; }
+    });
+
+    $('voltar-inicio').addEventListener('click', () => render(estadoAtual));
+
+    chamar('alunoObterEstado').then(render).catch((e) => mostrarErro(e.message));
+  </script>
+</body>
+</html>
