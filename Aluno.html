@@ -18,6 +18,19 @@
     .opcao input { width: auto; margin-top: 4px; }
     .opcao:has(input:checked) { border-color: var(--primaria); background: var(--primaria-clara); }
     .progresso { position: sticky; top: 0; background: var(--fundo); padding: 10px 0; z-index: 2; }
+    .selo { display: inline-block; font-size: .78rem; font-weight: 600; padding: 2px 9px; border-radius: 99px; white-space: nowrap; }
+    .selo.pendente-s { background: #fff3bf; color: #a05a00; }
+    .selo.enviada { background: #d0ebff; color: #1864ab; }
+    .selo.corrigida { background: #d3f9d8; color: #2b8a3e; }
+    .secao-tda h3 { margin: 14px 0 4px; color: #1a7a5e; }
+    .secao-tda p, .secao-tda li { white-space: pre-wrap; }
+    .nota-tda { font-size: 2rem; font-weight: 700; color: var(--primaria); }
+    .rub { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .rub th, .rub td { border: 1px solid var(--borda); padding: 6px; vertical-align: top; text-align: left; }
+    .rub td.minha { background: var(--primaria-clara); outline: 3px solid var(--primaria); outline-offset: -3px; font-weight: 600; }
+    .feedback { background: #fff9db; border-left: 4px solid #fab005; border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; }
+    .anexo-atual { display: flex; gap: 8px; align-items: center; font-size: .9rem; margin-top: 4px; }
+    .anexo-atual input { width: auto; }
   </style>
 </head>
 <body>
@@ -55,6 +68,10 @@
         <div id="pendentes"></div>
       </div>
       <div class="cartao">
+        <h2>Tarefas (TDA)</h2>
+        <div id="tdas"></div>
+      </div>
+      <div class="cartao">
         <h2>Meu grupo</h2>
         <div id="meu-grupo"></div>
       </div>
@@ -71,6 +88,30 @@
       <div id="quiz-questoes" class="pilha"></div>
       <div class="rodape-modal"><button class="btn primario" type="submit" id="enviar">Enviar respostas</button></div>
     </form>
+
+    <!-- TDA -->
+    <div id="tda-view" class="pilha" hidden>
+      <div class="linha">
+        <button class="btn" type="button" id="tda-voltar">← Voltar</button>
+        <strong id="tda-titulo" style="flex:1"></strong>
+      </div>
+      <div id="tda-correcao"></div>
+      <div class="cartao secao-tda" id="tda-conteudo"></div>
+      <div id="tda-entrega-atual"></div>
+      <form id="tda-form" class="cartao" hidden>
+        <h2 id="tda-form-titulo">Minha entrega</h2>
+        <p class="suave pequeno" id="tda-form-ajuda"></p>
+        <div class="campo"><label for="tda-texto">Texto</label>
+          <textarea id="tda-texto" rows="8" placeholder="Write your text here…"></textarea></div>
+        <div class="campo"><label for="tda-link">Link (Canva, Padlet, Google Docs…)</label>
+          <input id="tda-link" type="url" placeholder="https://…"></div>
+        <div class="campo"><label for="tda-arquivos">Anexos (foto, PDF, Word, PowerPoint – até 3, máx. 10 MB cada)</label>
+          <div id="tda-anexos-atuais"></div>
+          <input id="tda-arquivos" type="file" multiple accept="image/*,.pdf,.doc,.docx,.ppt,.pptx"></div>
+        <div class="rodape-modal"><span class="suave pequeno" id="tda-status" style="flex:1"></span>
+          <button class="btn primario" type="submit" id="tda-enviar">Enviar</button></div>
+      </form>
+    </div>
 
     <div id="enviado" class="cartao" hidden style="text-align:center">
       <h1 class="ola">Great job! ✅</h1>
@@ -101,7 +142,7 @@
     }
 
     function mostrar(id) {
-      ['carregando', 'erro', 'cadastro', 'fechado', 'painel', 'quiz', 'enviado'].forEach((x) => ($(x).hidden = x !== id));
+      ['carregando', 'erro', 'cadastro', 'fechado', 'painel', 'quiz', 'enviado', 'tda-view'].forEach((x) => ($(x).hidden = x !== id));
       window.scrollTo(0, 0);
     }
 
@@ -132,6 +173,17 @@
               <button class="btn primario" data-abrir="${esc(q.id)}">Responder</button>
             </div>`).join('')
         : '<p class="vazio" style="padding:8px 0">Nenhum questionário pendente. 🎉</p>';
+
+      const SIT = { pendente: ['pendente-s', 'Pendente'], enviada: ['enviada', 'Enviada'], corrigida: ['corrigida', 'Corrigida'] };
+      $('tdas').innerHTML = (estado.tdas || []).length
+        ? estado.tdas.map((t) => `
+            <div class="pendente">
+              <div style="flex:1"><strong>${esc(t.titulo)}</strong>
+                <div class="suave pequeno">${t.modo === 'grupo' ? 'Em grupo' : 'Individual'}${t.nota != null ? ' · nota ' + t.nota + '%' : ''}</div></div>
+              <span class="selo ${SIT[t.situacao][0]}">${SIT[t.situacao][1]}</span>
+              <button class="btn ${t.situacao === 'pendente' ? 'primario' : ''}" data-tda="${esc(t.id)}">${t.situacao === 'pendente' ? 'Fazer' : 'Abrir'}</button>
+            </div>`).join('')
+        : '<p class="vazio" style="padding:8px 0">Nenhuma TDA no momento.</p>';
 
       const g = estado.grupo;
       $('meu-grupo').innerHTML = g
@@ -227,6 +279,135 @@
     });
 
     $('voltar-inicio').addEventListener('click', () => render(estadoAtual));
+
+    // ---------- TDA ----------
+    let tdaAtual = null;
+
+    $('tdas').addEventListener('click', async (ev) => {
+      const id = ev.target.dataset.tda;
+      if (!id) return;
+      ev.target.disabled = true;
+      try {
+        renderTda(await chamar('alunoAbrirTda', id));
+      } catch (e) {
+        alert(e.message);
+      } finally { ev.target.disabled = false; }
+    });
+
+    $('tda-voltar').addEventListener('click', async () => {
+      mostrar('carregando');
+      try { render(await chamar('alunoObterEstado')); } catch (e) { mostrarErro(e.message); }
+    });
+
+    function renderTda(t) {
+      tdaAtual = t;
+      $('tda-titulo').textContent = t.titulo;
+      const lista = (itens, tag) => `<${tag}>${itens.map((i) => `<li>${esc(i)}</li>`).join('')}</${tag}>`;
+      $('tda-conteudo').innerHTML = `
+        ${t.modo === 'grupo' ? `<p class="suave pequeno">👥 Atividade em grupo${t.grupo ? ' — Grupo ' + esc(t.grupo.numero) + ': ' + t.grupo.nomes.map(esc).join(', ') : ' (seu grupo ainda não foi formado: sua entrega será individual)'}</p>` : ''}
+        <h3>🌍 Situação-problema</h3><p>${esc(t.situacao)}</p>
+        <h3>🎯 Produto final</h3><p>${esc(t.produto)}</p>
+        ${t.tarefas.length ? `<h3>📝 Tarefas de apoio</h3>${lista(t.tarefas, 'ol')}` : ''}
+        ${t.criterios.length ? `<h3>✅ Critérios de avaliação</h3>${lista(t.criterios, 'ul')}` : ''}`;
+
+      // Correção: nota, comentário e a rubrica com o nível recebido em cada critério.
+      const c = t.correcao;
+      $('tda-correcao').innerHTML = c ? `
+        <div class="cartao">
+          <h2>Correção do professor</h2>
+          <div class="nota-tda">${c.percentual}%</div>
+          <p class="suave pequeno" style="margin-top:0">${c.pontuacao} de ${c.total} pontos</p>
+          ${c.comentario ? `<div class="feedback">💬 ${esc(c.comentario)}</div>` : ''}
+          <div class="tabela-rolagem" style="margin-top:12px"><table class="rub">
+            <tr><th>Critério</th><th>4 – Excelente</th><th>3 – Satisfatório</th><th>2 – Em desenvolvimento</th><th>1 – Insuficiente</th></tr>
+            ${t.rubrica.map((r, i) => `<tr><td><strong>${esc(r.criterio)}</strong></td>${[4, 3, 2, 1].map((n) =>
+              `<td class="${c.niveis[i] === n ? 'minha' : ''}">${esc(r['n' + n])}</td>`).join('')}</tr>`).join('')}
+          </table></div>
+          <p class="suave pequeno">O quadro destacado mostra o nível que você alcançou em cada critério.</p>
+        </div>` : '';
+
+      const e = t.entrega;
+      const podeEditar = t.aberta && !c;
+      $('tda-entrega-atual').innerHTML = e && !podeEditar ? `
+        <div class="cartao"><h2>${t.modo === 'grupo' && e.grupo != null ? 'Entrega do grupo' : 'Minha entrega'}</h2>
+          <p class="suave pequeno">Enviada por ${esc(e.enviadoPor)} · ${esc(e.atualizado_em)}</p>
+          ${e.texto ? `<div class="apoio" style="font-style:normal">${esc(e.texto)}</div>` : ''}
+          ${e.link ? `<p>🔗 <a href="${esc(e.link)}" target="_blank" rel="noopener">${esc(e.link)}</a></p>` : ''}
+          ${e.anexos.map((a) => `<p>📎 ${esc(a.nome)}</p>`).join('')}
+        </div>` : (!e && !podeEditar && !c ? '<div class="cartao suave">Esta TDA não está mais recebendo entregas.</div>' : '');
+
+      $('tda-form').hidden = !podeEditar;
+      if (podeEditar) {
+        $('tda-form-titulo').textContent = e ? 'Atualizar entrega' : 'Minha entrega';
+        $('tda-form-ajuda').textContent = (t.modo === 'grupo' && (e ? e.grupo != null : t.grupo)
+          ? 'A entrega vale para todo o grupo. Qualquer integrante pode enviar ou atualizar. '
+          : '') + 'Você pode escrever o texto, colar um link e/ou anexar arquivos. Dá para atualizar até o professor corrigir.' +
+          (e ? ` Última atualização: ${e.atualizado_em}, por ${e.enviadoPor}.` : '');
+        $('tda-texto').value = e ? e.texto : '';
+        $('tda-link').value = e ? e.link : '';
+        $('tda-arquivos').value = '';
+        $('tda-anexos-atuais').innerHTML = e && e.anexos.length ? e.anexos.map((a) => `
+          <label class="anexo-atual"><input type="checkbox" data-manter="${esc(a.id)}" checked> manter 📎 ${esc(a.nome)}</label>`).join('') : '';
+        $('tda-enviar').textContent = e ? 'Atualizar entrega' : 'Enviar';
+        $('tda-status').textContent = '';
+      }
+      mostrar('tda-view');
+    }
+
+    /** Lê o arquivo em base64. Fotos grandes são reduzidas (máx. 1600 px) para envio mais rápido. */
+    function lerArquivo(arquivo) {
+      return new Promise((ok, falha) => {
+        const leitor = new FileReader();
+        leitor.onerror = () => falha(new Error('Não foi possível ler "' + arquivo.name + '".'));
+        leitor.onload = () => {
+          const url = leitor.result;
+          if (!/^image\/(jpeg|png|webp)$/.test(arquivo.type) || arquivo.size < 1.5 * 1024 * 1024) {
+            ok({ nome: arquivo.name, tipo: arquivo.type, base64: url.split(',')[1] });
+            return;
+          }
+          const img = new Image();
+          img.onload = () => {
+            const escala = Math.min(1, 1600 / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * escala);
+            canvas.height = Math.round(img.height * escala);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            const jpeg = canvas.toDataURL('image/jpeg', 0.85);
+            ok({ nome: arquivo.name.replace(/\.\w+$/, '') + '.jpg', tipo: 'image/jpeg', base64: jpeg.split(',')[1] });
+          };
+          img.onerror = () => ok({ nome: arquivo.name, tipo: arquivo.type, base64: url.split(',')[1] });
+          img.src = url;
+        };
+        leitor.readAsDataURL(arquivo);
+      });
+    }
+
+    $('tda-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const arquivos = [...$('tda-arquivos').files];
+      const manter = [...document.querySelectorAll('#tda-anexos-atuais [data-manter]')].filter((c) => c.checked).map((c) => c.dataset.manter);
+      if (manter.length + arquivos.length > 3) { alert('Envie no máximo 3 anexos no total.'); return; }
+      const grande = arquivos.find((a) => a.size > 10 * 1024 * 1024 && !/^image\//.test(a.type));
+      if (grande) { alert(`O arquivo "${grande.name}" passa de 10 MB.`); return; }
+      if (!$('tda-texto').value.trim() && !$('tda-link').value.trim() && !manter.length && !arquivos.length) {
+        alert('Escreva sua resposta, cole um link ou anexe um arquivo.');
+        return;
+      }
+      if (!confirm('Enviar a TDA? Você poderá atualizar a entrega até o professor corrigir.')) return;
+      $('tda-enviar').disabled = true;
+      $('tda-status').textContent = arquivos.length ? 'Enviando anexos… aguarde.' : 'Enviando…';
+      try {
+        const lidos = await Promise.all(arquivos.map(lerArquivo));
+        const t = await chamar('alunoEnviarTda', tdaAtual.id, {
+          texto: $('tda-texto').value, link: $('tda-link').value.trim(), manterAnexos: manter, arquivos: lidos,
+        });
+        renderTda(t);
+        alert('Entrega enviada! ✅');
+      } catch (e) {
+        $('tda-status').textContent = '';
+        alert(e.message);
+      } finally { $('tda-enviar').disabled = false; }
+    });
 
     chamar('alunoObterEstado').then(render).catch((e) => mostrarErro(e.message));
   </script>

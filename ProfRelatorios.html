@@ -158,8 +158,8 @@
         <span>${esc(t.topico)}</span>
         <div class="barra"><i class="${t.percentual < 50 ? 'baixo' : t.percentual < 70 ? 'medio' : ''}" style="width:${t.percentual}%"></i></div>
         <strong>${t.percentual}%</strong>
-        <span class="suave pequeno n">${t.acertos}/${t.respostas} acertos</span>
-      </div>`).join('') + '<p class="suave pequeno">Vermelho: abaixo de 50% · Amarelo: 50–69% · Azul: 70% ou mais.</p>'
+        <span class="suave pequeno n">${t.topico.startsWith('TDA – ') ? t.respostas + ' avaliações' : t.acertos + '/' + t.respostas + ' acertos'}</span>
+      </div>`).join('') + '<p class="suave pequeno">Vermelho: abaixo de 50% · Amarelo: 50–69% · Azul: 70% ou mais. Critérios de TDA: nível 4 = 100%, 3 = 75%, 2 = 50%, 1 = 25%.</p>'
       : '<p class="vazio">Ainda não há respostas com detalhe por questão para esta série.</p>';
   }
 
@@ -226,7 +226,7 @@
         <div class="cartao grafico"><h3>Evolução</h3>${graficoEvolucao(a.avaliacoes, rel.dados.faixas)}</div>
         <div class="cartao tabela-rolagem"><h3>Avaliações</h3>
           <table><thead><tr><th>Mês</th><th>Avaliação</th><th>Acertos</th><th>Nota</th><th>Média acumulada</th><th>Nível</th></tr></thead>
-          <tbody>${a.avaliacoes.map((v) => `<tr><td>${esc(v.mes)}</td><td>${esc(v.titulo)} <span class="suave pequeno">(${v.origem === 'online' ? 'online' : 'impresso'})</span></td>
+          <tbody>${a.avaliacoes.map((v) => `<tr><td>${esc(v.mes)}</td><td>${esc(v.titulo)} <span class="suave pequeno">(${v.origem === 'online' ? 'online' : v.origem === 'tda' ? 'TDA' : 'impresso'})</span></td>
             <td>${v.pontuacao}/${v.total}</td><td>${v.percentual}%</td><td>${v.mediaAcumulada}%</td><td><span class="selo ${esc(v.nivel)}">${esc(v.nivel)}</span></td></tr>`).join('')}</tbody></table></div>
         <div class="cartao"><h3>Desempenho por tópico</h3>${a.topicos.length ? a.topicos.map((t) => `
           <div class="topico-linha">

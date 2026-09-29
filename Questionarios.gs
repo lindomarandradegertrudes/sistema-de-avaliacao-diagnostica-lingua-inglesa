@@ -19,13 +19,17 @@ function serieDaTurma_(turma) {
 
 function lerQuestionarios_() {
   return lerTabela_('Questionarios').map(function (q) {
-    let questoes = [];
-    try { questoes = JSON.parse(q.questoes_json || '[]'); } catch (e) { /* célula corrompida: trata como vazio */ }
+    let dados = [];
+    try { dados = JSON.parse(q.questoes_json || '[]'); } catch (e) { /* célula corrompida: trata como vazio */ }
+    // Questionários guardam a lista de questões; TDAs guardam um objeto (situação, produto, tarefas, rubrica…).
+    const ehTda = String(q.tipo) === 'tda';
     return {
       _linha: q._linha,
       id: String(q.id), tipo: String(q.tipo), serie: String(q.serie), mes: String(q.mes),
       titulo: String(q.titulo), conteudo: String(q.conteudo || ''), status: String(q.status || 'rascunho'),
-      criado_em: String(q.criado_em), questoes: questoes,
+      criado_em: String(q.criado_em),
+      questoes: ehTda || !Array.isArray(dados) ? [] : dados,
+      tda: ehTda && !Array.isArray(dados) ? dados : null,
     };
   });
 }
@@ -143,7 +147,7 @@ function pendentesDoAluno_(email, turma) {
     .filter(function (r) { return r.email === email; })
     .map(function (r) { return r.questionario_id; });
   return lerQuestionarios_()
-    .filter(function (q) { return q.status === 'aberto' && q.serie === serie && respondidos.indexOf(q.id) === -1; })
+    .filter(function (q) { return q.tipo !== 'tda' && q.status === 'aberto' && q.serie === serie && respondidos.indexOf(q.id) === -1; })
     .map(function (q) { return { id: q.id, titulo: q.titulo, tipo: q.tipo, total: q.questoes.length }; });
 }
 
@@ -203,14 +207,15 @@ function profListarQuestionarios() {
 
 function profSalvarQuestionario(dados) {
   exigirProfessor_();
-  if (['diagnostico', 'mensal'].indexOf(dados.tipo) === -1) throw new Error('Tipo inválido.');
+  if (['diagnostico', 'mensal', 'tda'].indexOf(dados.tipo) === -1) throw new Error('Tipo inválido.');
   if (SERIES.indexOf(dados.serie) === -1) throw new Error('Série inválida.');
   const titulo = String(dados.titulo || '').trim();
   if (!titulo) throw new Error('Informe um título.');
   const mes = /^\d{4}-\d{2}$/.test(dados.mes) ? dados.mes : mesAtual_();
-  const questoes = validarQuestoes_(dados.questoes);
-  const json = JSON.stringify(questoes);
-  if (json.length > 49000) throw new Error('Questionário grande demais para a planilha. Reduza os textos de apoio ou divida em dois.');
+  const ehTda = dados.tipo === 'tda';
+  const conteudoValidado = ehTda ? validarTda_(dados.tda) : validarQuestoes_(dados.questoes);
+  const json = JSON.stringify(conteudoValidado);
+  if (json.length > 49000) throw new Error('Conteúdo grande demais para a planilha. Reduza os textos ou divida em dois.');
 
   let id = String(dados.id || '');
   comTrava_(function () {
@@ -225,8 +230,12 @@ function profSalvarQuestionario(dados) {
     }
     const atual = buscarQuestionario_(id);
     const temRespostas = lerRespostas_().some(function (r) { return r.questionario_id === id; });
-    if (temRespostas && JSON.stringify(atual.questoes) !== json) {
+    if (temRespostas && atual.tipo !== dados.tipo) throw new Error('Já há respostas: o tipo não pode mudar.');
+    if (temRespostas && !ehTda && JSON.stringify(atual.questoes) !== json) {
       throw new Error('Este questionário já tem respostas: as questões não podem mais ser alteradas.');
+    }
+    if (temRespostas && ehTda && JSON.stringify(atual.tda.rubrica) !== JSON.stringify(conteudoValidado.rubrica)) {
+      throw new Error('Esta TDA já tem correções: a rubrica não pode mais ser alterada (os demais campos, sim).');
     }
     if (temRespostas && atual.serie !== dados.serie) throw new Error('Este questionário já tem respostas: a série não pode mudar.');
     const linha = linhaDe_('Questionarios', {
@@ -243,9 +252,29 @@ function profImportarQuestionarios(texto) {
   exigirProfessor_();
   let dados;
   try { dados = JSON.parse(texto); } catch (e) { throw new Error('O texto colado não é um JSON válido.'); }
-  const lista = Array.isArray(dados) && dados.length && dados[0].questoes ? dados : [dados];
+  // Formatos aceitos: um item, uma lista de itens, ou { serie, mes, tdas: [...] } (TDAs da skill de planejamento).
+  let lista = Array.isArray(dados) ? dados : [dados];
+  if (!Array.isArray(dados) && Array.isArray(dados.tdas)) {
+    lista = dados.tdas.map(function (t) {
+      return Object.assign({ serie: dados.serie, mes: dados.mes, modo: dados.modo }, t, { tipo: 'tda' });
+    });
+  }
+  // Só a TDA da entrega final (a da última aula) vai para o sistema; as anteriores são etapas feitas em sala.
+  const ehItemTda = function (q) { return q && (q.tipo === 'tda' || Array.isArray(q.rubrica)); };
+  const ultimaTda = lista.filter(ehItemTda).pop();
+  lista = lista.filter(function (q) { return !ehItemTda(q) || q === ultimaTda; });
   const ids = lista.map(function (q, i) {
-    if (!q || !Array.isArray(q.questoes)) throw new Error('Item ' + (i + 1) + ': não encontrei a lista "questoes".');
+    const n = 'Item ' + (i + 1) + ': ';
+    if (!q) throw new Error(n + 'vazio.');
+    const ehTda = q.tipo === 'tda' || Array.isArray(q.rubrica);
+    if (ehTda) {
+      if (SERIES.indexOf(q.serie) === -1) throw new Error(n + 'informe a "serie" da TDA (ex.: "7º").');
+      return profSalvarQuestionario({
+        tipo: 'tda', serie: q.serie, mes: q.mes, titulo: q.titulo || 'TDA importada', conteudo: q.conteudo || '',
+        tda: { modo: q.modo, situacao: q.situacao, produto: q.produto, tarefas: q.tarefas, criterios: q.criterios, rubrica: q.rubrica },
+      });
+    }
+    if (!Array.isArray(q.questoes)) throw new Error(n + 'não encontrei a lista "questoes".');
     return profSalvarQuestionario({
       tipo: q.tipo === 'mensal' ? 'mensal' : 'diagnostico',
       serie: q.serie, mes: q.mes, titulo: q.titulo || 'Questionário importado',
@@ -316,6 +345,7 @@ function profResultados(id) {
 function profLancarRespostas(id, lancamentos) {
   exigirProfessor_();
   const q = buscarQuestionario_(id);
+  if (q.tipo === 'tda') throw new Error('TDAs são corrigidas pela rubrica, na tela da TDA.');
   const total = q.questoes.length;
   const turmaDe = {};
   lerTabela_('Alunos').forEach(function (a) { turmaDe[String(a.email).toLowerCase()] = String(a.turma); });

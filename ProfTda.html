@@ -1,0 +1,312 @@
+<!-- TDAs: edição (campos no editor de questionários), entregas e correção pela rubrica. Incluída em Professor.html -->
+<style>
+  .rubrica-edicao td { vertical-align: top; min-width: 150px; }
+  .rubrica-edicao textarea { font-size: .85rem; min-height: 64px; }
+  .tda-grade { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .tda-card h3 { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .tda-membro { display: flex; gap: 6px; align-items: center; padding: 4px 0; font-size: .9rem; border-top: 1px solid var(--borda); }
+  .tda-membro .nome { flex: 1; }
+  .tda-entrega { background: var(--fundo); border-radius: 8px; padding: 8px 10px; margin: 8px 0; font-size: .88rem; }
+  .tda-entrega .trecho { white-space: pre-wrap; max-height: 5.5em; overflow: hidden; }
+  .rub-grade { width: 100%; border-collapse: collapse; }
+  .rub-grade th, .rub-grade td { border: 1px solid var(--borda); padding: 6px; font-size: .82rem; vertical-align: top; }
+  .rub-grade td.opcao { cursor: pointer; }
+  .rub-grade td.opcao:hover { background: var(--fundo); }
+  .rub-grade td.sel { outline: 3px solid var(--primaria); outline-offset: -3px; background: var(--primaria-clara); font-weight: 600; }
+  .rub-grade th.n4 { background: #1a7a5e; color: #fff; } .rub-grade th.n3 { background: #ffd700; }
+  .rub-grade th.n2 { background: #ff8c00; color: #fff; } .rub-grade th.n1 { background: #e74c3c; color: #fff; }
+  #tda-nota-previa { font-size: 1.1rem; font-weight: 700; }
+</style>
+
+<!-- Tela de entregas e correção -->
+<div id="q-tda" class="pilha" hidden>
+  <div class="linha">
+    <button class="btn" data-voltar>← Voltar</button>
+    <h2 style="margin:0" id="tda-titulo"></h2>
+    <span class="espaco"></span>
+    <button class="btn" id="tda-imprimir">Imprimir TDA</button>
+    <button class="btn" id="tda-imprimir-rubrica">Imprimir rubrica</button>
+  </div>
+  <div class="chips" id="tda-turmas"></div>
+  <p class="suave pequeno" id="tda-info" style="margin:0"></p>
+  <div id="tda-lista" class="tda-grade"></div>
+</div>
+
+<dialog id="modal-tda" style="width:min(900px, calc(100vw - 32px))">
+  <div class="linha" style="margin-bottom:8px">
+    <h2 style="margin:0" id="mt-titulo">Corrigir</h2>
+    <span class="espaco"></span>
+    <button class="btn" type="button" data-fechar>Fechar</button>
+  </div>
+  <div style="max-height:72vh;overflow-y:auto" class="pilha">
+    <div id="mt-entrega"></div>
+    <div>
+      <h3>Rubrica <span class="suave pequeno">— clique no nível de cada critério</span></h3>
+      <div class="tabela-rolagem"><table class="rub-grade" id="mt-rubrica"></table></div>
+    </div>
+    <div class="campo"><label for="mt-comentario">Comentário para o aluno (feedback)</label>
+      <textarea id="mt-comentario" rows="3" placeholder="Ex.: Great job on the vocabulary! Next time, check the verb tenses in paragraph 2."></textarea></div>
+    <div id="mt-alvos"></div>
+    <div class="linha">
+      <span id="tda-nota-previa"></span>
+      <span class="espaco"></span>
+      <button class="btn perigo" id="mt-apagar" hidden>Apagar correção</button>
+      <button class="btn primario" id="mt-salvar">Salvar correção</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+  const tdaEstado = { dados: null, turma: '', unidade: null, niveis: [] };
+  const NIVEL_ROTULO = { 4: '4 – Excelente', 3: '3 – Satisfatório', 2: '2 – Em desenvolvimento', 1: '1 – Insuficiente' };
+
+  // ---------- Editor (campos da TDA dentro do editor de questionários) ----------
+  function tdaVazia() {
+    return { modo: 'individual', situacao: '', produto: '', tarefas: [], criterios: [],
+      rubrica: [{ criterio: '', n4: '', n3: '', n2: '', n1: '' }] };
+  }
+
+  function preencherTdaEditor(t) {
+    const tda = Object.assign(tdaVazia(), t || {});
+    $('ed-tda-modo').value = tda.modo === 'grupo' ? 'grupo' : 'individual';
+    $('ed-tda-situacao').value = tda.situacao || '';
+    $('ed-tda-produto').value = tda.produto || '';
+    $('ed-tda-tarefas').value = (tda.tarefas || []).join('\n');
+    $('ed-tda-criterios').value = (tda.criterios || []).join('\n');
+    renderRubricaEditor(tda.rubrica && tda.rubrica.length ? tda.rubrica : tdaVazia().rubrica);
+  }
+
+  function renderRubricaEditor(rubrica) {
+    const bloqueada = estado.edicao && estado.edicao.respostas > 0;
+    const dis = bloqueada ? 'disabled' : '';
+    $('ed-tda-rubrica').innerHTML = rubrica.map((r) => `<tr>
+      ${['criterio', 'n4', 'n3', 'n2', 'n1'].map((c) => `<td><textarea data-rub="${c}" ${dis}>${esc(r[c] || '')}</textarea></td>`).join('')}
+      <td><button class="btn mini perigo" data-rub-remover ${dis}>×</button></td></tr>`).join('');
+    $('ed-tda-add').disabled = bloqueada;
+  }
+
+  function lerRubricaEditor() {
+    return [...$('ed-tda-rubrica').querySelectorAll('tr')].map((tr) => {
+      const r = {};
+      tr.querySelectorAll('[data-rub]').forEach((el) => (r[el.dataset.rub] = el.value));
+      return r;
+    });
+  }
+
+  function lerTdaEditor() {
+    const linhas = (id) => $(id).value.split('\n').map((s) => s.trim()).filter(Boolean);
+    return {
+      modo: $('ed-tda-modo').value,
+      situacao: $('ed-tda-situacao').value,
+      produto: $('ed-tda-produto').value,
+      tarefas: linhas('ed-tda-tarefas'),
+      criterios: linhas('ed-tda-criterios'),
+      rubrica: lerRubricaEditor().filter((r) => r.criterio.trim()),
+    };
+  }
+
+  function aplicarTipoEditor() {
+    const tda = $('ed-tipo').value === 'tda';
+    document.querySelectorAll('#q-editor .so-questionario').forEach((el) => (el.hidden = tda));
+    document.querySelectorAll('#q-editor .so-tda').forEach((el) => (el.hidden = !tda));
+    $('ed-importar-q').textContent = tda ? 'Colar TDA (JSON)' : 'Colar questões (JSON)';
+    $('ed-imprimir').textContent = tda ? 'Imprimir TDA' : 'Imprimir prova';
+    $('ed-bloqueado').textContent = tda
+      ? 'Esta TDA já tem correções: a rubrica e a série não podem mais ser alteradas.'
+      : 'Este questionário já tem respostas: as questões e a série não podem mais ser alteradas.';
+    $('ed-conteudo').placeholder = tda
+      ? 'Opcional: conteúdo trabalhado no mês (aparece só para você).'
+      : 'Cole aqui o conteúdo/expectativas trabalhados (ex.: Simple past – verbos regulares; leitura de biografias; preposições in/on/at).';
+  }
+
+  // ---------- Impressão da TDA (aluno) e da rubrica (professor) ----------
+  function imprimirTda(q, rubrica) {
+    const t = q.tda;
+    const lista = (itens, ordenada) => `<${ordenada ? 'ol' : 'ul'} style="margin:4px 0 0 20px">${itens.map((i) => `<li>${esc(i)}</li>`).join('')}</${ordenada ? 'ol' : 'ul'}>`;
+    const titulo = esc(q.titulo || 'TDA');
+    let html;
+    if (rubrica) {
+      html = `<h2>Rubrica de avaliação – ${titulo} (${esc(q.serie)} ano)</h2>
+        <table style="width:100%"><tr><th>Critério</th><th>4 – Excelente</th><th>3 – Satisfatório</th><th>2 – Em desenvolvimento</th><th>1 – Insuficiente</th></tr>
+        ${t.rubrica.map((r) => `<tr><td style="text-align:left"><strong>${esc(r.criterio)}</strong></td>${['n4', 'n3', 'n2', 'n1'].map((c) => `<td style="text-align:left">${esc(r[c])}</td>`).join('')}</tr>`).join('')}</table>
+        <p><strong>Exclusivo para o/a professor/a.</strong> Nota = soma dos níveis ÷ ${4 * t.rubrica.length}.</p>`;
+    } else {
+      html = `<div class="cab"><div><strong>${titulo}</strong> – Língua Inglesa – ${esc(q.serie)} ano${t.modo === 'grupo' ? ' – atividade em grupo' : ''}</div>
+          <div>Nome: ____________________________________________ Turma: ________ Data: ___/___/______</div></div>
+        <h3>🌍 Situação-problema</h3><p style="white-space:pre-wrap">${esc(t.situacao)}</p>
+        <h3>🎯 Produto final</h3><p style="white-space:pre-wrap">${esc(t.produto)}</p>
+        ${t.tarefas.length ? `<h3>📝 Tarefas de apoio</h3>${lista(t.tarefas, true)}` : ''}
+        ${t.criterios.length ? `<h3>✅ Critérios de avaliação</h3>${lista(t.criterios, false)}` : ''}`;
+    }
+    $('impressao').innerHTML = html;
+    document.body.classList.add('imprimindo');
+    setTimeout(() => { window.print(); document.body.classList.remove('imprimindo'); }, 50);
+  }
+
+  // ---------- Tela de entregas ----------
+  async function abrirTda(id) {
+    tdaEstado.dados = await chamar('profTdaResultados', id);
+    if (!tdaEstado.dados.turmas.includes(tdaEstado.turma)) tdaEstado.turma = tdaEstado.dados.turmas[0];
+    renderTda();
+    telaQuestionarios('q-tda');
+  }
+
+  /** Monta as "unidades" de correção da turma: alunos (modo individual) ou grupos (modo grupo). */
+  function unidadesDaTurma(turma) {
+    const d = tdaEstado.dados;
+    const alunos = d.alunos.filter((a) => a.turma === turma);
+    const porEmail = Object.fromEntries(alunos.map((a) => [a.email, a]));
+    const entregas = d.entregas.filter((e) => e.turma === turma);
+    const unidades = [];
+    const usados = new Set();
+    const adicionar = (titulo, emails, entrega) => {
+      const membros = emails.filter((e) => porEmail[e] && !usados.has(e));
+      if (!membros.length) return;
+      membros.forEach((e) => usados.add(e));
+      unidades.push({ titulo, membros: membros.map((e) => porEmail[e]), entrega });
+    };
+    entregas.forEach((e) => adicionar(e.grupo != null ? 'Grupo ' + e.grupo : porEmail[e.membros[0].email]?.nome || 'Entrega',
+      e.membros.map((m) => m.email), e));
+    if (d.questionario.tda.modo === 'grupo') {
+      (d.grupos[turma] || []).forEach((g) => adicionar('Grupo ' + g.numero, g.membros, null));
+    }
+    alunos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).forEach((a) => adicionar(a.nome, [a.email], null));
+    return unidades.sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR', { numeric: true }));
+  }
+
+  function renderTda() {
+    const d = tdaEstado.dados;
+    const q = d.questionario;
+    $('tda-titulo').textContent = `${q.titulo} · ${q.serie} ano · ${q.tda.modo === 'grupo' ? 'em grupo' : 'individual'}`;
+    $('tda-turmas').innerHTML = d.turmas.map((t) => {
+      const alunos = d.alunos.filter((a) => a.turma === t);
+      const corrigidos = alunos.filter((a) => a.correcao).length;
+      return `<button class="btn ${t === tdaEstado.turma ? 'ativa' : ''}" data-turma="${esc(t)}">${esc(t)} <span class="pequeno">${corrigidos}/${alunos.length}</span></button>`;
+    }).join('');
+    const semGrupos = q.tda.modo === 'grupo' && !(d.grupos[tdaEstado.turma] || []).length;
+    $('tda-info').textContent = (q.status !== 'aberto' ? 'Esta TDA não está liberada para entregas online. ' : '') +
+      (semGrupos ? 'Esta turma ainda não tem grupos: a TDA aparece por aluno. ' : '') +
+      'Trabalhos feitos no papel também podem ser corrigidos aqui, mesmo sem entrega online.';
+
+    const unidades = unidadesDaTurma(tdaEstado.turma);
+    $('tda-lista').innerHTML = unidades.length ? unidades.map((u, i) => {
+      const e = u.entrega;
+      const corrigidos = u.membros.filter((m) => m.correcao).length;
+      const selo = corrigidos === u.membros.length ? '<span class="selo aberto">Corrigida</span>'
+        : corrigidos ? `<span class="selo rascunho">${corrigidos}/${u.membros.length} corrigidos</span>`
+        : e ? '<span class="selo Intermediário">Entregue</span>' : '<span class="selo encerrado">Sem entrega online</span>';
+      return `<div class="cartao tda-card">
+        <h3>${esc(u.titulo)} <span class="espaco"></span>${selo}</h3>
+        ${e ? `<div class="tda-entrega">
+            <div class="suave pequeno">Enviado por ${esc(e.enviadoPor)} · ${esc(e.atualizado_em)}</div>
+            ${e.texto ? `<div class="trecho">${esc(e.texto)}</div>` : ''}
+            ${e.link ? `<div>🔗 <a href="${esc(e.link)}" target="_blank" rel="noopener">abrir link</a></div>` : ''}
+            ${e.anexos.length ? `<div>📎 ${e.anexos.length} anexo(s)</div>` : ''}
+          </div>` : ''}
+        ${u.membros.map((m) => `<div class="tda-membro"><span class="nome">${esc(m.nome)}</span>
+          ${m.correcao ? `<strong>${m.correcao.percentual}%</strong>` : '<span class="suave pequeno">—</span>'}
+          ${u.membros.length > 1 ? `<button class="btn mini" data-ajustar="${i}" data-email="${esc(m.email)}">Ajustar</button>` : ''}</div>`).join('')}
+        <div class="rodape-modal" style="margin-top:10px"><button class="btn primario mini" data-corrigir="${i}">${corrigidos ? 'Rever correção' : 'Corrigir'}</button></div>
+      </div>`;
+    }).join('') : '<div class="cartao vazio">Nenhum aluno cadastrado nesta turma.</div>';
+    tdaEstado.unidades = unidades;
+  }
+
+  // ---------- Correção ----------
+  function abrirCorrecao(unidade, soEmail) {
+    const q = tdaEstado.dados.questionario;
+    const alvos = soEmail ? unidade.membros.filter((m) => m.email === soEmail) : unidade.membros;
+    const base = alvos.find((m) => m.correcao) || unidade.membros.find((m) => m.correcao);
+    tdaEstado.unidade = { ...unidade, alvos };
+    tdaEstado.niveis = base ? base.correcao.niveis.slice() : q.tda.rubrica.map(() => 0);
+    $('mt-titulo').textContent = soEmail ? `Ajustar nota – ${alvos[0].nome}` : `Corrigir – ${unidade.titulo}`;
+    $('mt-comentario').value = base ? base.correcao.comentario : '';
+
+    const e = unidade.entrega;
+    $('mt-entrega').innerHTML = e ? `<div class="cartao">
+        <h3>Entrega <span class="suave pequeno">· enviada por ${esc(e.enviadoPor)} em ${esc(e.atualizado_em)}</span></h3>
+        ${e.texto ? `<div style="white-space:pre-wrap;background:var(--fundo);border-radius:8px;padding:10px 12px">${esc(e.texto)}</div>` : '<p class="suave pequeno">Sem texto.</p>'}
+        ${e.link ? `<p>🔗 <a href="${esc(e.link)}" target="_blank" rel="noopener">${esc(e.link)}</a></p>` : ''}
+        ${e.anexos.map((a) => `<p>📎 <a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.nome)}</a></p>`).join('')}
+      </div>` : '<div class="cartao suave pequeno">Sem entrega online — corrija a partir do trabalho no papel.</div>';
+
+    $('mt-alvos').innerHTML = !soEmail && unidade.membros.length > 1
+      ? `<div class="campo"><label>A nota vale para</label>${unidade.membros.map((m) => `
+          <label style="font-weight:400;display:flex;gap:8px;align-items:center"><input type="checkbox" data-alvo="${esc(m.email)}" checked style="width:auto"> ${esc(m.nome)}</label>`).join('')}</div>`
+      : '';
+    $('mt-apagar').hidden = !alvos.some((m) => m.correcao);
+    renderRubricaCorrecao();
+    $('modal-tda').showModal();
+  }
+
+  function renderRubricaCorrecao() {
+    const rub = tdaEstado.dados.questionario.tda.rubrica;
+    $('mt-rubrica').innerHTML = `<tr><th>Critério</th><th class="n4">4 – Excelente</th><th class="n3">3 – Satisfatório</th><th class="n2">2 – Em desenvolvimento</th><th class="n1">1 – Insuficiente</th></tr>` +
+      rub.map((r, i) => `<tr><td><strong>${esc(r.criterio)}</strong></td>${[4, 3, 2, 1].map((n) =>
+        `<td class="opcao ${tdaEstado.niveis[i] === n ? 'sel' : ''}" data-crit="${i}" data-nivel="${n}">${esc(r['n' + n])}</td>`).join('')}</tr>`).join('');
+    const soma = tdaEstado.niveis.reduce((s, v) => s + v, 0);
+    const completos = tdaEstado.niveis.every((v) => v > 0);
+    $('tda-nota-previa').textContent = completos
+      ? `Nota: ${soma}/${4 * rub.length} = ${Math.round((soma / (4 * rub.length)) * 1000) / 10}%`
+      : `Marque os ${rub.length} critérios`;
+  }
+
+  function configurarTda() {
+    $('ed-tipo').addEventListener('change', aplicarTipoEditor);
+    $('ed-tda-add').addEventListener('click', () => {
+      renderRubricaEditor([...lerRubricaEditor(), { criterio: '', n4: '', n3: '', n2: '', n1: '' }]);
+    });
+    $('ed-tda-rubrica').addEventListener('click', (ev) => {
+      if (!ev.target.matches('[data-rub-remover]')) return;
+      ev.target.closest('tr').remove();
+      if (!$('ed-tda-rubrica').children.length) renderRubricaEditor(tdaVazia().rubrica);
+    });
+
+    $('tda-turmas').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button[data-turma]');
+      if (!b) return;
+      tdaEstado.turma = b.dataset.turma;
+      renderTda();
+    });
+    $('tda-lista').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      if (b.dataset.corrigir !== undefined) abrirCorrecao(tdaEstado.unidades[Number(b.dataset.corrigir)]);
+      if (b.dataset.ajustar !== undefined) abrirCorrecao(tdaEstado.unidades[Number(b.dataset.ajustar)], b.dataset.email);
+    });
+    $('tda-imprimir').addEventListener('click', () => imprimirTda(tdaEstado.dados.questionario, false));
+    $('tda-imprimir-rubrica').addEventListener('click', () => imprimirTda(tdaEstado.dados.questionario, true));
+
+    $('mt-rubrica').addEventListener('click', (ev) => {
+      const td = ev.target.closest('td[data-crit]');
+      if (!td) return;
+      tdaEstado.niveis[Number(td.dataset.crit)] = Number(td.dataset.nivel);
+      renderRubricaCorrecao();
+    });
+    $('mt-salvar').addEventListener('click', (ev) => {
+      const u = tdaEstado.unidade;
+      const marcados = [...document.querySelectorAll('#mt-alvos [data-alvo]')];
+      const emails = marcados.length ? marcados.filter((c) => c.checked).map((c) => c.dataset.alvo) : u.alvos.map((m) => m.email);
+      if (!emails.length) { avisar('Marque pelo menos um aluno.', true); return; }
+      if (!tdaEstado.niveis.every((v) => v > 0)) { avisar('Marque um nível em todos os critérios.', true); return; }
+      comBotao(ev.target, async () => {
+        tdaEstado.dados = await chamar('profCorrigirTda', tdaEstado.dados.questionario.id, emails, tdaEstado.niveis, $('mt-comentario').value);
+        $('modal-tda').close();
+        renderTda();
+        estado.alunos = await chamar('profListarAlunos');
+        renderAlunos();
+        avisar('Correção salva. O aluno já pode ver a nota e o comentário.');
+      });
+    });
+    $('mt-apagar').addEventListener('click', (ev) => {
+      if (!confirm('Apagar a correção? A nota sai da média e o aluno volta a poder editar a entrega.')) return;
+      comBotao(ev.target, async () => {
+        tdaEstado.dados = await chamar('profApagarCorrecaoTda', tdaEstado.dados.questionario.id, tdaEstado.unidade.alvos.map((m) => m.email));
+        $('modal-tda').close();
+        renderTda();
+        estado.alunos = await chamar('profListarAlunos');
+        renderAlunos();
+      });
+    });
+  }
+</script>

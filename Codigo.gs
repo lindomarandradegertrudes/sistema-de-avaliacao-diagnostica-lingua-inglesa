@@ -1,6 +1,6 @@
 /**
- * Sistema de Grupos – Língua Inglesa
- * Etapa 1: instalação da planilha, cadastro de alunos e painel do professor.
+ * English Learning App – Língua Inglesa
+ * Instalação da planilha, acesso aos dados, permissões, cadastro de alunos e painel do professor.
  */
 
 const FUSO = 'America/Sao_Paulo';
@@ -15,6 +15,7 @@ const CABECALHOS = {
   Questionarios: ['id', 'tipo', 'serie', 'mes', 'titulo', 'conteudo', 'questoes_json', 'status', 'form_id', 'criado_em'],
   Respostas: ['questionario_id', 'email', 'turma', 'pontuacao', 'total', 'percentual', 'acertos_json', 'origem', 'respondido_em'],
   Grupos: ['mes', 'turma', 'grupo', 'email', 'nome', 'nivel', 'media', 'aplicado_em'],
+  Entregas: ['questionario_id', 'turma', 'grupo', 'membros', 'email', 'texto', 'link', 'anexos_json', 'enviado_em', 'atualizado_em'],
 };
 
 const CONFIG_PADRAO = [
@@ -118,7 +119,11 @@ function lerTabela_(nome) {
 }
 
 function linhaDe_(nome, obj) {
-  return CABECALHOS[nome].map(function (c) { return obj[c] === undefined ? '' : obj[c]; });
+  return CABECALHOS[nome].map(function (c) {
+    const v = obj[c] === undefined ? '' : obj[c];
+    // Texto digitado por alunos não pode virar fórmula na planilha.
+    return typeof v === 'string' && /^[=+\-@]/.test(v) ? "'" + v : v;
+  });
 }
 
 function lerConfig_() {
@@ -225,6 +230,7 @@ function alunoObterEstado() {
     aluno: aluno ? { nome: aluno.nome, turma: String(aluno.turma) } : null,
     grupo: aluno ? grupoDoAluno_(email, String(aluno.turma)) : null,
     questionarios: aluno ? pendentesDoAluno_(email, String(aluno.turma)) : [],
+    tdas: aluno ? alunoTdas_(email, String(aluno.turma)) : [],
   };
 }
 

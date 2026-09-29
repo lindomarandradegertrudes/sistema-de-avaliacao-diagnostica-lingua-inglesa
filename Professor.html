@@ -126,28 +126,50 @@
             <div class="campo"><label for="ed-titulo">Título</label><input id="ed-titulo" placeholder="ex.: Diagnóstico 7º ano – 2026"></div>
             <div class="grade-2">
               <div class="campo"><label for="ed-tipo">Tipo</label>
-                <select id="ed-tipo"><option value="diagnostico">Diagnóstico</option><option value="mensal">Mensal</option></select></div>
+                <select id="ed-tipo"><option value="diagnostico">Diagnóstico</option><option value="mensal">Mensal</option><option value="tda">TDA</option></select></div>
               <div class="campo"><label for="ed-serie">Série</label><select id="ed-serie"></select></div>
             </div>
           </div>
           <div class="grade-2" style="margin-top:14px">
             <div class="campo"><label for="ed-mes">Mês de referência</label><input id="ed-mes" type="month"></div>
-            <div class="campo"><label for="ed-qtd">Quantidade de questões (para a IA)</label><input id="ed-qtd" type="number" min="3" max="25" value="10"></div>
+            <div class="campo so-questionario"><label for="ed-qtd">Quantidade de questões (para a IA)</label><input id="ed-qtd" type="number" min="3" max="25" value="10"></div>
+            <div class="campo so-tda" hidden><label for="ed-tda-modo">Como a TDA será feita</label>
+              <select id="ed-tda-modo"><option value="individual">Individual</option><option value="grupo">Em grupo (grupos do mês)</option></select></div>
           </div>
           <div class="campo" style="margin-top:14px">
             <label for="ed-conteudo">Conteúdo do mês</label>
             <textarea id="ed-conteudo" rows="4" placeholder="Cole aqui o conteúdo/expectativas trabalhados (ex.: Simple past – verbos regulares; leitura de biografias; preposições in/on/at)."></textarea>
           </div>
           <div class="linha" style="margin-top:12px">
-            <button class="btn" id="ed-gerar">✨ Gerar questões com IA</button>
+            <button class="btn so-questionario" id="ed-gerar">✨ Gerar questões com IA</button>
             <button class="btn" id="ed-importar-q">Colar questões (JSON)</button>
             <span class="suave pequeno" id="ed-ia-status"></span>
           </div>
         </div>
-        <div class="linha"><h3 style="margin:0">Questões <span class="suave" id="ed-contagem"></span></h3><span class="espaco"></span>
+        <div class="linha so-questionario"><h3 style="margin:0">Questões <span class="suave" id="ed-contagem"></span></h3><span class="espaco"></span>
           <button class="btn" id="ed-add">+ Questão</button></div>
-        <div id="ed-questoes" class="pilha"></div>
+        <div id="ed-questoes" class="pilha so-questionario"></div>
+
+        <!-- Campos da TDA -->
+        <div class="cartao pilha so-tda" hidden>
+          <div class="campo"><label for="ed-tda-situacao">🌍 Situação-problema</label><textarea id="ed-tda-situacao" rows="3"></textarea></div>
+          <div class="campo"><label for="ed-tda-produto">🎯 Produto final</label><textarea id="ed-tda-produto" rows="2"></textarea></div>
+          <div class="grade-2">
+            <div class="campo"><label for="ed-tda-tarefas">📝 Tarefas de apoio <span class="suave pequeno">(uma por linha)</span></label><textarea id="ed-tda-tarefas" rows="5"></textarea></div>
+            <div class="campo"><label for="ed-tda-criterios">✅ Critérios para o aluno <span class="suave pequeno">(um por linha)</span></label><textarea id="ed-tda-criterios" rows="5"></textarea></div>
+          </div>
+        </div>
+        <div class="linha so-tda" hidden><h3 style="margin:0">Rubrica do professor <span class="suave pequeno">(o aluno só vê depois da correção)</span></h3><span class="espaco"></span>
+          <button class="btn" id="ed-tda-add">+ Critério</button></div>
+        <div class="cartao tabela-rolagem so-tda" hidden>
+          <table class="rubrica-edicao">
+            <thead><tr><th>Critério</th><th>4 – Excelente</th><th>3 – Satisfatório</th><th>2 – Em desenvolvimento</th><th>1 – Insuficiente</th><th></th></tr></thead>
+            <tbody id="ed-tda-rubrica"></tbody>
+          </table>
+        </div>
       </div>
+
+      <?!= incluir('ProfTda'); ?>
 
       <!-- Resultados -->
       <div id="q-resultados" class="pilha" hidden>
@@ -264,7 +286,7 @@
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const LETRAS = ['A', 'B', 'C', 'D', 'E'];
-    const TIPOS = { diagnostico: 'Diagnóstico', mensal: 'Mensal' };
+    const TIPOS = { diagnostico: 'Diagnóstico', mensal: 'Mensal', tda: 'TDA' };
     const STATUS = { rascunho: 'Rascunho', aberto: 'Aberto', encerrado: 'Encerrado' };
     const DIFS = { facil: 'Fácil', media: 'Média', dificil: 'Difícil' };
 
@@ -407,7 +429,7 @@
 
     // ---------- Questionários: lista ----------
     function telaQuestionarios(qual) {
-      ['q-lista', 'q-editor', 'q-resultados'].forEach((id) => ($(id).hidden = id !== qual));
+      ['q-lista', 'q-editor', 'q-resultados', 'q-tda'].forEach((id) => ($(id).hidden = id !== qual));
       window.scrollTo(0, 0);
     }
     document.querySelectorAll('[data-voltar]').forEach((b) => b.addEventListener('click', async () => {
@@ -427,7 +449,7 @@
         const acaoStatus = q.status === 'rascunho' ? ['aberto', 'Liberar para alunos']
           : q.status === 'aberto' ? ['encerrado', 'Encerrar'] : ['aberto', 'Reabrir'];
         return `<tr>
-          <td><strong>${esc(q.titulo)}</strong><div class="suave pequeno">${q.questoes.length} questões</div></td>
+          <td><strong>${esc(q.titulo)}</strong><div class="suave pequeno">${q.tipo === 'tda' ? (q.tda && q.tda.modo === 'grupo' ? 'em grupo' : 'individual') + ' · rubrica com ' + (q.tda ? q.tda.rubrica.length : 0) + ' critérios' : q.questoes.length + ' questões'}</div></td>
           <td>${esc(q.serie)}</td>
           <td>${TIPOS[q.tipo] || esc(q.tipo)}</td>
           <td>${esc(q.mes)}</td>
@@ -449,7 +471,7 @@
       if (!b) return;
       const q = estado.questionarios.find((x) => x.id === b.dataset.id);
       if (b.dataset.acao === 'editar') abrirEditor(q);
-      if (b.dataset.acao === 'resultados') comBotao(b, () => abrirResultados(q.id));
+      if (b.dataset.acao === 'resultados') comBotao(b, () => (q.tipo === 'tda' ? abrirTda(q.id) : abrirResultados(q.id)));
       if (b.dataset.acao === 'status') {
         if (b.dataset.novo === 'aberto' && !confirm(`Liberar "${q.titulo}" para todos os alunos do ${q.serie} ano?`)) return;
         comBotao(b, async () => {
@@ -498,7 +520,20 @@
         return;
       }
       try {
-        const dados = JSON.parse(texto);
+        let dados = JSON.parse(texto);
+        // TDA colada no editor: aceita o objeto da TDA, uma lista ou { tdas: [...] } — usa sempre a última (a da entrega).
+        const listaTda = Array.isArray(dados) ? dados : Array.isArray(dados.tdas) ? dados.tdas : [dados];
+        const tda = listaTda.filter((x) => x && Array.isArray(x.rubrica)).pop();
+        if (tda) {
+          $('ed-tipo').value = 'tda';
+          if (tda.titulo && !$('ed-titulo').value) $('ed-titulo').value = tda.titulo;
+          if (dados.serie || tda.serie) $('ed-serie').value = tda.serie || dados.serie;
+          preencherTdaEditor(tda);
+          aplicarTipoEditor();
+          $('modal-json').close();
+          avisar('TDA colada. Revise e clique em Salvar.');
+          return;
+        }
         const questoes = Array.isArray(dados) ? dados : dados.questoes;
         if (!Array.isArray(questoes)) throw new Error('não encontrei a lista de questões');
         const ed = estado.edicao;
@@ -538,7 +573,9 @@
       $('ed-conteudo').value = q ? q.conteudo : '';
       $('ed-qtd').value = q && q.tipo === 'diagnostico' ? 15 : 10;
       $('ed-ia-status').textContent = '';
+      preencherTdaEditor(q && q.tda ? q.tda : null);
       renderQuestoesEditor();
+      aplicarTipoEditor();
       telaQuestionarios('q-editor');
     }
     $('q-novo').addEventListener('click', () => abrirEditor(null));
@@ -607,6 +644,7 @@
         mes: $('ed-mes').value,
         conteudo: $('ed-conteudo').value,
         questoes: estado.edicao.questoes,
+        tda: $('ed-tipo').value === 'tda' ? lerTdaEditor() : null,
       };
     }
 
@@ -638,7 +676,10 @@
       });
     });
 
-    $('ed-imprimir').addEventListener('click', () => imprimir(dadosEditor(), false));
+    $('ed-imprimir').addEventListener('click', () => {
+      const d = dadosEditor();
+      if (d.tipo === 'tda') imprimirTda(d, false); else imprimir(d, false);
+    });
 
     // ---------- Resultados ----------
     async function abrirResultados(id) {
@@ -873,6 +914,7 @@
         renderTudo();
         configurarGrupos();
         configurarRelatorios();
+        configurarTda();
         $('carregando').hidden = true;
         abrirAba('turmas');
       } catch (e) {

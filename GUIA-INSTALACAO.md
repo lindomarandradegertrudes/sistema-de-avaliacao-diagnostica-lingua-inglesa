@@ -4,6 +4,48 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# TDAs (Tarefas de Desempenho Autêntico)
+
+## A. Atualizar o código
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `Tda.gs` | **arquivo novo:** clique em **+ > Script**, dê o nome `Tda` e cole **Tda.gs** |
+| `ProfTda.html` | **arquivo novo:** clique em **+ > HTML**, dê o nome `ProfTda` e cole **ProfTda.html** |
+| `Codigo.gs`, `Questionarios.gs`, `Relatorios.gs` | apague tudo e cole as novas versões |
+| `Professor.html`, `Aluno.html`, `ProfRelatorios.html` | apague tudo e cole as novas versões |
+
+Depois faça o seguinte:
+1. Execute a função **instalar**. Ela cria a aba **Entregas** na planilha.
+2. Autorize o **Google Drive** quando o Google pedir. É onde ficam os anexos dos alunos.
+3. Publique em **Implantar > Gerenciar implantações > ✏️ > Nova versão**.
+
+## B. Cadastrar a TDA do mês
+Só a TDA da **entrega final**, a da última aula, vai para o sistema. As TDAs das aulas anteriores são etapas feitas em sala.
+
+- **Pela skill de planejamento:** peça "gere também o JSON das TDAs para o English Learning App" e cole o resultado em **Questionários > Importar JSON**. Se vierem várias TDAs, o sistema importa **só a última**.
+- **À mão:** clique em **+ Novo questionário**, escolha o tipo **TDA** e preencha a situação-problema, o produto final, as tarefas, os critérios e a rubrica.
+- **Modo:** escolha **Individual** ou **Em grupo**. No modo grupo, a TDA usa os grupos do mês.
+
+## C. Aplicar
+- **No sistema:** clique em **Liberar para alunos**. O aluno vê a TDA em "Tarefas (TDA)" e envia texto, **link** (Canva, Padlet…) e/ou até **3 anexos** (foto, PDF, Word, PowerPoint). Ele pode atualizar a entrega até você corrigir. No modo grupo, qualquer integrante envia, e a entrega vale para o grupo todo.
+- **No papel:** use **Imprimir TDA**, na tela da TDA ou no editor.
+- **Onde ficam os anexos:** na pasta **"English Learning App – Anexos das TDAs"** do seu Drive.
+
+## D. Corrigir
+1. Clique em **Resultados** na TDA e escolha a turma.
+2. Clique em **Corrigir** no aluno ou no grupo. Aparecem a entrega (texto, link e anexos) e a rubrica.
+3. Clique no nível de cada critério e escreva o comentário.
+4. **No modo grupo**, a nota vale para os integrantes marcados. O botão **Ajustar** muda a nota de um aluno específico.
+5. **Trabalho feito no papel:** corrija do mesmo jeito, mesmo sem entrega online.
+
+**Nota** = soma dos níveis ÷ (4 × número de critérios). Ela entra na média do nível com o **mesmo peso** de um questionário.
+
+## E. O que o aluno vê
+Depois da correção, o aluno vê a **nota**, o **seu comentário** e a **rubrica com o nível alcançado em cada critério destacado**. A partir daí, a entrega não pode mais ser alterada. Se precisar reabrir, use **Apagar correção**.
+
+---
+
 # Etapa 4 — Relatórios
 
 ## A. Atualizar o código

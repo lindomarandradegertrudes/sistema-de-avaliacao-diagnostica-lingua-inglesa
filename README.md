@@ -10,6 +10,7 @@ Roda **gratuitamente** no Google Workspace da escola: Google Apps Script e Googl
 
 - **Cadastro:** o aluno se cadastra no primeiro acesso com a conta Google da escola, e o professor pode editar ou excluir cadastros.
 - **Questionários:** há o diagnóstico e os mensais, respondidos online (com correção automática) ou impressos (com lançamento das respostas). As questões podem ser geradas com IA a partir do conteúdo do mês, o que é opcional.
+- **TDAs (Tarefas de Desempenho Autêntico):** a entrega final do mês pode ser individual ou em grupo, feita no papel ou no sistema, com texto, link e anexos. A correção usa uma rubrica de 4 níveis, e o aluno vê a nota, o feedback e a rubrica.
 - **Níveis:** Iniciante, Básico, Intermediário e Avançado, calculados pela média de todas as avaliações. As faixas são configuráveis.
 - **Grupos mensais:** a sugestão automática distribui os alunos em serpentina e depois equilibra as médias dos grupos. O professor pode fazer ajustes manuais e decide, a cada mês, se mantém ou refaz os grupos. O aluno vê apenas o próprio grupo, sem níveis nem notas.
 - **Relatórios:**
@@ -26,6 +27,8 @@ Roda **gratuitamente** no Google Workspace da escola: Google Apps Script e Googl
 | `Questionarios.gs` | Questionários, correção, lançamento, níveis e geração com IA |
 | `Grupos.gs` | Leitura e gravação dos grupos mensais |
 | `Relatorios.gs` | Comparativo, tópicos, evolução e exportação |
+| `Tda.gs` | TDAs: entregas, anexos no Drive e correção por rubrica |
+| `ProfTda.html` | Tela de entregas e correção das TDAs |
 | `Professor.html` | Painel do professor |
 | `ProfGrupos.html` / `ProfRelatorios.html` | Abas de Grupos e Relatórios |
 | `Aluno.html` | Tela do aluno |

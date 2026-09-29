@@ -19,23 +19,32 @@ function acertosPorTopico_(questionarios, respostas) {
   const porId = {};
   questionarios.forEach(function (q) { porId[q.id] = q; });
   const res = {};
+  function somar(q, topico, valor) {
+    const chave = q.serie + '|' + topico.toLowerCase();
+    res[chave] = res[chave] || { serie: q.serie, topico: topico, respostas: 0, acertos: 0, questionarios: {} };
+    res[chave].respostas += 1;
+    res[chave].acertos += valor;
+    res[chave].questionarios[q.id] = true;
+  }
   respostas.forEach(function (r) {
     const q = porId[r.questionario_id];
-    if (!q || !r.detalhe || !r.detalhe.acertos) return;
+    if (!q || !r.detalhe) return;
+    if (q.tipo === 'tda' && q.tda && Array.isArray(r.detalhe.rubrica)) {
+      // Cada critério da rubrica vira um tópico; nível 4 = 100%, 3 = 75%, 2 = 50%, 1 = 25%.
+      r.detalhe.rubrica.forEach(function (nivel, i) {
+        if (q.tda.rubrica[i]) somar(q, 'TDA – ' + q.tda.rubrica[i].criterio, nivel / 4);
+      });
+      return;
+    }
+    if (!r.detalhe.acertos) return;
     r.detalhe.acertos.forEach(function (ok, i) {
-      if (!q.questoes[i]) return;
-      const topico = q.questoes[i].topico || 'Geral';
-      const chave = q.serie + '|' + topico.toLowerCase();
-      res[chave] = res[chave] || { serie: q.serie, topico: topico, respostas: 0, acertos: 0, questionarios: {} };
-      res[chave].respostas += 1;
-      if (ok) res[chave].acertos += 1;
-      res[chave].questionarios[q.id] = true;
+      if (q.questoes[i]) somar(q, q.questoes[i].topico || 'Geral', ok ? 1 : 0);
     });
   });
   return Object.keys(res).map(function (k) {
     const t = res[k];
     return {
-      serie: t.serie, topico: t.topico, respostas: t.respostas, acertos: t.acertos,
+      serie: t.serie, topico: t.topico, respostas: t.respostas, acertos: Math.round(t.acertos * 10) / 10,
       percentual: Math.round((t.acertos / t.respostas) * 1000) / 10,
       questionarios: Object.keys(t.questionarios),
     };
