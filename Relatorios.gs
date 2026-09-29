@@ -139,7 +139,7 @@ function profExportarPlanilha() {
   const respostas = lerRespostas_();
   const agora = Utilities.formatDate(new Date(), FUSO, 'dd/MM/yyyy HH:mm');
 
-  const ss = SpreadsheetApp.create('Relatório – Grupos de Inglês – ' + agora);
+  const ss = SpreadsheetApp.create('Relatório – English Learning App – ' + agora);
 
   function preencher(aba, cabecalho, linhas) {
     const dados = [cabecalho].concat(linhas);

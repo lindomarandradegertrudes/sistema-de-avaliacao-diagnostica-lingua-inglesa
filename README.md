@@ -1,4 +1,6 @@
-# Sistema de Avaliação Diagnóstica – Língua Inglesa
+# English Learning App
+
+**Sistema de Avaliação Diagnóstica – Língua Inglesa**
 
 Sistema web para professores de Língua Inglesa do Ensino Fundamental II (6º ao 9º ano) avaliarem e acompanharem a aprendizagem das turmas e formarem **grupos heterogêneos** de até 5 alunos, que misturam alunos com mais e com menos conhecimento.
 

@@ -1,4 +1,4 @@
-# Grupos de Inglês — Guia de instalação
+# English Learning App — Guia de instalação
 
 Faça tudo com a sua **conta institucional**.
 

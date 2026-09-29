@@ -33,7 +33,7 @@ const CONFIG_PADRAO = [
 
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu('Sistema de Grupos')
+    .createMenu('English Learning App')
     .addItem('Instalar / atualizar planilha', 'instalar')
     .addItem('Mostrar link do sistema', 'mostrarLink')
     .addToUi();
@@ -177,7 +177,7 @@ function doGet() {
     const t = HtmlService.createTemplateFromFile(pagina);
     t.email = email;
     return t.evaluate()
-      .setTitle(pagina === 'Professor' ? 'Grupos de Inglês – Professor' : 'Grupos de Inglês')
+      .setTitle(pagina === 'Professor' ? 'English Learning App – Professor' : 'English Learning App')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   } catch (e) {
     return HtmlService.createHtmlOutput('<p style="font-family:sans-serif;padding:24px">' + e.message + '</p>');
