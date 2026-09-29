@@ -237,6 +237,16 @@
     </form>
   </dialog>
 
+  <dialog id="modal-respostas" style="width:min(780px, calc(100vw - 32px))">
+    <div class="linha" style="margin-bottom:12px">
+      <h2 style="margin:0">Respostas do aluno</h2>
+      <span class="espaco"></span>
+      <button class="btn" id="respostas-imprimir">Imprimir / PDF</button>
+      <button class="btn" type="button" data-fechar>Fechar</button>
+    </div>
+    <div id="respostas-conteudo" style="max-height:70vh;overflow-y:auto"></div>
+  </dialog>
+
   <dialog id="modal-json">
     <form id="form-json" method="dialog">
       <h2 id="json-titulo">Importar JSON</h2>
@@ -655,7 +665,7 @@
           <td>${x ? x.pontuacao + '/' + x.total : ''}</td>
           <td>${x ? x.percentual + '%' : ''}</td>
           <td><input class="lanc" data-email="${esc(a.email)}" data-nome="${esc(a.nome)}" placeholder="${x && x.marcadas ? esc(x.marcadas) : 'letras ou nº'}"></td>
-          <td class="acoes">${x ? `<button class="btn mini perigo" data-apagar="${esc(a.email)}">Apagar</button>` : ''}</td>
+          <td class="acoes">${x && x.marcadas ? `<button class="btn mini" data-ver="${esc(a.email)}">Ver respostas</button> ` : ''}${x ? `<button class="btn mini perigo" data-apagar="${esc(a.email)}">Apagar</button>` : ''}</td>
         </tr>`;
       }).join('') : '<tr><td colspan="6" class="vazio">Nenhum aluno cadastrado nesta turma.</td></tr>';
 
@@ -691,7 +701,53 @@
       });
     });
 
+    // ---------- Respostas de um aluno (questão por questão) ----------
+    /** HTML da prova respondida. Usa estilos inline para sair igual na tela e na impressão. */
+    function folhaDoAluno(aluno) {
+      const q = estado.resultados.questionario;
+      const r = aluno.resposta;
+      const marcadas = r.marcadas.split('');
+      const nl = (s) => esc(s).replace(/\n/g, '<br>');
+      return `<div style="margin-bottom:14px">
+          <div style="font-size:1.15rem;font-weight:700">${esc(aluno.nome)} · ${esc(aluno.turma)}</div>
+          <div>${esc(q.titulo)} – ${esc(q.serie)} ano</div>
+          <div>Respondido em ${esc(r.respondido_em)} (${r.origem === 'online' ? 'online' : 'prova impressa'}) ·
+            <strong>${r.pontuacao}/${r.total} acertos (${r.percentual}%)</strong></div>
+        </div>
+        ${q.questoes.map((x, i) => {
+          const marcada = LETRAS.indexOf(marcadas[i]);
+          const acertou = marcada === x.correta;
+          return `<div style="border:1px solid #ccc;border-left:5px solid ${acertou ? '#2b8a3e' : '#c92a2a'};border-radius:8px;padding:10px 12px;margin-bottom:10px;break-inside:avoid">
+            <div style="font-weight:700">${acertou ? '✅' : '❌'} Questão ${i + 1} <span style="font-weight:400;color:#666;font-size:.85em">· ${esc(x.topico)}</span></div>
+            ${x.texto_apoio ? `<div style="border-left:3px solid #999;padding:4px 10px;margin:6px 0;font-style:italic">${nl(x.texto_apoio)}</div>` : ''}
+            <div style="margin:6px 0">${nl(x.enunciado)}</div>
+            ${x.alternativas.map((alt, j) => {
+              const ehMarcada = j === marcada, ehCorreta = j === x.correta;
+              const fundo = ehCorreta ? '#d3f9d8' : ehMarcada ? '#ffe3e3' : 'transparent';
+              const nota = ehMarcada && ehCorreta ? ' ← marcou (correta)' : ehMarcada ? ' ← marcou' : ehCorreta ? ' ← resposta correta' : '';
+              return `<div style="padding:3px 8px;border-radius:5px;background:${fundo};${ehMarcada || ehCorreta ? 'font-weight:600' : ''}">${LETRAS[j]}) ${esc(alt)}<span style="font-size:.85em">${nota}</span></div>`;
+            }).join('')}
+            ${marcada === -1 ? '<div style="color:#c92a2a;font-size:.85em;margin-top:4px">Questão deixada em branco.</div>' : ''}
+          </div>`;
+        }).join('')}`;
+    }
+
+    let alunoVisto = null;
+    function verRespostas(email) {
+      alunoVisto = estado.resultados.alunos.find((a) => a.email === email);
+      $('respostas-conteudo').innerHTML = folhaDoAluno(alunoVisto);
+      $('modal-respostas').showModal();
+      $('respostas-conteudo').scrollTop = 0;
+    }
+    $('respostas-imprimir').addEventListener('click', () => {
+      $('modal-respostas').close();
+      $('impressao').innerHTML = folhaDoAluno(alunoVisto);
+      document.body.classList.add('imprimindo');
+      setTimeout(() => { window.print(); document.body.classList.remove('imprimindo'); }, 50);
+    });
+
     $('res-tabela').addEventListener('click', (ev) => {
+      if (ev.target.dataset.ver) { verRespostas(ev.target.dataset.ver); return; }
       const email = ev.target.dataset.apagar;
       if (!email) return;
       if (!confirm('Apagar a resposta deste aluno? Ele poderá responder de novo (online) ou você poderá lançar outra vez.')) return;
