@@ -259,10 +259,12 @@ function profImportarQuestionarios(texto) {
       return Object.assign({ serie: dados.serie, mes: dados.mes, modo: dados.modo }, t, { tipo: 'tda' });
     });
   }
-  // Só a TDA da entrega final (a da última aula) vai para o sistema; as anteriores são etapas feitas em sala.
+  // Só a TDA da entrega final (a da última aula) de cada série/mês vai para o sistema;
+  // as anteriores são etapas feitas em sala.
   const ehItemTda = function (q) { return q && (q.tipo === 'tda' || Array.isArray(q.rubrica)); };
-  const ultimaTda = lista.filter(ehItemTda).pop();
-  lista = lista.filter(function (q) { return !ehItemTda(q) || q === ultimaTda; });
+  const ultimaPorSerieMes = {};
+  lista.filter(ehItemTda).forEach(function (q) { ultimaPorSerieMes[q.serie + '|' + (q.mes || '')] = q; });
+  lista = lista.filter(function (q) { return !ehItemTda(q) || ultimaPorSerieMes[q.serie + '|' + (q.mes || '')] === q; });
   const ids = lista.map(function (q, i) {
     const n = 'Item ' + (i + 1) + ': ';
     if (!q) throw new Error(n + 'vazio.');
