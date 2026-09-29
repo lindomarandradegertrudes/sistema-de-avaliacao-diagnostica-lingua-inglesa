@@ -185,7 +185,7 @@
           <p class="suave pequeno" style="margin-top:0">Para provas impressas, digite as letras marcadas pelo aluno em ordem (ex.: <code>ABDCA…</code>, use <code>-</code> para questão em branco) ou apenas o número de acertos. Letras permitem a análise por questão.</p>
           <div class="tabela-rolagem">
             <table>
-              <thead><tr><th>Nome</th><th>Situação</th><th>Acertos</th><th>%</th><th>Lançar impresso</th><th></th></tr></thead>
+              <thead><tr><th>Nome</th><th>Situação</th><th>Acertos</th><th>%</th><th title="Vezes que o aluno saiu da tela durante o questionário online">Saídas da tela</th><th>Lançar impresso</th><th></th></tr></thead>
               <tbody id="res-tabela"></tbody>
             </table>
           </div>
@@ -705,10 +705,11 @@
           <td>${x ? `<span class="selo ${x.origem === 'online' ? 'aberto' : 'rascunho'}">${x.origem === 'online' ? 'Online' : 'Impresso'}</span>` : '<span class="suave pequeno">pendente</span>'}</td>
           <td>${x ? x.pontuacao + '/' + x.total : ''}</td>
           <td>${x ? x.percentual + '%' : ''}</td>
+          <td>${textoSaidas(x && x.saidas, x && x.origem === 'online')}</td>
           <td><input class="lanc" data-email="${esc(a.email)}" data-nome="${esc(a.nome)}" placeholder="${x && x.marcadas ? esc(x.marcadas) : 'letras ou nº'}"></td>
           <td class="acoes">${x && x.marcadas ? `<button class="btn mini" data-ver="${esc(a.email)}">Ver respostas</button> ` : ''}${x ? `<button class="btn mini perigo" data-apagar="${esc(a.email)}">Apagar</button>` : ''}</td>
         </tr>`;
-      }).join('') : '<tr><td colspan="6" class="vazio">Nenhum aluno cadastrado nesta turma.</td></tr>';
+      }).join('') : '<tr><td colspan="7" class="vazio">Nenhum aluno cadastrado nesta turma.</td></tr>';
 
       $('res-questoes').innerHTML = r.porQuestao.map((q) => {
         const pct = q.respostas ? Math.round((q.acertos / q.respostas) * 100) : null;
@@ -742,6 +743,17 @@
       });
     });
 
+    // ---------- Saídas da tela ----------
+    function duracaoTexto(seg) {
+      seg = Number(seg) || 0;
+      return seg < 60 ? seg + ' s' : Math.round(seg / 60) + ' min';
+    }
+    /** online = a resposta foi feita no sistema (só aí o monitoramento existe). */
+    function textoSaidas(s, online) {
+      if (s && s.vezes) return `<span class="selo Iniciante" title="Tempo total fora: ${duracaoTexto(s.segundos)}">⚠️ ${s.vezes}× · ${duracaoTexto(s.segundos)}</span>`;
+      return online ? '<span class="suave pequeno">nenhuma</span>' : '';
+    }
+
     // ---------- Respostas de um aluno (questão por questão) ----------
     /** HTML da prova respondida. Usa estilos inline para sair igual na tela e na impressão. */
     function folhaDoAluno(aluno) {
@@ -754,6 +766,7 @@
           <div>${esc(q.titulo)} – ${esc(q.serie)} ano</div>
           <div>Respondido em ${esc(r.respondido_em)} (${r.origem === 'online' ? 'online' : 'prova impressa'}) ·
             <strong>${r.pontuacao}/${r.total} acertos (${r.percentual}%)</strong></div>
+          ${r.saidas && r.saidas.vezes ? `<div style="color:#c92a2a">Saiu da tela ${r.saidas.vezes}× durante o questionário (${duracaoTexto(r.saidas.segundos)} fora).</div>` : ''}
         </div>
         ${q.questoes.map((x, i) => {
           const marcada = LETRAS.indexOf(marcadas[i]);

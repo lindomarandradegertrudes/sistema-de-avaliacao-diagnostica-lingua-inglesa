@@ -31,6 +31,10 @@
     .feedback { background: #fff9db; border-left: 4px solid #fab005; border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; }
     .anexo-atual { display: flex; gap: 8px; align-items: center; font-size: .9rem; margin-top: 4px; }
     .anexo-atual input { width: auto; }
+    #aviso-saida {
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 20; max-width: calc(100vw - 32px);
+      background: #c92a2a; color: #fff; padding: 12px 18px; border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.25); font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -102,9 +106,9 @@
         <h2 id="tda-form-titulo">Minha entrega</h2>
         <p class="suave pequeno" id="tda-form-ajuda"></p>
         <div class="campo"><label for="tda-texto">Texto</label>
-          <textarea id="tda-texto" rows="8" placeholder="Write your text here…"></textarea></div>
+          <textarea id="tda-texto" rows="8" placeholder="Write your text here…" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false"></textarea></div>
         <div class="campo"><label for="tda-link">Link (Canva, Padlet, Google Docs…)</label>
-          <input id="tda-link" type="url" placeholder="https://…"></div>
+          <input id="tda-link" type="url" placeholder="https://…" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off"></div>
         <div class="campo"><label for="tda-arquivos">Anexos (foto, PDF, Word, PowerPoint – até 3, máx. 10 MB cada)</label>
           <div id="tda-anexos-atuais"></div>
           <input id="tda-arquivos" type="file" multiple accept="image/*,.pdf,.doc,.docx,.ppt,.pptx"></div>
@@ -119,6 +123,8 @@
       <button class="btn primario" id="voltar-inicio">Voltar ao início</button>
     </div>
   </main>
+
+  <div id="aviso-saida" role="alert" hidden></div>
 
   <dialog id="confirmar">
     <h2>Confira seus dados</h2>
@@ -151,8 +157,77 @@
       mostrar('erro');
     }
 
+    // ---------- Monitoramento de saídas da tela (questionários e TDAs) ----------
+    // Um site não consegue bloquear outras abas; aqui só percebemos a saída, avisamos o aluno e registramos para o professor.
+    // A contagem fica guardada no navegador para não zerar se o aluno recarregar a página.
+    const monitor = { chave: null, dados: null, ausente: false, inicio: 0, porVisibilidade: false, seletorArquivo: false };
+    let temporizadorAviso;
+
+    function lerMonitor(chave) {
+      try { return JSON.parse(localStorage.getItem('saidas:' + chave)) || null; } catch (e) { return null; }
+    }
+    function gravarMonitor() {
+      if (!monitor.chave) return;
+      try { localStorage.setItem('saidas:' + monitor.chave, JSON.stringify(monitor.dados)); } catch (e) { /* sem armazenamento: segue só na memória */ }
+    }
+    function iniciarMonitor(chave) {
+      monitor.chave = chave;
+      monitor.dados = lerMonitor(chave) || { vezes: 0, ms: 0, desde: 0 };
+      monitor.ausente = false;
+      // Recarregar ou fechar a página no meio da atividade também conta como saída.
+      if (monitor.dados.desde) registrarVolta(monitor.dados.desde, true);
+    }
+    function pararMonitor(apagar) {
+      if (apagar && monitor.chave) { try { localStorage.removeItem('saidas:' + monitor.chave); } catch (e) { /* ignora */ } }
+      monitor.chave = null;
+      monitor.ausente = false;
+    }
+    function saidasAtuais() {
+      return monitor.dados && monitor.chave ? { vezes: monitor.dados.vezes, segundos: Math.round(monitor.dados.ms / 1000) } : { vezes: 0, segundos: 0 };
+    }
+    function zerarSaidas() {
+      if (!monitor.dados) return;
+      monitor.dados.vezes = 0;
+      monitor.dados.ms = 0;
+      gravarMonitor();
+    }
+    function saiuDaTela(porVisibilidade) {
+      if (!monitor.chave || monitor.seletorArquivo) return;
+      if (monitor.ausente) { monitor.porVisibilidade = monitor.porVisibilidade || porVisibilidade; return; }
+      monitor.ausente = true;
+      monitor.porVisibilidade = porVisibilidade;
+      monitor.inicio = Date.now();
+      monitor.dados.desde = monitor.inicio;
+      gravarMonitor();
+    }
+    function voltouParaTela() {
+      if (monitor.seletorArquivo) { monitor.seletorArquivo = false; return; }
+      if (!monitor.chave || !monitor.ausente) return;
+      monitor.ausente = false;
+      registrarVolta(monitor.inicio, monitor.porVisibilidade);
+    }
+    function registrarVolta(desde, contaSempre) {
+      const duracao = Date.now() - desde;
+      monitor.dados.desde = 0;
+      // Trocar de aba sempre conta; perder o foco da janela só conta a partir de 1,5 s (evita cliques acidentais).
+      if (contaSempre || duracao >= 1500) {
+        monitor.dados.vezes += 1;
+        monitor.dados.ms += duracao;
+        const aviso = $('aviso-saida');
+        aviso.textContent = `⚠️ Você saiu da tela da atividade (${monitor.dados.vezes} ${monitor.dados.vezes === 1 ? 'vez' : 'vezes'}). Isso fica registrado para o professor.`;
+        aviso.hidden = false;
+        clearTimeout(temporizadorAviso);
+        temporizadorAviso = setTimeout(() => (aviso.hidden = true), 7000);
+      }
+      gravarMonitor();
+    }
+    document.addEventListener('visibilitychange', () => (document.hidden ? saiuDaTela(true) : voltouParaTela()));
+    window.addEventListener('blur', () => saiuDaTela(false));
+    window.addEventListener('focus', voltouParaTela);
+
     function render(estado) {
       estadoAtual = estado;
+      pararMonitor(false);
       if (!estado.aluno) {
         const series = [...new Set(estado.turmas.map((t) => t.serie))];
         $('turma').innerHTML = '<option value="">Selecione…</option>' + series.map((s) =>
@@ -222,6 +297,7 @@
       try {
         quizAtual = await chamar('alunoAbrirQuestionario', id);
         renderQuiz();
+        iniciarMonitor('q:' + quizAtual.id);
       } catch (e) {
         alert(e.message);
       } finally { ev.target.disabled = false; }
@@ -270,7 +346,8 @@
       if (!confirm('Enviar as respostas? Depois de enviar não será possível alterar.')) return;
       $('enviar').disabled = true;
       try {
-        estadoAtual = await chamar('alunoResponder', quizAtual.id, m);
+        estadoAtual = await chamar('alunoResponder', quizAtual.id, m, saidasAtuais());
+        pararMonitor(true);
         quizAtual = null;
         mostrar('enviado');
       } catch (e) {
@@ -352,7 +429,12 @@
         $('tda-status').textContent = '';
       }
       mostrar('tda-view');
+      if (podeEditar) iniciarMonitor('t:' + t.id); else pararMonitor(false);
     }
+
+    // Abrir o seletor de arquivos tira o foco da página, mas não é saída da atividade.
+    $('tda-arquivos').addEventListener('click', () => (monitor.seletorArquivo = true));
+    $('tda-arquivos').addEventListener('change', () => (monitor.seletorArquivo = false));
 
     /** Lê o arquivo em base64. Fotos grandes são reduzidas (máx. 1600 px) para envio mais rápido. */
     function lerArquivo(arquivo) {
@@ -399,8 +481,9 @@
       try {
         const lidos = await Promise.all(arquivos.map(lerArquivo));
         const t = await chamar('alunoEnviarTda', tdaAtual.id, {
-          texto: $('tda-texto').value, link: $('tda-link').value.trim(), manterAnexos: manter, arquivos: lidos,
+          texto: $('tda-texto').value, link: $('tda-link').value.trim(), manterAnexos: manter, arquivos: lidos, saidas: saidasAtuais(),
         });
+        zerarSaidas(); // o servidor soma as saídas de cada envio
         renderTda(t);
         alert('Entrega enviada! ✅');
       } catch (e) {

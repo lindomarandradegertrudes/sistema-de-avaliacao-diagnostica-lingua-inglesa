@@ -204,6 +204,7 @@
             ${e.anexos.length ? `<div>📎 ${e.anexos.length} anexo(s)</div>` : ''}
           </div>` : ''}
         ${u.membros.map((m) => `<div class="tda-membro"><span class="nome">${esc(m.nome)}</span>
+          ${textoSaidas(e && e.saidas && e.saidas[m.email], false)}
           ${m.correcao ? `<strong>${m.correcao.percentual}%</strong>` : '<span class="suave pequeno">—</span>'}
           ${u.membros.length > 1 ? `<button class="btn mini" data-ajustar="${i}" data-email="${esc(m.email)}">Ajustar</button>` : ''}</div>`).join('')}
         <div class="rodape-modal" style="margin-top:10px"><button class="btn primario mini" data-corrigir="${i}">${corrigidos ? 'Rever correção' : 'Corrigir'}</button></div>
@@ -228,6 +229,10 @@
         ${e.texto ? `<div style="white-space:pre-wrap;background:var(--fundo);border-radius:8px;padding:10px 12px">${esc(e.texto)}</div>` : '<p class="suave pequeno">Sem texto.</p>'}
         ${e.link ? `<p>🔗 <a href="${esc(e.link)}" target="_blank" rel="noopener">${esc(e.link)}</a></p>` : ''}
         ${e.anexos.map((a) => `<p>📎 <a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.nome)}</a></p>`).join('')}
+        ${Object.keys(e.saidas || {}).filter((m) => e.saidas[m].vezes).map((m) => {
+          const nome = (e.membros.find((x) => x.email === m) || { nome: m }).nome;
+          return `<p class="pequeno" style="color:var(--perigo)">⚠️ ${esc(nome)} saiu da tela ${e.saidas[m].vezes}× enquanto fazia a TDA (${duracaoTexto(e.saidas[m].segundos)} fora).</p>`;
+        }).join('')}
       </div>` : '<div class="cartao suave pequeno">Sem entrega online — corrija a partir do trabalho no papel.</div>';
 
     $('mt-alvos').innerHTML = !soEmail && unidade.membros.length > 1

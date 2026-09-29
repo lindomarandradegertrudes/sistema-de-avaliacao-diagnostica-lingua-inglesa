@@ -173,7 +173,13 @@ function alunoAbrirQuestionario(id) {
   };
 }
 
-function alunoResponder(id, marcadas) {
+/** Saídas da tela informadas pelo navegador do aluno: { vezes, segundos }. */
+function normalizarSaidas_(s) {
+  const n = function (v, max) { v = Math.floor(Number(v) || 0); return Math.min(Math.max(v, 0), max); };
+  return { vezes: n(s && s.vezes, 1000), segundos: n(s && s.segundos, 24 * 3600) };
+}
+
+function alunoResponder(id, marcadas, saidas) {
   const aluno = alunoAtual_();
   const q = buscarQuestionario_(id);
   if (!Array.isArray(marcadas) || marcadas.length !== q.questoes.length) throw new Error('Responda todas as questões.');
@@ -186,7 +192,9 @@ function alunoResponder(id, marcadas) {
   comTrava_(function () {
     const pendente = pendentesDoAluno_(aluno.email, aluno.turma).some(function (p) { return p.id === id; });
     if (!pendente) throw new Error('Este questionário já foi respondido ou foi encerrado.');
-    gravarResposta_(q, aluno.email, aluno.turma, corrigir_(q.questoes, normalizadas), 'online');
+    const resultado = corrigir_(q.questoes, normalizadas);
+    resultado.detalhe.saidas = normalizarSaidas_(saidas);
+    gravarResposta_(q, aluno.email, aluno.turma, resultado, 'online');
   });
   return alunoObterEstado();
 }
@@ -328,6 +336,7 @@ function profResultados(id) {
         resposta: r ? {
           pontuacao: r.pontuacao, total: r.total, percentual: r.percentual, origem: r.origem,
           respondido_em: r.respondido_em,
+          saidas: r.detalhe && r.detalhe.saidas ? r.detalhe.saidas : null,
           marcadas: r.detalhe && r.detalhe.marcadas ? r.detalhe.marcadas.map(function (m) { return m === null ? '-' : LETRAS_ALT[m]; }).join('') : '',
         } : null,
       };

@@ -15,7 +15,7 @@ const CABECALHOS = {
   Questionarios: ['id', 'tipo', 'serie', 'mes', 'titulo', 'conteudo', 'questoes_json', 'status', 'form_id', 'criado_em'],
   Respostas: ['questionario_id', 'email', 'turma', 'pontuacao', 'total', 'percentual', 'acertos_json', 'origem', 'respondido_em'],
   Grupos: ['mes', 'turma', 'grupo', 'email', 'nome', 'nivel', 'media', 'aplicado_em'],
-  Entregas: ['questionario_id', 'turma', 'grupo', 'membros', 'email', 'texto', 'link', 'anexos_json', 'enviado_em', 'atualizado_em'],
+  Entregas: ['questionario_id', 'turma', 'grupo', 'membros', 'email', 'texto', 'link', 'anexos_json', 'enviado_em', 'atualizado_em', 'saidas_json'],
 };
 
 const CONFIG_PADRAO = [

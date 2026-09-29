@@ -42,13 +42,16 @@ function buscarTda_(id) {
 function lerEntregas_() {
   return lerTabela_('Entregas').map(function (e) {
     let anexos = [];
+    let saidas = {};
     try { anexos = e.anexos_json ? JSON.parse(e.anexos_json) : []; } catch (err) { /* ignora */ }
+    try { saidas = e.saidas_json ? JSON.parse(e.saidas_json) : {}; } catch (err) { /* ignora */ }
     return {
       _linha: e._linha, questionario_id: String(e.questionario_id), turma: String(e.turma),
       grupo: e.grupo === '' ? null : Number(e.grupo),
       membros: String(e.membros || '').split(',').map(function (m) { return m.trim().toLowerCase(); }).filter(String),
       email: String(e.email).toLowerCase(), texto: String(e.texto || ''), link: String(e.link || ''),
       anexos: anexos, enviado_em: String(e.enviado_em), atualizado_em: String(e.atualizado_em),
+      saidas: saidas,
     };
   });
 }
@@ -96,14 +99,17 @@ function correcaoDe_(r) {
   };
 }
 
-function entregaPublica_(e, nomes) {
+/** incluirSaidas: só o professor vê as saídas da tela de cada integrante. */
+function entregaPublica_(e, nomes, incluirSaidas) {
   if (!e) return null;
-  return {
+  const pub = {
     turma: e.turma, grupo: e.grupo, membros: e.membros.map(function (m) { return { email: m, nome: nomes[m] || m }; }),
     enviadoPor: nomes[e.email] || e.email, texto: e.texto, link: e.link,
     anexos: e.anexos.map(function (a) { return { id: a.id, nome: a.nome, url: a.url }; }),
     enviado_em: e.enviado_em, atualizado_em: e.atualizado_em,
   };
+  if (incluirSaidas) pub.saidas = e.saidas;
+  return pub;
 }
 
 // ============================================================
@@ -219,11 +225,17 @@ function alunoEnviarTda(id, dados) {
 
     const prefixo = aluno.turma + (grupo ? ' – Grupo ' + grupo : ' – ' + (nomes[aluno.email] || aluno.email));
     const anexos = anexosMantidos.concat(salvarAnexos_(q, novos, prefixo));
+    // Saídas da tela: soma o que este aluno informou agora ao que já estava registrado para ele.
+    const saidas = atual ? atual.saidas : {};
+    const novasSaidas = normalizarSaidas_(dados.saidas);
+    const anteriores = saidas[aluno.email] || { vezes: 0, segundos: 0 };
+    saidas[aluno.email] = { vezes: anteriores.vezes + novasSaidas.vezes, segundos: anteriores.segundos + novasSaidas.segundos };
     const agora = new Date();
     const linha = linhaDe_('Entregas', {
       questionario_id: id, turma: aluno.turma, grupo: grupo === null ? '' : grupo, membros: membros.join(','),
       email: aluno.email, texto: texto, link: link, anexos_json: JSON.stringify(anexos),
       enviado_em: atual ? aba_('Entregas').getRange(atual._linha, 9).getValue() : agora, atualizado_em: agora,
+      saidas_json: JSON.stringify(saidas),
     });
     const aba = aba_('Entregas');
     if (atual) aba.getRange(atual._linha, 1, 1, linha.length).setValues([linha]);
@@ -256,7 +268,7 @@ function profTdaResultados(id) {
   return {
     questionario: q, turmas: turmas, alunos: alunos, grupos: gruposSerie,
     entregas: lerEntregas_().filter(function (e) { return e.questionario_id === id; })
-      .map(function (e) { return entregaPublica_(e, nomes); }),
+      .map(function (e) { return entregaPublica_(e, nomes, true); }),
   };
 }
 
