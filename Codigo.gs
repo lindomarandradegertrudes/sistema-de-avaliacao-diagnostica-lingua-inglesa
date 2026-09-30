@@ -16,6 +16,9 @@ const CABECALHOS = {
   Respostas: ['questionario_id', 'email', 'turma', 'pontuacao', 'total', 'percentual', 'acertos_json', 'origem', 'respondido_em'],
   Grupos: ['mes', 'turma', 'grupo', 'email', 'nome', 'nivel', 'media', 'aplicado_em'],
   Entregas: ['questionario_id', 'turma', 'grupo', 'membros', 'email', 'texto', 'link', 'anexos_json', 'enviado_em', 'atualizado_em', 'saidas_json'],
+  Periodos: ['id', 'nome', 'inicio', 'fim', 'status', 'fechado_em', 'planilha_url'],
+  Aulas: ['id', 'turma', 'data', 'descricao', 'criado_em'],
+  EntregasDiarias: ['aula_id', 'email', 'status', 'atualizado_em'],
 };
 
 const CONFIG_PADRAO = [
@@ -26,6 +29,9 @@ const CONFIG_PADRAO = [
   ['faixa_basico', 40, 'Média mínima (%) para o nível Básico. Abaixo disso: Iniciante.'],
   ['faixa_intermediario', 60, 'Média mínima (%) para o nível Intermediário.'],
   ['faixa_avancado', 80, 'Média mínima (%) para o nível Avançado.'],
+  ['diaria_verde', 100, 'Entregas diárias: % mínimo para o verde (bônus 1,0).'],
+  ['diaria_amarelo', 80, 'Entregas diárias: % mínimo para o amarelo (bônus 0,5).'],
+  ['diaria_laranja', 50, 'Entregas diárias: % mínimo para o laranja (bônus 0,2). Abaixo: vermelho (0).'],
 ];
 
 // ============================================================
@@ -231,6 +237,7 @@ function alunoObterEstado() {
     grupo: aluno ? grupoDoAluno_(email, String(aluno.turma)) : null,
     questionarios: aluno ? pendentesDoAluno_(email, String(aluno.turma)) : [],
     tdas: aluno ? alunoTdas_(email, String(aluno.turma)) : [],
+    diarias: aluno ? alunoDiarias_(email, String(aluno.turma), cfg) : null,
   };
 }
 
@@ -294,6 +301,9 @@ function profResumo() {
       faixa_basico: Number(cfg.faixa_basico),
       faixa_intermediario: Number(cfg.faixa_intermediario),
       faixa_avancado: Number(cfg.faixa_avancado),
+      diaria_verde: Number(cfg.diaria_verde) || 100,
+      diaria_amarelo: Number(cfg.diaria_amarelo) || 80,
+      diaria_laranja: Number(cfg.diaria_laranja) || 50,
     },
   };
 }
@@ -374,7 +384,14 @@ function profSalvarConfig(novos) {
   if (professores.split(/[\s,;]+/).indexOf(email) === -1 && email !== Session.getEffectiveUser().getEmail().toLowerCase()) {
     throw new Error('Seu próprio e-mail precisa continuar na lista de professores.');
   }
+  const dv = Number(novos.diaria_verde), da = Number(novos.diaria_amarelo), dl = Number(novos.diaria_laranja);
+  if (!(dl > 0 && dl < da && da < dv && dv <= 100)) {
+    throw new Error('Faixas das entregas diárias devem ser crescentes: laranja < amarelo < verde ≤ 100.');
+  }
   const valores = {
+    diaria_verde: dv,
+    diaria_amarelo: da,
+    diaria_laranja: dl,
     dominio: String(novos.dominio || '').replace(/^@/, '').toLowerCase().trim(),
     professores: professores,
     cadastro_aberto: novos.cadastro_aberto === 'NÃO' ? 'NÃO' : 'SIM',

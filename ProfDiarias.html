@@ -1,0 +1,342 @@
+<!-- Entregas diárias: registro de aulas, marcação de entregas e bônus por período. Incluída em Professor.html -->
+<style>
+  .cor-bonus { display: inline-block; font-size: .78rem; font-weight: 700; padding: 2px 9px; border-radius: 99px; color: #fff; white-space: nowrap; }
+  .cor-bonus.verde { background: #2f9e44; } .cor-bonus.amarelo { background: #f08c00; }
+  .cor-bonus.laranja { background: #e8590c; } .cor-bonus.vermelho { background: #e03131; }
+  .cor-bonus.nenhuma { background: var(--borda); color: var(--suave); }
+  .diarias-grade { border-collapse: separate; border-spacing: 0; font-size: .88rem; }
+  .diarias-grade th, .diarias-grade td { border-bottom: 1px solid var(--borda); padding: 6px 8px; text-align: center; white-space: nowrap; }
+  .diarias-grade th.nome, .diarias-grade td.nome { position: sticky; left: 0; background: var(--cartao); text-align: left; z-index: 1; min-width: 180px; }
+  .diarias-grade th.aula { vertical-align: bottom; min-width: 64px; }
+  .diarias-grade th.aula .data { font-weight: 700; color: var(--texto); font-size: .85rem; }
+  .diarias-grade th.aula .acoes-aula { display: flex; gap: 2px; justify-content: center; margin-top: 4px; }
+  .diarias-grade th.aula .acoes-aula button { border: 1px solid var(--borda); background: #fff; border-radius: 5px; padding: 1px 5px; cursor: pointer; font-size: .75rem; }
+  .celula { cursor: pointer; user-select: none; font-size: 1.05rem; width: 44px; }
+  .celula.E { background: #d3f9d8; } .celula.N { background: #ffe3e3; } .celula.D { background: #f1f3f5; color: #868e96; }
+  .celula.vazia { color: #ced4da; }
+  .celula:hover { outline: 2px solid var(--primaria); outline-offset: -2px; }
+  .fechado .celula { cursor: default; } .fechado .celula:hover { outline: none; }
+  #dia-salvando { min-width: 110px; text-align: right; }
+</style>
+
+<section id="aba-diarias" class="pilha" hidden>
+  <div class="linha">
+    <select id="dia-turma" style="width:auto"></select>
+    <select id="dia-periodo" style="width:auto"></select>
+    <button class="btn" id="dia-periodos">Períodos</button>
+    <span class="espaco"></span>
+    <span class="suave pequeno" id="dia-salvando"></span>
+    <button class="btn primario" id="dia-nova-aula">+ Aula</button>
+  </div>
+
+  <div class="cartao linha" id="dia-info"></div>
+
+  <div class="legenda pequeno suave" id="dia-legenda"></div>
+
+  <div class="cartao tabela-rolagem" id="dia-grade-box">
+    <table class="diarias-grade" id="dia-grade"></table>
+  </div>
+</section>
+
+<dialog id="modal-aula">
+  <form id="form-aula" method="dialog">
+    <h2 id="aula-titulo">Nova aula</h2>
+    <input type="hidden" id="aula-id">
+    <div class="campo"><label for="aula-data">Data</label><input id="aula-data" type="date" required></div>
+    <div class="campo"><label for="aula-descricao">Tarefa do dia (opcional)</label>
+      <input id="aula-descricao" placeholder="ex.: Ficha Aula 3 – Simple Past"></div>
+    <div class="rodape-modal">
+      <button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn primario" type="submit">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="modal-periodos" style="width:min(620px, calc(100vw - 32px))">
+  <div class="linha" style="margin-bottom:10px"><h2 style="margin:0">Períodos do bônus</h2><span class="espaco"></span>
+    <button class="btn" type="button" data-fechar>Fechar</button></div>
+  <p class="suave pequeno">Cada aula entra no período em que a data cair. Os períodos não podem se sobrepor.</p>
+  <div class="tabela-rolagem"><table><thead><tr><th>Nome</th><th>Início</th><th>Fim</th><th>Situação</th><th></th></tr></thead>
+    <tbody id="per-lista"></tbody></table></div>
+  <form id="form-periodo" class="pilha" style="margin-top:14px">
+    <h3 id="per-form-titulo" style="margin:0">Novo período</h3>
+    <input type="hidden" id="per-id">
+    <div class="grade-2">
+      <div class="campo"><label for="per-nome">Nome</label><input id="per-nome" placeholder="ex.: 3º trimestre" required></div>
+      <div class="grade-2">
+        <div class="campo"><label for="per-inicio">Início</label><input id="per-inicio" type="date" required></div>
+        <div class="campo"><label for="per-fim">Fim</label><input id="per-fim" type="date" required></div>
+      </div>
+    </div>
+    <div class="rodape-modal" style="margin-top:0">
+      <button class="btn" type="button" id="per-cancelar" hidden>Cancelar edição</button>
+      <button class="btn primario" type="submit">Salvar período</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  const dia = { dados: null, pendentes: {}, temporizador: null, salvando: false };
+  const SIMBOLO = { E: '✅', N: '❌', D: '➖', '': '·' };
+  const PROXIMO = { '': 'E', E: 'N', N: 'D', D: '' };
+
+  function dataBr(iso) { const [a, m, d] = String(iso).split('-'); return d && m ? `${d}/${m}${a ? '/' + a : ''}` : iso; }
+  function dataCurta(iso) { const [, m, d] = String(iso).split('-'); return `${d}/${m}`; }
+  function formatarBonus(b) { return b == null ? '—' : b.toLocaleString('pt-BR', { minimumFractionDigits: 1 }); }
+
+  /** Mesmo cálculo do servidor (resumoDiarias_) para atualizar a tela na hora, antes de salvar. */
+  function resumoAluno(email) {
+    const d = dia.dados;
+    let E = 0, N = 0, D = 0, P = 0;
+    d.aulas.forEach((a) => {
+      const s = d.marcacoes[a.id + '|' + email] || '';
+      if (s === 'E') E++; else if (s === 'N') N++; else if (s === 'D') D++; else P++;
+    });
+    const validas = E + N;
+    const pct = validas ? Math.round((E / validas) * 1000) / 10 : null;
+    const faixa = pct == null ? null : d.faixas.find((f) => pct >= f.minimo) || d.faixas[d.faixas.length - 1];
+    return { E, N, D, P, validas, pct, faixa };
+  }
+
+  function periodoFechado() { return dia.dados && dia.dados.periodo && dia.dados.periodo.status === 'fechado'; }
+
+  async function carregarDiarias(periodoId) {
+    if (Object.keys(dia.pendentes).length) await salvarPendentes();
+    $('dia-grade').innerHTML = '<tr><td class="carregando">Carregando…</td></tr>';
+    try {
+      dia.dados = await chamar('profDiariasDados', $('dia-turma').value, periodoId ?? $('dia-periodo').value);
+    } catch (e) {
+      $('dia-grade').innerHTML = `<tr><td class="vazio" style="color:var(--perigo)">Erro ao carregar: ${esc(e.message)}</td></tr>`;
+      return;
+    }
+    renderDiarias();
+  }
+
+  function renderDiarias() {
+    const d = dia.dados;
+    $('dia-periodo').innerHTML = d.periodos.length
+      ? d.periodos.map((p) => `<option value="${esc(p.id)}" ${d.periodo && p.id === d.periodo.id ? 'selected' : ''}>${esc(p.nome)} (${dataCurta(p.inicio)}–${dataCurta(p.fim)})${p.status === 'fechado' ? ' · fechado' : ''}</option>`).join('')
+      : '<option value="">Nenhum período</option>';
+
+    $('dia-legenda').innerHTML = d.faixas.map((f) =>
+      `<span><span class="cor-bonus ${f.cor}">${f.rotulo} · ${formatarBonus(f.bonus)}</span> ${f.minimo ? (f.minimo >= 100 ? '100%' : '≥ ' + f.minimo + '%') : 'abaixo de ' + d.faixas[d.faixas.length - 2].minimo + '%'}</span>`).join('') +
+      ' <span>· Clique na célula: ✅ entregou → ❌ não entregou → ➖ dispensado → vazio. Vazio e ➖ não contam.</span>';
+
+    if (!d.periodo) {
+      $('dia-info').innerHTML = '<span>Crie um <strong>período</strong> (ex.: 3º trimestre, com as datas de início e fim) para começar a registrar as aulas.</span><span class="espaco"></span><button class="btn primario" id="dia-criar-periodo">Criar período</button>';
+      $('dia-criar-periodo').onclick = abrirPeriodos;
+      $('dia-grade').innerHTML = '';
+      $('dia-nova-aula').disabled = true;
+      return;
+    }
+    const fechado = periodoFechado();
+    $('dia-nova-aula').disabled = fechado;
+    $('dia-info').innerHTML = `
+      <div><strong>${esc(d.periodo.nome)}</strong> <span class="suave">· ${dataBr(d.periodo.inicio)} a ${dataBr(d.periodo.fim)} · ${d.aulas.length} aula(s) registradas na ${esc(d.turma)}</span>
+        ${fechado ? `<div class="pequeno" style="color:var(--perigo)">Período fechado em ${esc(d.periodo.fechado_em)} — marcações bloqueadas.${d.periodo.planilha_url ? ` <a href="${esc(d.periodo.planilha_url)}" target="_blank" rel="noopener">Abrir planilha do bônus</a>` : ''}</div>` : ''}</div>
+      <span class="espaco"></span>
+      ${fechado ? '<button class="btn" id="dia-reabrir">Reabrir período</button>' : '<button class="btn" id="dia-fechar">Fechar período e gerar planilha</button>'}`;
+    if ($('dia-fechar')) $('dia-fechar').onclick = fecharPeriodo;
+    if ($('dia-reabrir')) $('dia-reabrir').onclick = reabrirPeriodo;
+
+    if (!d.alunos.length) { $('dia-grade').innerHTML = '<tr><td class="vazio">Nenhum aluno cadastrado nesta turma.</td></tr>'; return; }
+    if (!d.aulas.length) {
+      $('dia-grade').innerHTML = `<tr><td class="vazio">Nenhuma aula registrada neste período. Clique em <strong>+ Aula</strong>.</td></tr>`;
+      return;
+    }
+    $('dia-grade').className = 'diarias-grade' + (fechado ? ' fechado' : '');
+    $('dia-grade').innerHTML = `
+      <thead><tr><th class="nome">Aluno</th>
+        ${d.aulas.map((a) => `<th class="aula" title="${esc(a.descricao)}"><div class="data">${dataCurta(a.data)}</div>
+          <div class="suave pequeno" style="max-width:90px;overflow:hidden;text-overflow:ellipsis">${esc(a.descricao) || '&nbsp;'}</div>
+          ${fechado ? '' : `<div class="acoes-aula"><button data-todos="${esc(a.id)}" title="Todos entregaram">✅ todos</button>
+            <button data-editar-aula="${esc(a.id)}" title="Editar aula">✏️</button><button data-excluir-aula="${esc(a.id)}" title="Excluir aula">🗑</button></div>`}</th>`).join('')}
+        <th>Entregas</th><th>%</th><th>Bônus</th></tr></thead>
+      <tbody>${d.alunos.map((al) => linhaAluno(al)).join('')}</tbody>`;
+  }
+
+  function linhaAluno(al) {
+    const d = dia.dados;
+    const r = resumoAluno(al.email);
+    return `<tr data-aluno="${esc(al.email)}"><td class="nome">${esc(al.nome)}</td>
+      ${d.aulas.map((a) => {
+        const s = d.marcacoes[a.id + '|' + al.email] || '';
+        return `<td class="celula ${s || 'vazia'}" data-aula="${esc(a.id)}" data-email="${esc(al.email)}">${SIMBOLO[s]}</td>`;
+      }).join('')}
+      <td class="resumo-e">${r.E}/${r.validas}${r.D ? ` <span class="suave pequeno">(+${r.D} disp.)</span>` : ''}</td>
+      <td class="resumo-p">${r.pct == null ? '—' : r.pct + '%'}</td>
+      <td class="resumo-b">${r.faixa ? `<span class="cor-bonus ${r.faixa.cor}">${formatarBonus(r.faixa.bonus)}</span>` : '<span class="cor-bonus nenhuma">—</span>'}</td></tr>`;
+  }
+
+  function atualizarLinha(email) {
+    const tr = document.querySelector(`#dia-grade tr[data-aluno="${CSS.escape(email)}"]`);
+    if (!tr) return;
+    const al = dia.dados.alunos.find((a) => a.email === email);
+    tr.outerHTML = linhaAluno(al);
+  }
+
+  // ---------- Marcação com salvamento automático ----------
+  function marcar(aulaId, email, status) {
+    dia.dados.marcacoes[aulaId + '|' + email] = status;
+    dia.pendentes[aulaId + '|' + email] = { aula_id: aulaId, email, status };
+    $('dia-salvando').textContent = 'Alterações não salvas…';
+    clearTimeout(dia.temporizador);
+    dia.temporizador = setTimeout(salvarPendentes, 1200);
+  }
+
+  async function salvarPendentes() {
+    clearTimeout(dia.temporizador);
+    const lista = Object.values(dia.pendentes);
+    if (!lista.length || dia.salvando) return;
+    dia.pendentes = {};
+    dia.salvando = true;
+    $('dia-salvando').textContent = 'Salvando…';
+    try {
+      await chamar('profSalvarMarcacoes', lista);
+      $('dia-salvando').textContent = Object.keys(dia.pendentes).length ? 'Alterações não salvas…' : 'Tudo salvo ✓';
+    } catch (e) {
+      lista.forEach((m) => { dia.pendentes[m.aula_id + '|' + m.email] = dia.pendentes[m.aula_id + '|' + m.email] || m; });
+      $('dia-salvando').textContent = '⚠️ Não salvo — tente de novo';
+    } finally {
+      dia.salvando = false;
+      if (Object.keys(dia.pendentes).length) dia.temporizador = setTimeout(salvarPendentes, 1500);
+    }
+  }
+
+  // ---------- Aulas ----------
+  function abrirAula(aula) {
+    $('aula-titulo').textContent = aula ? 'Editar aula' : `Nova aula – ${dia.dados.turma}`;
+    $('aula-id').value = aula ? aula.id : '';
+    const hoje = dia.dados.hoje;
+    const p = dia.dados.periodo;
+    $('aula-data').value = aula ? aula.data : (hoje >= p.inicio && hoje <= p.fim ? hoje : p.inicio);
+    $('aula-data').min = p.inicio;
+    $('aula-data').max = p.fim;
+    $('aula-descricao').value = aula ? aula.descricao : '';
+    $('modal-aula').showModal();
+  }
+
+  // ---------- Períodos ----------
+  function renderPeriodos() {
+    const ps = dia.dados.periodos;
+    $('per-lista').innerHTML = ps.length ? ps.map((p) => `<tr><td>${esc(p.nome)}</td><td>${dataBr(p.inicio)}</td><td>${dataBr(p.fim)}</td>
+      <td>${p.status === 'fechado' ? '<span class="selo encerrado">Fechado</span>' : '<span class="selo aberto">Aberto</span>'}</td>
+      <td class="acoes">${p.status === 'fechado' ? '' : `<button class="btn mini" data-per-editar="${esc(p.id)}">Editar</button>
+        <button class="btn mini perigo" data-per-excluir="${esc(p.id)}">Excluir</button>`}</td></tr>`).join('')
+      : '<tr><td colspan="5" class="vazio">Nenhum período ainda.</td></tr>';
+  }
+  function limparFormPeriodo() {
+    $('per-id').value = ''; $('per-nome').value = ''; $('per-inicio').value = ''; $('per-fim').value = '';
+    $('per-form-titulo').textContent = 'Novo período'; $('per-cancelar').hidden = true;
+  }
+  function abrirPeriodos() { renderPeriodos(); limparFormPeriodo(); $('modal-periodos').showModal(); }
+
+  async function fecharPeriodo(ev) {
+    const p = dia.dados.periodo;
+    if (!confirm(`Fechar o período "${p.nome}"?\n\nAs marcações de TODAS as turmas neste período ficam bloqueadas e será gerada uma planilha no seu Drive com o bônus de cada aluno. Você pode reabrir depois, se precisar corrigir.`)) return;
+    await salvarPendentes();
+    comBotao(ev.target, async () => {
+      const url = await chamar('profFecharPeriodo', p.id);
+      await carregarDiarias(p.id);
+      avisar('Período fechado. Planilha criada no seu Drive.');
+      window.open(url, '_blank', 'noopener');
+    });
+  }
+  function reabrirPeriodo(ev) {
+    if (!confirm('Reabrir o período? As marcações voltam a poder ser alteradas e os alunos veem as mudanças.')) return;
+    comBotao(ev.target, async () => {
+      await chamar('profReabrirPeriodo', dia.dados.periodo.id);
+      await carregarDiarias(dia.dados.periodo.id);
+      avisar('Período reaberto.');
+    });
+  }
+
+  function configurarDiarias() {
+    $('dia-turma').innerHTML = opcoesTurma(false);
+    document.querySelector('.abas button[data-aba="diarias"]').addEventListener('click', () => carregarDiarias());
+    $('dia-turma').addEventListener('change', () => carregarDiarias());
+    $('dia-periodo').addEventListener('change', () => carregarDiarias($('dia-periodo').value));
+    $('dia-nova-aula').addEventListener('click', () => abrirAula(null));
+    $('dia-periodos').addEventListener('click', abrirPeriodos);
+
+    $('dia-grade').addEventListener('click', (ev) => {
+      const celula = ev.target.closest('td.celula');
+      if (celula && !periodoFechado()) {
+        const chave = celula.dataset.aula + '|' + celula.dataset.email;
+        marcar(celula.dataset.aula, celula.dataset.email, PROXIMO[dia.dados.marcacoes[chave] || '']);
+        atualizarLinha(celula.dataset.email);
+        return;
+      }
+      const b = ev.target.closest('button');
+      if (!b) return;
+      if (b.dataset.todos) {
+        const aulaId = b.dataset.todos;
+        const faltando = dia.dados.alunos.filter((al) => !dia.dados.marcacoes[aulaId + '|' + al.email]);
+        // Marca como entregue só quem ainda está vazio; se todos já têm marcação, marca todos como entregue.
+        (faltando.length ? faltando : dia.dados.alunos).forEach((al) => marcar(aulaId, al.email, 'E'));
+        renderDiarias();
+      }
+      if (b.dataset.editarAula) abrirAula(dia.dados.aulas.find((a) => a.id === b.dataset.editarAula));
+      if (b.dataset.excluirAula) {
+        const a = dia.dados.aulas.find((x) => x.id === b.dataset.excluirAula);
+        if (!confirm(`Excluir a aula de ${dataBr(a.data)}${a.descricao ? ' (' + a.descricao + ')' : ''} e todas as marcações dela?`)) return;
+        comBotao(b, async () => {
+          await salvarPendentes();
+          dia.dados = await chamar('profExcluirAula', a.id, dia.dados.periodo.id);
+          renderDiarias();
+          avisar('Aula excluída.');
+        });
+      }
+    });
+
+    $('form-aula').addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      comBotao(ev.submitter, async () => {
+        await salvarPendentes();
+        dia.dados = await chamar('profSalvarAula', {
+          id: $('aula-id').value, turma: dia.dados.turma, data: $('aula-data').value,
+          descricao: $('aula-descricao').value, periodoId: dia.dados.periodo.id,
+        });
+        $('modal-aula').close();
+        renderDiarias();
+        avisar('Aula salva.');
+      });
+    });
+
+    $('form-periodo').addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      comBotao(ev.submitter, async () => {
+        dia.dados.periodos = await chamar('profSalvarPeriodo', {
+          id: $('per-id').value, nome: $('per-nome').value, inicio: $('per-inicio').value, fim: $('per-fim').value,
+        });
+        renderPeriodos();
+        limparFormPeriodo();
+        avisar('Período salvo.');
+        await carregarDiarias(dia.dados.periodo ? dia.dados.periodo.id : '');
+      });
+    });
+    $('per-cancelar').addEventListener('click', limparFormPeriodo);
+    $('per-lista').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      const p = dia.dados.periodos.find((x) => x.id === (b.dataset.perEditar || b.dataset.perExcluir));
+      if (b.dataset.perEditar) {
+        $('per-id').value = p.id; $('per-nome').value = p.nome; $('per-inicio').value = p.inicio; $('per-fim').value = p.fim;
+        $('per-form-titulo').textContent = 'Editar período'; $('per-cancelar').hidden = false;
+      }
+      if (b.dataset.perExcluir) {
+        if (!confirm(`Excluir o período "${p.nome}"? As aulas e marcações continuam guardadas, mas deixam de aparecer até existir um período com essas datas.`)) return;
+        comBotao(b, async () => {
+          dia.dados.periodos = await chamar('profExcluirPeriodo', p.id);
+          renderPeriodos();
+          await carregarDiarias('');
+        });
+      }
+    });
+
+    // Não perder marcações ao fechar a aba do navegador.
+    window.addEventListener('beforeunload', (ev) => {
+      if (Object.keys(dia.pendentes).length) { salvarPendentes(); ev.preventDefault(); ev.returnValue = ''; }
+    });
+  }
+</script>

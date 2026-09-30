@@ -4,6 +4,46 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# Entregas diárias (bônus)
+
+## A. Atualizar o código
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `Diarias.gs` | **arquivo novo:** clique em **+ > Script**, dê o nome `Diarias` e cole **Diarias.gs** |
+| `ProfDiarias.html` | **arquivo novo:** clique em **+ > HTML**, dê o nome `ProfDiarias` e cole **ProfDiarias.html** |
+| `Codigo.gs`, `Professor.html`, `Aluno.html` | apague tudo e cole as novas versões |
+
+Depois faça o seguinte:
+1. Execute **instalar**. Ela cria as abas **Periodos**, **Aulas** e **EntregasDiarias** e as faixas do bônus em Config.
+2. Publique em **Implantar > Gerenciar implantações > ✏️ > Nova versão**.
+
+## B. Usar
+1. **Crie o período:** em **Entregas diárias > Períodos**, dê um nome (ex.: "3º trimestre") e as datas de início e fim. Os períodos não podem se sobrepor.
+2. **Registre a aula:** escolha a turma e clique em **+ Aula**. Informe a data e, se quiser, a tarefa do dia.
+3. **Marque as entregas:** clique na célula do aluno para alternar entre ✅ entregou, ❌ não entregou, ➖ dispensado (falta justificada, por exemplo) e vazio. O botão **✅ todos** marca como entregue quem ainda está em branco naquela aula. Tudo é salvo sozinho em cerca de 1 segundo.
+4. **Acompanhe o bônus:** ao lado de cada aluno aparecem as entregas, o percentual e o bônus na cor da faixa.
+5. **Feche o período:** o botão **Fechar período e gerar planilha** bloqueia as marcações de todas as turmas e cria no seu Drive a planilha com o bônus de cada aluno. Você pode reabrir se precisar corrigir.
+
+**Regra do bônus:** conta o percentual de tarefas entregues no período. As aulas com ➖ ou em branco não entram na conta. As faixas são editáveis em Configurações.
+
+| Cor | Bônus | Faixa padrão |
+|---|---|---|
+| 🟢 Verde | 1,0 | 100% |
+| 🟡 Amarelo | 0,5 | 80–99% |
+| 🟠 Laranja | 0,2 | 50–79% |
+| 🔴 Vermelho | 0 | abaixo de 50% |
+
+**O que o aluno vê**, em "Minhas tarefas diárias":
+- a barra na cor da faixa e o bônus atual;
+- quantas tarefas entregou;
+- o que falta para a próxima cor;
+- a lista das aulas com ✅, ❌, ➖ e ⏳ (aguardando o professor).
+
+O bônus **não** altera o nível nem os grupos.
+
+---
+
 # TDAs (Tarefas de Desempenho Autêntico)
 
 ## A. Atualizar o código

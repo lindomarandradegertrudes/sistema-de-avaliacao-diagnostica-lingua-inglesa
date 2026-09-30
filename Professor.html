@@ -56,6 +56,7 @@
     <button data-aba="alunos">Alunos</button>
     <button data-aba="questionarios">Questionários</button>
     <button data-aba="grupos">Grupos</button>
+    <button data-aba="diarias">Entregas diárias</button>
     <button data-aba="relatorios">Relatórios</button>
     <button data-aba="config">Configurações</button>
   </nav>
@@ -200,6 +201,7 @@
 
     <?!= incluir('ProfGrupos'); ?>
     <?!= incluir('ProfRelatorios'); ?>
+    <?!= incluir('ProfDiarias'); ?>
 
     <!-- Configurações -->
     <section id="aba-config" class="pilha" hidden>
@@ -225,6 +227,15 @@
             <span class="pequeno">Básico</span><input id="cfg-b" type="number" min="1" max="100" style="width:80px">
             <span class="pequeno">Intermediário</span><input id="cfg-i" type="number" min="1" max="100" style="width:80px">
             <span class="pequeno">Avançado</span><input id="cfg-a" type="number" min="1" max="100" style="width:80px">
+          </div>
+        </div>
+        <div class="campo">
+          <label>Bônus das entregas diárias (% mínimo de tarefas entregues)</label>
+          <div class="linha">
+            <span class="suave pequeno">Vermelho (0): abaixo do laranja</span>
+            <span class="pequeno">Laranja (0,2)</span><input id="cfg-dl" type="number" min="1" max="100" style="width:80px">
+            <span class="pequeno">Amarelo (0,5)</span><input id="cfg-da" type="number" min="1" max="100" style="width:80px">
+            <span class="pequeno">Verde (1,0)</span><input id="cfg-dv" type="number" min="1" max="100" style="width:80px">
           </div>
         </div>
         <div class="rodape-modal"><button class="btn primario" type="submit">Salvar</button></div>
@@ -863,6 +874,9 @@
       $('cfg-b').value = c.faixa_basico;
       $('cfg-i').value = c.faixa_intermediario;
       $('cfg-a').value = c.faixa_avancado;
+      $('cfg-dl').value = c.diaria_laranja;
+      $('cfg-da').value = c.diaria_amarelo;
+      $('cfg-dv').value = c.diaria_verde;
       $('api-status').textContent = estado.resumo.temChaveApi ? 'chave configurada ✅' : 'sem chave (use a opção de colar questões)';
     }
 
@@ -876,6 +890,9 @@
           faixa_basico: $('cfg-b').value,
           faixa_intermediario: $('cfg-i').value,
           faixa_avancado: $('cfg-a').value,
+          diaria_laranja: $('cfg-dl').value,
+          diaria_amarelo: $('cfg-da').value,
+          diaria_verde: $('cfg-dv').value,
         });
         estado.alunos = await chamar('profListarAlunos');
         renderTudo();
@@ -928,6 +945,7 @@
         configurarGrupos();
         configurarRelatorios();
         configurarTda();
+        configurarDiarias();
         $('carregando').hidden = true;
         abrirAba('turmas');
       } catch (e) {

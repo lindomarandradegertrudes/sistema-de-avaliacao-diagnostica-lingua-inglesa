@@ -31,6 +31,18 @@
     .feedback { background: #fff9db; border-left: 4px solid #fab005; border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; }
     .anexo-atual { display: flex; gap: 8px; align-items: center; font-size: .9rem; margin-top: 4px; }
     .anexo-atual input { width: auto; }
+    .barra-bonus { position: relative; height: 22px; background: #f1f3f5; border-radius: 99px; overflow: hidden; margin: 10px 0 4px; }
+    .barra-bonus .preenchimento { height: 100%; border-radius: 99px; transition: width .4s; }
+    .barra-bonus .marca { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(0,0,0,.18); }
+    .fundo-verde { background: #2f9e44; } .fundo-amarelo { background: #f08c00; }
+    .fundo-laranja { background: #e8590c; } .fundo-vermelho { background: #e03131; }
+    .faixas-bonus { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+    .faixas-bonus span { font-size: .78rem; font-weight: 700; padding: 3px 10px; border-radius: 99px; color: #fff; opacity: .35; }
+    .faixas-bonus span.atual { opacity: 1; box-shadow: 0 0 0 3px rgba(0,0,0,.12); }
+    .bonus-grande { font-size: 1.8rem; font-weight: 800; }
+    .aula-diaria { display: flex; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--borda); font-size: .9rem; }
+    .aula-diaria .data { font-weight: 700; min-width: 48px; }
+    .aula-diaria .desc { flex: 1; color: var(--suave); }
     #aviso-saida {
       position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 20; max-width: calc(100vw - 32px);
       background: #c92a2a; color: #fff; padding: 12px 18px; border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.25); font-weight: 600;
@@ -66,6 +78,10 @@
       <div class="cartao">
         <h1 class="ola">Hello, <span id="primeiro-nome"></span>! 👋</h1>
         <p class="suave" style="margin:0"><span id="nome-completo"></span> · Turma <strong id="minha-turma"></strong></p>
+      </div>
+      <div class="cartao" id="diarias-card" hidden>
+        <h2>Minhas tarefas diárias</h2>
+        <div id="diarias"></div>
       </div>
       <div class="cartao">
         <h2>Questionários</h2>
@@ -249,6 +265,8 @@
             </div>`).join('')
         : '<p class="vazio" style="padding:8px 0">Nenhum questionário pendente. 🎉</p>';
 
+      renderDiarias(estado.diarias);
+
       const SIT = { pendente: ['pendente-s', 'Pendente'], enviada: ['enviada', 'Enviada'], corrigida: ['corrigida', 'Corrigida'] };
       $('tdas').innerHTML = (estado.tdas || []).length
         ? estado.tdas.map((t) => `
@@ -266,6 +284,47 @@
             `<div class="colega ${n === estado.aluno.nome ? 'eu' : ''}">${esc(n)}</div>`).join('')}`
         : '<p class="vazio" style="padding:8px 0">Os grupos ainda não foram formados.</p>';
       mostrar('painel');
+    }
+
+    // ---------- Tarefas diárias (bônus) ----------
+    function renderDiarias(d) {
+      $('diarias-card').hidden = !d;
+      if (!d) return;
+      const r = d.resumo;
+      const br = (iso) => { const [, m, dd] = iso.split('-'); return `${dd}/${m}`; };
+      const num = (b) => b.toLocaleString('pt-BR', { minimumFractionDigits: 1 });
+      const EMOJI = { verde: '🟢', amarelo: '🟡', laranja: '🟠', vermelho: '🔴' };
+      const SIMB = { E: ['✅', 'entregue'], N: ['❌', 'não entregue'], D: ['➖', 'dispensado'], '': ['⏳', 'aguardando o professor'] };
+      const faixaAtual = d.faixas.find((f) => f.cor === r.cor);
+      const marcas = d.faixas.filter((f) => f.minimo > 0 && f.minimo < 100)
+        .map((f) => `<span class="marca" style="left:${f.minimo}%" title="${f.rotulo}: ${f.minimo}%"></span>`).join('');
+
+      let dica = '';
+      if (r.proxima) {
+        dica = r.proxima.faltam > 0
+          ? `Entregue ${r.proxima.faltam === 1 ? 'a próxima <strong>1</strong> tarefa' : `as próximas <strong>${r.proxima.faltam}</strong> tarefas`} para chegar ao ${EMOJI[r.proxima.cor]} <strong>${r.proxima.rotulo.toLowerCase()}</strong> (${num(r.proxima.bonus)} ponto).`
+          : `Continue entregando para chegar ao ${EMOJI[r.proxima.cor]} ${r.proxima.rotulo.toLowerCase()}.`;
+        if (r.naoEntregues > 0 && r.cor !== 'verde') dica += ' <span class="suave">O verde exige todas as tarefas do período.</span>';
+      } else if (r.cor === 'verde') {
+        dica = 'Parabéns! Você entregou todas as tarefas até agora. 🎉 Continue assim!';
+      } else if (r.total) {
+        dica = 'Você está na faixa mais alta possível neste período (o verde exige todas as tarefas). Continue entregando para não cair de faixa!';
+      }
+
+      $('diarias').innerHTML = `
+        <p class="suave pequeno" style="margin:0">${esc(d.periodo.nome)} · ${br(d.periodo.inicio)} a ${br(d.periodo.fim)}${d.periodo.fechado ? ' · <strong>período encerrado</strong>' : ''}</p>
+        ${r.total ? `
+          <div class="linha" style="margin-top:8px"><span class="bonus-grande">${EMOJI[r.cor]} ${num(r.bonus)}</span>
+            <span class="suave">ponto extra${d.periodo.fechado ? '' : ' até agora'}</span></div>
+          <div class="barra-bonus">${marcas}<div class="preenchimento fundo-${r.cor}" style="width:${Math.max(r.percentual, 3)}%"></div></div>
+          <p style="margin:4px 0">Você entregou <strong>${r.entregues} de ${r.total}</strong> tarefas (${r.percentual}%).</p>
+          <div class="faixas-bonus">${d.faixas.map((f) => `<span class="fundo-${f.cor} ${f === faixaAtual ? 'atual' : ''}">${f.rotulo} · ${num(f.bonus)}</span>`).join('')}</div>
+          ${dica ? `<p class="pequeno" style="margin:6px 0 10px">${dica}</p>` : ''}`
+        : '<p class="suave">Ainda não há tarefas corrigidas neste período.</p>'}
+        ${d.aulas.length ? `<details ${r.naoEntregues ? 'open' : ''}><summary class="pequeno" style="cursor:pointer">Ver minhas tarefas por aula (${d.aulas.length})</summary>
+          ${d.aulas.slice().reverse().map((a) => `<div class="aula-diaria"><span class="data">${br(a.data)}</span>
+            <span class="desc">${esc(a.descricao) || 'Tarefa da aula'}</span>
+            <span title="${SIMB[a.status][1]}">${SIMB[a.status][0]}</span></div>`).join('')}</details>` : ''}`;
     }
 
     // ---------- Cadastro ----------
