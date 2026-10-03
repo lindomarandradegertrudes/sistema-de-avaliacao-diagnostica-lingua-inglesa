@@ -4,6 +4,18 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# Exceção do monitoramento de tela (uso do Canva)
+
+Substitua **Codigo.gs, Questionarios.gs, Tda.gs, Professor.html e Aluno.html**. Depois execute **instalar**, que acrescenta a coluna `monitorar` na aba Questionarios, e publique uma **nova versão**.
+
+No editor de cada questionário ou TDA aparece a caixa **"Monitorar saídas da tela"**:
+- **marcada (padrão):** o aluno é avisado e você vê as saídas nos Resultados;
+- **desmarcada:** o aluno pode usar o Canva ou outros sites nessa atividade, sem aviso e sem registro.
+
+As atividades já existentes continuam monitoradas. O sistema não tem como liberar só um site específico, porque o navegador não informa para onde o aluno foi.
+
+---
+
 # Entregas diárias (bônus)
 
 ## A. Atualizar o código

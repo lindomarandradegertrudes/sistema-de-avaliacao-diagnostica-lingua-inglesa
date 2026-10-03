@@ -176,7 +176,7 @@ function alunoAbrirTda(id) {
   const correcao = correcaoDe_(lerRespostas_().filter(function (r) { return r.questionario_id === id && r.email === aluno.email; })[0]);
   const grupo = q.tda.modo === 'grupo' ? grupoAtualDoAluno_(aluno.email, aluno.turma) : null;
   return {
-    id: q.id, titulo: q.titulo, aberta: q.status === 'aberto', modo: q.tda.modo,
+    id: q.id, titulo: q.titulo, aberta: q.status === 'aberto', modo: q.tda.modo, monitorar: q.monitorar,
     situacao: q.tda.situacao, produto: q.tda.produto, tarefas: q.tda.tarefas, criterios: q.tda.criterios,
     // A rubrica só é mostrada ao aluno depois da correção, junto com os níveis que ele recebeu.
     rubrica: correcao ? q.tda.rubrica : null,
@@ -227,7 +227,7 @@ function alunoEnviarTda(id, dados) {
     const anexos = anexosMantidos.concat(salvarAnexos_(q, novos, prefixo));
     // Saídas da tela: soma o que este aluno informou agora ao que já estava registrado para ele.
     const saidas = atual ? atual.saidas : {};
-    const novasSaidas = normalizarSaidas_(dados.saidas);
+    const novasSaidas = normalizarSaidas_(q.monitorar ? dados.saidas : null);
     const anteriores = saidas[aluno.email] || { vezes: 0, segundos: 0 };
     saidas[aluno.email] = { vezes: anteriores.vezes + novasSaidas.vezes, segundos: anteriores.segundos + novasSaidas.segundos };
     const agora = new Date();

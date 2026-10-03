@@ -12,7 +12,7 @@ const CABECALHOS = {
   Config: ['chave', 'valor', 'descricao'],
   Turmas: ['turma', 'serie'],
   Alunos: ['email', 'nome', 'turma', 'cadastrado_em', 'atualizado_em'],
-  Questionarios: ['id', 'tipo', 'serie', 'mes', 'titulo', 'conteudo', 'questoes_json', 'status', 'form_id', 'criado_em'],
+  Questionarios: ['id', 'tipo', 'serie', 'mes', 'titulo', 'conteudo', 'questoes_json', 'status', 'form_id', 'criado_em', 'monitorar'],
   Respostas: ['questionario_id', 'email', 'turma', 'pontuacao', 'total', 'percentual', 'acertos_json', 'origem', 'respondido_em'],
   Grupos: ['mes', 'turma', 'grupo', 'email', 'nome', 'nivel', 'media', 'aplicado_em'],
   Entregas: ['questionario_id', 'turma', 'grupo', 'membros', 'email', 'texto', 'link', 'anexos_json', 'enviado_em', 'atualizado_em', 'saidas_json'],

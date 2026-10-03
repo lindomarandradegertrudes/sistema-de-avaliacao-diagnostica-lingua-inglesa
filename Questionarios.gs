@@ -28,6 +28,8 @@ function lerQuestionarios_() {
       id: String(q.id), tipo: String(q.tipo), serie: String(q.serie), mes: String(q.mes),
       titulo: String(q.titulo), conteudo: String(q.conteudo || ''), status: String(q.status || 'rascunho'),
       criado_em: String(q.criado_em),
+      // Vazio (atividades antigas) = monitorada; só 'NÃO' desliga o monitoramento de saídas da tela.
+      monitorar: String(q.monitorar || '').toUpperCase().replace('NAO', 'NÃO') !== 'NÃO',
       questoes: ehTda || !Array.isArray(dados) ? [] : dados,
       tda: ehTda && !Array.isArray(dados) ? dados : null,
     };
@@ -166,7 +168,7 @@ function alunoAbrirQuestionario(id) {
   if (!pendente) throw new Error('Este questionário não está disponível para você.');
   const q = buscarQuestionario_(id);
   return {
-    id: q.id, titulo: q.titulo,
+    id: q.id, titulo: q.titulo, monitorar: q.monitorar,
     questoes: q.questoes.map(function (x) {
       return { texto_apoio: x.texto_apoio, enunciado: x.enunciado, alternativas: x.alternativas };
     }),
@@ -193,7 +195,7 @@ function alunoResponder(id, marcadas, saidas) {
     const pendente = pendentesDoAluno_(aluno.email, aluno.turma).some(function (p) { return p.id === id; });
     if (!pendente) throw new Error('Este questionário já foi respondido ou foi encerrado.');
     const resultado = corrigir_(q.questoes, normalizadas);
-    resultado.detalhe.saidas = normalizarSaidas_(saidas);
+    if (q.monitorar) resultado.detalhe.saidas = normalizarSaidas_(saidas);
     gravarResposta_(q, aluno.email, aluno.turma, resultado, 'online');
   });
   return alunoObterEstado();
@@ -225,6 +227,7 @@ function profSalvarQuestionario(dados) {
   const json = JSON.stringify(conteudoValidado);
   if (json.length > 49000) throw new Error('Conteúdo grande demais para a planilha. Reduza os textos ou divida em dois.');
 
+  const monitorar = dados.monitorar === false ? 'NÃO' : 'SIM';
   let id = String(dados.id || '');
   comTrava_(function () {
     const aba = aba_('Questionarios');
@@ -233,6 +236,7 @@ function profSalvarQuestionario(dados) {
       aba.appendRow(linhaDe_('Questionarios', {
         id: id, tipo: dados.tipo, serie: dados.serie, mes: "'" + mes, titulo: titulo,
         conteudo: String(dados.conteudo || ''), questoes_json: json, status: 'rascunho', form_id: '', criado_em: new Date(),
+        monitorar: monitorar,
       }));
       return;
     }
@@ -249,6 +253,7 @@ function profSalvarQuestionario(dados) {
     const linha = linhaDe_('Questionarios', {
       id: id, tipo: dados.tipo, serie: dados.serie, mes: "'" + mes, titulo: titulo,
       conteudo: String(dados.conteudo || ''), questoes_json: json, status: atual.status, form_id: '', criado_em: aba.getRange(atual._linha, 10).getValue(),
+      monitorar: monitorar,
     });
     aba.getRange(atual._linha, 1, 1, linha.length).setValues([linha]);
   });
@@ -281,6 +286,7 @@ function profImportarQuestionarios(texto) {
       if (SERIES.indexOf(q.serie) === -1) throw new Error(n + 'informe a "serie" da TDA (ex.: "7º").');
       return profSalvarQuestionario({
         tipo: 'tda', serie: q.serie, mes: q.mes, titulo: q.titulo || 'TDA importada', conteudo: q.conteudo || '',
+        monitorar: q.monitorar !== false,
         tda: { modo: q.modo, situacao: q.situacao, produto: q.produto, tarefas: q.tarefas, criterios: q.criterios, rubrica: q.rubrica },
       });
     }
@@ -288,7 +294,7 @@ function profImportarQuestionarios(texto) {
     return profSalvarQuestionario({
       tipo: q.tipo === 'mensal' ? 'mensal' : 'diagnostico',
       serie: q.serie, mes: q.mes, titulo: q.titulo || 'Questionário importado',
-      conteudo: q.conteudo || '', questoes: q.questoes,
+      conteudo: q.conteudo || '', questoes: q.questoes, monitorar: q.monitorar !== false,
     });
   });
   return ids.length;

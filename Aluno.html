@@ -356,7 +356,7 @@
       try {
         quizAtual = await chamar('alunoAbrirQuestionario', id);
         renderQuiz();
-        iniciarMonitor('q:' + quizAtual.id);
+        if (quizAtual.monitorar !== false) iniciarMonitor('q:' + quizAtual.id);
       } catch (e) {
         alert(e.message);
       } finally { ev.target.disabled = false; }
@@ -364,7 +364,9 @@
 
     function renderQuiz() {
       $('quiz-titulo').textContent = quizAtual.titulo;
-      $('quiz-questoes').innerHTML = quizAtual.questoes.map((q, i) => `
+      $('quiz-questoes').innerHTML = (quizAtual.monitorar !== false
+        ? '<p class="suave pequeno" style="margin:0">⚠️ Fique nesta tela até terminar: sair para outras abas ou janelas fica registrado para o professor.</p>'
+        : '') + quizAtual.questoes.map((q, i) => `
         <div class="cartao questao">
           <span class="num">Questão ${i + 1}</span>
           ${q.texto_apoio ? `<div class="apoio">${esc(q.texto_apoio)}</div>` : ''}
@@ -478,6 +480,7 @@
         $('tda-form-ajuda').textContent = (t.modo === 'grupo' && (e ? e.grupo != null : t.grupo)
           ? 'A entrega vale para todo o grupo. Qualquer integrante pode enviar ou atualizar. '
           : '') + 'Você pode escrever o texto, colar um link e/ou anexar arquivos. Dá para atualizar até o professor corrigir.' +
+          (t.monitorar !== false ? ' ⚠️ Nesta TDA, sair desta tela (outras abas ou sites) fica registrado para o professor.' : '') +
           (e ? ` Última atualização: ${e.atualizado_em}, por ${e.enviadoPor}.` : '');
         $('tda-texto').value = e ? e.texto : '';
         $('tda-link').value = e ? e.link : '';
@@ -488,7 +491,7 @@
         $('tda-status').textContent = '';
       }
       mostrar('tda-view');
-      if (podeEditar) iniciarMonitor('t:' + t.id); else pararMonitor(false);
+      if (podeEditar && t.monitorar !== false) iniciarMonitor('t:' + t.id); else pararMonitor(false);
     }
 
     // Abrir o seletor de arquivos tira o foco da página, mas não é saída da atividade.

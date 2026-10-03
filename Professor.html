@@ -141,6 +141,11 @@
             <label for="ed-conteudo">Conteúdo do mês</label>
             <textarea id="ed-conteudo" rows="4" placeholder="Cole aqui o conteúdo/expectativas trabalhados (ex.: Simple past – verbos regulares; leitura de biografias; preposições in/on/at)."></textarea>
           </div>
+          <label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;margin-top:14px">
+            <input type="checkbox" id="ed-monitorar" style="width:auto;margin-top:4px">
+            <span><strong>Monitorar saídas da tela</strong><br>
+              <span class="suave pequeno">Avisa o aluno e registra quando ele troca de aba ou de janela. Desmarque para permitir o uso do Canva ou de outros sites nesta atividade (sem aviso e sem registro).</span></span>
+          </label>
           <div class="linha" style="margin-top:12px">
             <button class="btn so-questionario" id="ed-gerar">✨ Gerar questões com IA</button>
             <button class="btn" id="ed-importar-q">Colar questões (JSON)</button>
@@ -460,7 +465,7 @@
         const acaoStatus = q.status === 'rascunho' ? ['aberto', 'Liberar para alunos']
           : q.status === 'aberto' ? ['encerrado', 'Encerrar'] : ['aberto', 'Reabrir'];
         return `<tr>
-          <td><strong>${esc(q.titulo)}</strong><div class="suave pequeno">${q.tipo === 'tda' ? (q.tda && q.tda.modo === 'grupo' ? 'em grupo' : 'individual') + ' · rubrica com ' + (q.tda ? q.tda.rubrica.length : 0) + ' critérios' : q.questoes.length + ' questões'}</div></td>
+          <td><strong>${esc(q.titulo)}</strong><div class="suave pequeno">${q.tipo === 'tda' ? (q.tda && q.tda.modo === 'grupo' ? 'em grupo' : 'individual') + ' · rubrica com ' + (q.tda ? q.tda.rubrica.length : 0) + ' critérios' : q.questoes.length + ' questões'}${q.monitorar === false ? ' · <span title="O aluno pode usar outros sites, sem aviso nem registro">sem monitoramento de tela</span>' : ''}</div></td>
           <td>${esc(q.serie)}</td>
           <td>${TIPOS[q.tipo] || esc(q.tipo)}</td>
           <td>${esc(q.mes)}</td>
@@ -582,6 +587,7 @@
       $('ed-serie').value = q ? q.serie : ($('q-filtro-serie').value || estado.resumo.series[0]);
       $('ed-mes').value = q ? q.mes : new Date().toISOString().slice(0, 7);
       $('ed-conteudo').value = q ? q.conteudo : '';
+      $('ed-monitorar').checked = q ? q.monitorar !== false : true;
       $('ed-qtd').value = q && q.tipo === 'diagnostico' ? 15 : 10;
       $('ed-ia-status').textContent = '';
       preencherTdaEditor(q && q.tda ? q.tda : null);
@@ -656,6 +662,7 @@
         conteudo: $('ed-conteudo').value,
         questoes: estado.edicao.questoes,
         tda: $('ed-tipo').value === 'tda' ? lerTdaEditor() : null,
+        monitorar: $('ed-monitorar').checked,
       };
     }
 
@@ -716,7 +723,7 @@
           <td>${x ? `<span class="selo ${x.origem === 'online' ? 'aberto' : 'rascunho'}">${x.origem === 'online' ? 'Online' : 'Impresso'}</span>` : '<span class="suave pequeno">pendente</span>'}</td>
           <td>${x ? x.pontuacao + '/' + x.total : ''}</td>
           <td>${x ? x.percentual + '%' : ''}</td>
-          <td>${textoSaidas(x && x.saidas, x && x.origem === 'online')}</td>
+          <td>${r.questionario.monitorar === false ? (x ? '<span class="suave pequeno">não monitorado</span>' : '') : textoSaidas(x && x.saidas, x && x.origem === 'online')}</td>
           <td><input class="lanc" data-email="${esc(a.email)}" data-nome="${esc(a.nome)}" placeholder="${x && x.marcadas ? esc(x.marcadas) : 'letras ou nº'}"></td>
           <td class="acoes">${x && x.marcadas ? `<button class="btn mini" data-ver="${esc(a.email)}">Ver respostas</button> ` : ''}${x ? `<button class="btn mini perigo" data-apagar="${esc(a.email)}">Apagar</button>` : ''}</td>
         </tr>`;
