@@ -3,7 +3,8 @@
  * Um ciclo reúne de 1 a 3 casos do ano (cada caso tem versões ★/★★/★★★ e vale 100 pontos em qualquer degrau).
  * Nota do ciclo = média dos casos do ciclo; casos não concluídos no prazo valem 0.
  * Quem não concluiu nenhum caso no prazo fica sem nota naquele mês (não entra na média).
- * A nota vai para a aba Respostas (questionario_id = id do ciclo, origem "jogos") e entra no nível com o mesmo peso de um questionário.
+ * A nota vai para a aba Respostas (questionario_id = id do ciclo, origem "jogos") e entra no nível com o mesmo peso de um questionário,
+ * mas só quando o aluno conclui TODOS os casos no prazo ou quando o professor fecha o ciclo (antes disso, o aluno vê a média parcial).
  */
 
 const STATUS_CICLO = ['aberto', 'fechado'];
@@ -84,8 +85,12 @@ function resultadoNoCiclo_(ciclo, email, grupos, jogadas) {
   return { prazo: prazo, itens: itens, nota: notaDoCiclo_(itens.map(function (i) { return { pontos: i.pontos || 0, noPrazo: i.noPrazo }; })) };
 }
 
-/** Grava (ou apaga) a nota de jogos dos alunos informados num ciclo aberto. */
-function gravarNotasCiclo_(ciclo, emails) {
+/**
+ * Grava (ou apaga) a nota de jogos dos alunos informados num ciclo aberto.
+ * fechando = true: é o fechamento do ciclo; grava também quem fez só parte (os casos que faltam valem 0).
+ * Sem fechar, só grava quem concluiu todos os casos no prazo.
+ */
+function gravarNotasCiclo_(ciclo, emails, fechando) {
   if (ciclo.status !== 'aberto') return;
   const casos = lerCasos_().filter(function (c) { return !ehTrilha_(c); });
   const grupos = agruparMissoes_(casos);
@@ -97,7 +102,8 @@ function gravarNotasCiclo_(ciclo, emails) {
     emails.forEach(function (email) {
       const r = resultadoNoCiclo_(ciclo, email, grupos, jogadas);
       const existente = respostas.filter(function (x) { return x.email === email; })[0];
-      if (r.nota === null) { if (existente) apagar.push(existente._linha); return; }
+      const completo = r.itens.length > 0 && r.itens.every(function (i) { return i.noPrazo; });
+      if (r.nota === null || (!fechando && !completo)) { if (existente) apagar.push(existente._linha); return; }
       const total = 100 * r.itens.length;
       gravarResposta_(q, email, ciclo.turma, {
         pontuacao: Math.round(r.nota * r.itens.length), total: total, percentual: r.nota,
@@ -208,7 +214,7 @@ function profStatusCiclo(id, status) {
   exigirProfessor_();
   if (STATUS_CICLO.indexOf(status) === -1) throw new Error('Situação inválida.');
   const c = buscarCiclo_(id);
-  if (status === 'fechado') gravarNotasCiclo_(c, emailsDaTurma_(c.turma));
+  if (status === 'fechado') gravarNotasCiclo_(c, emailsDaTurma_(c.turma), true);
   comTrava_(function () {
     const atual = buscarCiclo_(id);
     atual.status = status;

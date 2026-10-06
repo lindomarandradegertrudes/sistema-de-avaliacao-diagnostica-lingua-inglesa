@@ -31,7 +31,8 @@
     <p class="suave pequeno" style="margin:0">
       Um ciclo reúne de 1 a 3 casos do ano para uma turma, com prazo. Cada aluno joga a versão do seu degrau, e todas valem 100 pontos.
       <strong>Nota do ciclo</strong> = média dos casos; caso não concluído no prazo vale 0. Quem não concluiu nenhum caso no prazo fica <strong>sem nota</strong> no mês.
-      A nota entra no nível com o mesmo peso de um questionário mensal. <strong>Fechar</strong> congela as notas.
+      A nota entra no nível (com o peso de um questionário mensal) quando o aluno <strong>conclui todos os casos</strong> no prazo ou quando você <strong>fecha</strong> o ciclo:
+      ao fechar, quem fez só parte recebe a nota com 0 nos casos que faltaram. Feche o ciclo depois do prazo.
     </p>
     <div class="tabela-rolagem">
       <table>
@@ -288,7 +289,7 @@
   function renderResultadosCiclo(r) {
     $('jog-res-legenda').innerHTML = `Prazo da turma: <strong>${dataBrJ(r.ciclo.prazo)}</strong> · ${r.ciclo.status === 'fechado' ? 'ciclo <strong>fechado</strong> (notas congeladas)' : 'ciclo aberto'}. ` +
       'Em cada caso: degrau jogado e pontos. ✔ = concluído no prazo · ⏰ = concluído depois do prazo (não vale). ' +
-      '<strong>Nota</strong> = média dos casos (os não concluídos no prazo valem 0); vazio = sem nota no mês.';
+      '<strong>Nota no nível</strong> = média dos casos; entra quando o aluno conclui todos no prazo ou quando você fecha o ciclo (os que faltarem valem 0). Vazio = ainda sem nota no nível.';
     $('jog-res-tabela').innerHTML = `<thead><tr><th>Aluno</th><th>Degrau atual</th>${r.missoes.map((m) => `<th>${esc(m.titulo)}</th>`).join('')}<th>Nota</th><th>Prazo</th><th></th></tr></thead><tbody>` +
       (r.linhas.length ? r.linhas.map((l) => `
         <tr>

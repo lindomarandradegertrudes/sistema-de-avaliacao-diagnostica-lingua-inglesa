@@ -4,6 +4,12 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# Ajuste da Etapa 2 · nota só entra no nível ao concluir o ciclo
+
+Substitua **Ciclos** (.gs), **Aluno** e **ProfJogos** (.html) → Salvar → Nova versão → F5.
+
+---
+
 # Etapa 2 · Ciclos com nota e casos do ano em degraus
 
 ## A. Atualizar o código
@@ -25,7 +31,7 @@ Depois: **Salvar** → **Implantar > Gerenciar implantações > ✏️ > Nova ve
 5. **Resultados** do ciclo: degrau e pontos de cada caso (✔ no prazo, ⏰ fora do prazo), a **nota** e o botão **Prazo** para prorrogar só para um aluno.
 6. **Fechar** o ciclo congela as notas. Reabrir volta a aceitar conclusões dentro do prazo.
 
-**Regras da nota:** média dos casos do ciclo (todas as versões valem 100). Caso não concluído no prazo vale 0. Quem não concluiu nenhum caso no prazo fica **sem nota** no mês. A nota aparece no nível com o mesmo peso de um questionário mensal e nos Relatórios como "Jogos".
+**Regras da nota:** média dos casos do ciclo (todas as versões valem 100). A nota só entra no nível quando o aluno **conclui todos os casos no prazo** ou quando você **fecha o ciclo** (aí quem fez só parte recebe 0 nos casos que faltaram; quem não fez nenhum fica sem nota). Antes disso o aluno vê só a média parcial. **Feche o ciclo depois do prazo.** A nota tem o mesmo peso de um questionário mensal e aparece nos Relatórios como "Jogos".
 
 ---
 

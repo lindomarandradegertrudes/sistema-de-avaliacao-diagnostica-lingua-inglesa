@@ -332,7 +332,7 @@
         </div>` +
         ci.missoes.map((c) => linhaCaso(c, c.situacao === 'concluida' && !c.noPrazo ? ' · ⏰ depois do prazo' : '')).join('') +
         `<p class="pequeno" style="margin:6px 0 0">Média do ciclo: <strong>${ci.nota != null ? ci.nota + ' pontos' : '—'}</strong>
-          <span class="suave">· casos não concluídos no prazo valem 0</span></p>`).join('<hr class="sep-ciclo">') : '';
+          <span class="suave">· ${ci.missoes.every((c) => c.noPrazo) ? 'ciclo concluído!' : 'parcial: conclua todos os casos até o prazo (os que faltarem valem 0)'}</span></p>`).join('<hr class="sep-ciclo">') : '';
 
       const trilha = t ? `
         <div class="trilha-topo" ${temCiclos ? 'style="margin-top:18px"' : ''}>
