@@ -304,7 +304,7 @@
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const LETRAS = ['A', 'B', 'C', 'D', 'E'];
-    const TIPOS = { diagnostico: 'Diagnóstico', mensal: 'Mensal', tda: 'TDA' };
+    const TIPOS = { diagnostico: 'Diagnóstico', mensal: 'Mensal', tda: 'TDA', jogos: 'Jogos' };
     const STATUS = { rascunho: 'Rascunho', aberto: 'Aberto', encerrado: 'Encerrado' };
     const DIFS = { facil: 'Fácil', media: 'Média', dificil: 'Difícil' };
 

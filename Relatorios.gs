@@ -57,7 +57,7 @@ function profRelatorioGeral() {
   const cfg = lerConfig_();
   const niveis = calcularNiveis_(cfg);
   const alunos = lerTabela_('Alunos');
-  const questionarios = lerQuestionarios_();
+  const questionarios = questionariosComCiclos_();
   const respostas = lerRespostas_();
   const mesDe = {};
   questionarios.forEach(function (q) { mesDe[q.id] = q.mes; });
@@ -104,7 +104,7 @@ function profEvolucaoAluno(email) {
   const cfg = lerConfig_();
   const aluno = lerTabela_('Alunos').filter(function (a) { return String(a.email).toLowerCase() === email; })[0];
   if (!aluno) throw new Error('Aluno não encontrado.');
-  const questionarios = lerQuestionarios_();
+  const questionarios = questionariosComCiclos_();
   const porId = {};
   questionarios.forEach(function (q) { porId[q.id] = q; });
   const respostas = lerRespostas_().filter(function (r) { return r.email === email && porId[r.questionario_id]; });
@@ -144,7 +144,7 @@ function profExportarPlanilha() {
   const cfg = lerConfig_();
   const geral = profRelatorioGeral();
   const niveis = calcularNiveis_(cfg);
-  const questionarios = lerQuestionarios_().sort(function (a, b) { return a.mes.localeCompare(b.mes) || a.serie.localeCompare(b.serie); });
+  const questionarios = questionariosComCiclos_().sort(function (a, b) { return a.mes.localeCompare(b.mes) || a.serie.localeCompare(b.serie); });
   const respostas = lerRespostas_();
   const agora = Utilities.formatDate(new Date(), FUSO, 'dd/MM/yyyy HH:mm');
 

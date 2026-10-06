@@ -1,4 +1,4 @@
-<!-- Jogos investigativos: Trilha Base (degraus) e casos do ano. Lista, liberação, teste e resultados. Incluída em Professor.html -->
+<!-- Jogos: ciclos com nota (Etapa 2), casos do ano em degraus e Trilha Base. Incluída em Professor.html -->
 <style>
   .jog-chip { display: inline-block; font-size: .72rem; background: var(--primaria-clara); color: var(--primaria); border-radius: 99px; padding: 1px 8px; margin: 2px 2px 0 0; white-space: nowrap; }
   .jog-trava { display: inline-block; min-width: 34px; text-align: center; font-size: .78rem; font-weight: 700; border-radius: 6px; padding: 2px 4px; margin-right: 2px; background: #d3f9d8; color: #2b8a3e; }
@@ -8,30 +8,35 @@
   .jog-sit { font-size: .78rem; font-weight: 600; padding: 2px 9px; border-radius: 99px; white-space: nowrap; }
   .jog-sit.nao { background: #f1f3f5; color: #868e96; }
   .jog-sit.andamento { background: #fff3bf; color: #a05a00; }
-  .jog-sit.concluido { background: #d3f9d8; color: #2b8a3e; }
+  .jog-sit.concluido, .jog-sit.aberto { background: #d3f9d8; color: #2b8a3e; }
+  .jog-sit.fechado { background: #e9ecef; color: #495057; }
+  .jog-sit.fora { background: #ffe3e3; color: #c92a2a; }
   .jog-frase { max-width: 260px; font-size: .82rem; }
   .jog-frase .fb { color: var(--suave); font-style: italic; }
   .jog-estrelas { color: #e8590c; font-weight: 700; letter-spacing: .05em; white-space: nowrap; }
-  #jog-lista td, #jog-trilha td, #jog-res-tabela td { vertical-align: top; }
+  .jog-nota { font-size: 1.05rem; font-weight: 800; }
+  .jog-checks { display: grid; gap: 6px; max-height: 240px; overflow: auto; border: 1px solid var(--borda); border-radius: 8px; padding: 8px 10px; }
+  .jog-checks label { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; cursor: pointer; }
+  .jog-checks input { width: auto; margin-top: 4px; }
+  #jog-ciclos td, #jog-lista td, #jog-trilha td, #jog-res-tabela td { vertical-align: top; }
 </style>
 
 <section id="aba-jogos" class="pilha" hidden>
   <div class="cartao pilha">
     <div class="linha">
-      <h2 style="margin:0">🎓 Trilha Base · Detective Academy</h2>
+      <h2 style="margin:0">📅 Ciclos (valem nota)</h2>
       <span class="espaco"></span>
-      <button class="btn" id="jog-trilha-carregar">Carregar Trilha Base</button>
-      <button class="btn primario" id="jog-trilha-abrir">Abrir a trilha inteira</button>
+      <button class="btn primario" id="jog-ciclo-novo">+ Novo ciclo</button>
     </div>
     <p class="suave pequeno" style="margin:0">
-      Reposição de aprendizagem, igual para o 6º ao 9º ano. <strong>Não vale nota.</strong> Cada missão tem 3 degraus (★ ★★ ★★★); o aluno joga a versão do degrau dele:
-      começa pelo nível (Iniciante ou sem nível = ★, Básico/Intermediário = ★★, Avançado = ★★★), <strong>sobe</strong> com 80+ pontos em 2 missões seguidas e <strong>desce</strong> abaixo de 40.
-      As missões abrem em sequência: a próxima libera quando o aluno termina a anterior (a 1ª é o tutorial).
+      Um ciclo reúne de 1 a 3 casos do ano para uma turma, com prazo. Cada aluno joga a versão do seu degrau, e todas valem 100 pontos.
+      <strong>Nota do ciclo</strong> = média dos casos; caso não concluído no prazo vale 0. Quem não concluiu nenhum caso no prazo fica <strong>sem nota</strong> no mês.
+      A nota entra no nível com o mesmo peso de um questionário mensal. <strong>Fechar</strong> congela as notas.
     </p>
     <div class="tabela-rolagem">
       <table>
-        <thead><tr><th>#</th><th>Missão</th><th>Tema</th><th>Testar</th><th>Situação</th><th>Jogaram</th><th></th></tr></thead>
-        <tbody id="jog-trilha"></tbody>
+        <thead><tr><th>Turma</th><th>Ciclo</th><th>Casos</th><th>Prazo</th><th>Situação</th><th>Notas</th><th></th></tr></thead>
+        <tbody id="jog-ciclos"></tbody>
       </table>
     </div>
   </div>
@@ -41,17 +46,37 @@
       <h2 style="margin:0">🕵️ Casos do ano</h2>
       <select id="jog-serie" style="width:auto"></select>
       <span class="espaco"></span>
-      <button class="btn" id="jog-padrao">Carregar casos padrão</button>
+      <button class="btn" id="jog-padrao">Carregar casos do ano</button>
       <button class="btn" id="jog-importar">Importar JSON</button>
     </div>
     <p class="suave pequeno" style="margin:0">
-      Casos <strong>abertos</strong> aparecem para os alunos da série em "Missions". Só a 1ª jogada vale; as outras são treino.
-      Por enquanto os jogos <strong>não entram no nível</strong>. Use <strong>Testar</strong> para jogar como aluno: suas jogadas de teste não aparecem nos resultados.
+      Cada caso tem 3 degraus (★ ★★ ★★★). Para valer nota, coloque o caso num <strong>ciclo</strong>.
+      <strong>Treino livre</strong> = "Aberto" deixa o caso disponível para todos da série, sem nota. Use os botões de estrela para testar cada degrau.
     </p>
     <div class="tabela-rolagem">
       <table>
-        <thead><tr><th>Série</th><th>Caso</th><th>Habilidades (sigla · foco)</th><th>Situação</th><th>Jogaram</th><th></th></tr></thead>
+        <thead><tr><th>Série</th><th>Caso</th><th>Habilidades</th><th>Testar</th><th>Treino livre</th><th>Jogaram</th><th></th></tr></thead>
         <tbody id="jog-lista"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="cartao pilha">
+    <div class="linha">
+      <h2 style="margin:0">🎓 Trilha Base · Detective Academy</h2>
+      <span class="espaco"></span>
+      <button class="btn" id="jog-trilha-carregar">Carregar Trilha Base</button>
+      <button class="btn" id="jog-trilha-abrir">Abrir a trilha inteira</button>
+    </div>
+    <p class="suave pequeno" style="margin:0">
+      Reposição de aprendizagem, igual para o 6º ao 9º ano. <strong>Não vale nota.</strong> As missões abrem em sequência (a 1ª é o tutorial).
+      O degrau de cada aluno é o mesmo nos casos do ano: começa pelo nível (Iniciante ou sem nível = ★, Básico/Intermediário = ★★, Avançado = ★★★),
+      <strong>sobe</strong> com 80+ pontos em 2 missões seguidas e <strong>desce</strong> abaixo de 40.
+    </p>
+    <div class="tabela-rolagem">
+      <table>
+        <thead><tr><th>#</th><th>Missão</th><th>Tema</th><th>Testar</th><th>Situação</th><th>Jogaram</th><th></th></tr></thead>
+        <tbody id="jog-trilha"></tbody>
       </table>
     </div>
   </div>
@@ -70,6 +95,38 @@
   </div>
 </section>
 
+<dialog id="modal-jog-ciclo" style="width:min(640px, calc(100vw - 32px))">
+  <form id="form-jog-ciclo" method="dialog">
+    <h2 id="jog-ciclo-titulo">Novo ciclo</h2>
+    <input type="hidden" id="jc-id">
+    <div class="grade-2">
+      <div class="campo"><label for="jc-serie">Série</label><select id="jc-serie"></select></div>
+      <div class="campo"><label for="jc-mes">Mês</label><input id="jc-mes" type="month" required></div>
+    </div>
+    <div class="campo" id="jc-turmas-campo"><label>Turmas (um ciclo para cada turma marcada)</label><div class="jog-checks" id="jc-turmas"></div></div>
+    <div class="campo"><label for="jc-titulo">Título</label><input id="jc-titulo" placeholder="ex.: Jogos de novembro" required></div>
+    <div class="campo"><label for="jc-prazo">Prazo (até o fim do dia)</label><input id="jc-prazo" type="date" required></div>
+    <div class="campo"><label>Casos (1 a 3)</label><div class="jog-checks" id="jc-casos"></div></div>
+    <div class="rodape-modal">
+      <button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn primario" type="submit" id="jc-salvar">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="modal-jog-prazo">
+  <form id="form-jog-prazo" method="dialog">
+    <h2>Prazo especial</h2>
+    <p class="suave pequeno" id="jp-aluno"></p>
+    <div class="campo"><label for="jp-data">Novo prazo para este aluno</label><input id="jp-data" type="date"></div>
+    <div class="rodape-modal">
+      <button class="btn" type="button" id="jp-limpar">Voltar ao prazo da turma</button>
+      <button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn primario" type="submit">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="modal-jog-json" style="width:min(720px, calc(100vw - 32px))">
   <h2>Importar casos (JSON)</h2>
   <p class="suave pequeno">Cole um caso ou uma lista de casos no formato dos jogos. Caso com o mesmo "id" é substituído (a situação aberto/rascunho é mantida).</p>
@@ -81,63 +138,88 @@
 </dialog>
 
 <script>
-  const jog = { casos: [], atual: null, missao: null, turma: '' };
+  const jog = { casos: [], ciclos: [], modo: null, alvo: null, turma: '', prazoEmail: '' };
   const estrelas = (n) => (n ? '★'.repeat(n) + '☆'.repeat(3 - n) : '—');
   const linkTeste = (id) => `${esc(estado.resumo.link)}?caso=${encodeURIComponent(id)}`;
+  const dataBrJ = (iso) => { const [a, m, d] = String(iso || '').split('-'); return d ? `${d}/${m}/${a}` : ''; };
+  const hojeJ = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 
-  /** Agrupa os casos da trilha por missão (uma linha por missão, com os 3 degraus). */
-  function missoesTrilha() {
+  /** Agrupa os casos por missão (uma linha por missão, com as versões de cada degrau). */
+  function agrupar(lista) {
     const m = {};
-    jog.casos.filter((c) => c.trilha).forEach((c) => {
-      if (!m[c.missao]) m[c.missao] = { missao: c.missao, ordem: c.ordem, titulo: c.titulo, tema: c.tema, versoes: [], jogaram: 0, concluiram: 0, status: c.status, misto: false };
+    lista.forEach((c) => {
+      if (!m[c.missao]) m[c.missao] = { missao: c.missao, ordem: c.ordem, titulo: c.titulo, tema: c.tema, serie: c.serie, mes: c.mes, numero: c.numero, versoes: [], jogaram: 0, concluiram: 0, status: c.status, misto: false, etiquetas: [] };
       const x = m[c.missao];
       x.versoes.push(c);
       x.jogaram += c.jogaram;
       x.concluiram += c.concluiram;
       if (c.status !== x.status) x.misto = true;
     });
-    return Object.values(m).sort((a, b) => a.ordem - b.ordem).map((x) => { x.versoes.sort((a, b) => a.degrau - b.degrau); return x; });
+    // Habilidades: as da versão mais completa (maior degrau).
+    return Object.values(m).map((x) => { x.versoes.sort((a, b) => a.degrau - b.degrau); x.etiquetas = x.versoes[x.versoes.length - 1].etiquetas; return x; });
   }
+  const missoesTrilha = () => agrupar(jog.casos.filter((c) => c.trilha)).sort((a, b) => a.ordem - b.ordem);
+  const missoesAno = () => agrupar(jog.casos.filter((c) => !c.trilha)).sort((a, b) => a.serie.localeCompare(b.serie) || a.mes.localeCompare(b.mes) || a.titulo.localeCompare(b.titulo));
+  const botoesTeste = (m) => m.versoes.map((v) => `<a class="btn mini" href="${linkTeste(v.id)}" target="_blank" rel="noopener" title="Testar">${v.degrau ? '★'.repeat(v.degrau) : (m.versoes.length === 1 ? 'Testar' : 'Tutorial')}</a>`).join(' ');
+  const seletorSituacao = (m, attr, rotuloAberto) => `<select ${attr}="${esc(m.missao)}" style="width:auto">
+    <option value="rascunho" ${m.status === 'rascunho' && !m.misto ? 'selected' : ''}>Rascunho</option>
+    <option value="aberto" ${m.status === 'aberto' && !m.misto ? 'selected' : ''}>${rotuloAberto}</option>
+    ${m.misto ? '<option selected disabled>Misto</option>' : ''}</select>`;
 
   function renderJogos() {
-    const missoes = missoesTrilha();
-    $('jog-trilha').innerHTML = missoes.length ? missoes.map((m) => `
+    $('jog-ciclos').innerHTML = jog.ciclos.length ? jog.ciclos.map((c) => `
+      <tr>
+        <td><strong>${esc(c.turma)}</strong></td>
+        <td><strong>${esc(c.titulo)}</strong><div class="suave pequeno">${esc(c.mes)}</div></td>
+        <td>${c.missoes.map((m) => `<span class="jog-chip">${esc(m.titulo)}</span>`).join('')}</td>
+        <td>${dataBrJ(c.prazo)}${c.prazo < hojeJ() ? '<div class="suave pequeno">vencido</div>' : ''}${c.extensoes ? `<div class="suave pequeno">${c.extensoes} prorrogado(s)</div>` : ''}</td>
+        <td><select data-jog-ciclo-status="${esc(c.id)}" style="width:auto">
+          <option value="aberto" ${c.status === 'aberto' ? 'selected' : ''}>Aberto</option>
+          <option value="fechado" ${c.status === 'fechado' ? 'selected' : ''}>Fechado</option></select></td>
+        <td>${c.comNota}/${c.alunos} com nota${c.media != null ? `<div class="suave pequeno">média ${c.media}</div>` : ''}</td>
+        <td style="white-space:nowrap">
+          <button class="btn mini" data-jog-ciclo-res="${esc(c.id)}">Resultados</button>
+          <button class="btn mini" data-jog-ciclo-editar="${esc(c.id)}">Editar</button>
+          <button class="btn mini perigo" data-jog-ciclo-excluir="${esc(c.id)}">Excluir</button>
+        </td>
+      </tr>`).join('')
+      : '<tr><td colspan="7" class="vazio">Nenhum ciclo ainda. Clique em "+ Novo ciclo".</td></tr>';
+
+    const serie = $('jog-serie').value;
+    const ano = missoesAno().filter((m) => !serie || m.serie === serie);
+    $('jog-lista').innerHTML = ano.length ? ano.map((m) => `
+      <tr>
+        <td><strong>${esc(m.serie)}</strong><div class="suave pequeno">${esc(m.mes)}</div></td>
+        <td><strong>${esc(m.titulo)}</strong><div class="suave pequeno">Case ${esc(m.numero)} · ${m.versoes.length} versão(ões)</div></td>
+        <td>${m.etiquetas.map((e) => `<span class="jog-chip">${esc(e)}</span>`).join('')}</td>
+        <td style="white-space:nowrap">${botoesTeste(m)}</td>
+        <td>${seletorSituacao(m, 'data-jog-missao-status', 'Aberto')}</td>
+        <td>${m.concluiram} concluíram<div class="suave pequeno">${m.jogaram - m.concluiram} em andamento</div></td>
+        <td style="white-space:nowrap">
+          <button class="btn mini" data-jog-missao-res="${esc(m.missao)}">Resultados</button>
+          <button class="btn mini perigo" data-jog-missao-excluir="${esc(m.missao)}">Excluir</button>
+        </td>
+      </tr>`).join('')
+      : `<tr><td colspan="7" class="vazio">Nenhum caso${serie ? ' nesta série' : ''}. Clique em "Carregar casos do ano".</td></tr>`;
+
+    const trilha = missoesTrilha();
+    $('jog-trilha').innerHTML = trilha.length ? trilha.map((m) => `
       <tr>
         <td><strong>${m.ordem}</strong></td>
         <td><strong>${esc(m.titulo)}</strong></td>
         <td class="suave pequeno">${esc(m.tema)}</td>
-        <td style="white-space:nowrap">${m.versoes.map((v) => `<a class="btn mini" href="${linkTeste(v.id)}" target="_blank" rel="noopener" title="Testar este degrau">${v.degrau ? '★'.repeat(v.degrau) : 'Tutorial'}</a>`).join(' ')}</td>
-        <td><select data-jog-missao-status="${esc(m.missao)}" style="width:auto">
-          <option value="rascunho" ${m.status === 'rascunho' && !m.misto ? 'selected' : ''}>Rascunho</option>
-          <option value="aberto" ${m.status === 'aberto' && !m.misto ? 'selected' : ''}>Aberto</option>
-          ${m.misto ? '<option selected disabled>Misto</option>' : ''}</select></td>
+        <td style="white-space:nowrap">${botoesTeste(m)}</td>
+        <td>${seletorSituacao(m, 'data-jog-missao-status', 'Aberto')}</td>
         <td>${m.concluiram} concluíram<div class="suave pequeno">${m.jogaram - m.concluiram} em andamento</div></td>
         <td><button class="btn mini" data-jog-missao-res="${esc(m.missao)}">Resultados</button></td>
       </tr>`).join('')
       : '<tr><td colspan="7" class="vazio">A trilha ainda não foi carregada. Clique em "Carregar Trilha Base".</td></tr>';
-
-    const serie = $('jog-serie').value;
-    const lista = jog.casos.filter((c) => !c.trilha && (!serie || c.serie === serie));
-    $('jog-lista').innerHTML = lista.length ? lista.map((c) => `
-      <tr>
-        <td><strong>${esc(c.serie)}</strong><div class="suave pequeno">${esc(c.mes)}</div></td>
-        <td><strong>${esc(c.titulo)}</strong><div class="suave pequeno">Case ${esc(c.numero)} · ${c.travas} cadeados</div></td>
-        <td>${c.etiquetas.map((e) => `<span class="jog-chip">${esc(e)}</span>`).join('')}</td>
-        <td><select data-jog-status="${esc(c.id)}" style="width:auto">
-          <option value="rascunho" ${c.status === 'rascunho' ? 'selected' : ''}>Rascunho</option>
-          <option value="aberto" ${c.status === 'aberto' ? 'selected' : ''}>Aberto</option></select></td>
-        <td>${c.concluiram} concluíram<div class="suave pequeno">${c.jogaram - c.concluiram} em andamento</div></td>
-        <td style="white-space:nowrap">
-          <a class="btn mini" href="${linkTeste(c.id)}" target="_blank" rel="noopener">Testar</a>
-          <button class="btn mini" data-jog-res="${esc(c.id)}">Resultados</button>
-          <button class="btn mini perigo" data-jog-excluir="${esc(c.id)}">Excluir</button>
-        </td>
-      </tr>`).join('')
-      : `<tr><td colspan="6" class="vazio">Nenhum caso${serie ? ' nesta série' : ''}. Clique em "Carregar casos padrão".</td></tr>`;
   }
 
   async function carregarJogos() {
-    jog.casos = await chamar('profListarCasos');
+    const [casos, ciclos] = await Promise.all([chamar('profListarCasos'), chamar('profListarCiclos')]);
+    jog.casos = casos;
+    jog.ciclos = ciclos;
     renderJogos();
   }
 
@@ -150,6 +232,7 @@
   function prepararResultados(titulo, turmas, turma) {
     if (!turma || !turmas.some((t) => t.turma === turma)) turma = turmas[0] ? turmas[0].turma : '';
     jog.turma = turma;
+    $('jog-res-turma').hidden = turmas.length === 0;
     $('jog-res-turma').innerHTML = turmas.map((t) => `<option value="${esc(t.turma)}" ${t.turma === turma ? 'selected' : ''}>${esc(t.turma)}</option>`).join('');
     $('jog-res').hidden = false;
     $('jog-res-titulo').textContent = titulo;
@@ -158,19 +241,13 @@
     return turma;
   }
 
-  async function abrirResultadosJogo(id, turma) {
-    const caso = jog.casos.find((c) => c.id === id);
-    jog.atual = id;
-    jog.missao = null;
-    turma = prepararResultados(caso.titulo, estado.resumo.turmas.filter((t) => t.serie === caso.serie), turma);
-    renderResultadosJogo(await chamar('profResultadosCaso', id, turma));
-  }
-
+  // ---------- Resultados de uma missão (trilha ou caso do ano) ----------
   async function abrirResultadosMissao(missao, turma) {
-    const m = missoesTrilha().find((x) => x.missao === missao);
-    jog.missao = missao;
-    jog.atual = null;
-    turma = prepararResultados('🎓 ' + m.titulo, estado.resumo.turmas, turma);
+    const m = agrupar(jog.casos.filter((c) => c.missao === missao))[0];
+    jog.modo = 'missao';
+    jog.alvo = missao;
+    const turmas = m.serie === 'todas' ? estado.resumo.turmas : estado.resumo.turmas.filter((t) => t.serie === m.serie);
+    turma = prepararResultados((m.serie === 'todas' ? '🎓 ' : '🕵️ ') + m.titulo, turmas, turma);
     renderResultadosMissao(await chamar('profResultadosMissao', missao, turma));
   }
 
@@ -179,26 +256,9 @@
   const fraseHtml = (l) => (l.final_texto ? `${esc(l.final_texto)}${l.final_feedback ? `<div class="fb">${esc(l.final_feedback)}</div>` : ''}` : '');
   const CORES = 'Cores: verde = pontos cheios · amarelo = perdeu pontos (dica/erro) · vermelho = 0 ou resposta revelada · cinza = ainda não abriu.';
 
-  function renderResultadosJogo(r) {
-    $('jog-res-legenda').innerHTML = 'Cadeados: ' + r.travas.map((t, i) => `<strong>${i + 1}</strong> ${esc(t.titulo)} <span class="suave">(${t.etiquetas.map(esc).join('; ')})</span>`).join(' · ') + '<br>' + CORES;
-    $('jog-res-tabela').innerHTML = `<thead><tr><th>Aluno</th><th>Situação</th><th>Pontos</th><th>Por cadeado</th><th>Dicas</th><th>Erros</th><th>Treinos</th><th>Frase final</th><th></th></tr></thead><tbody>` +
-      (r.linhas.length ? r.linhas.map((l) => `
-        <tr>
-          <td>${esc(l.nome)}</td>
-          <td><span class="jog-sit ${l.situacao}">${SIT[l.situacao]}</span>${l.concluido_em ? `<div class="suave pequeno">${esc(l.concluido_em)}</div>` : ''}</td>
-          <td><strong>${l.pontos == null ? '—' : l.pontos}</strong></td>
-          <td style="white-space:nowrap">${travasHtml(l)}</td>
-          <td>${l.situacao === 'nao' ? '' : l.dicas}</td>
-          <td>${l.situacao === 'nao' ? '' : l.erros}</td>
-          <td>${l.treinos || ''}</td>
-          <td class="jog-frase">${fraseHtml(l)}</td>
-          <td>${l.situacao !== 'nao' ? `<button class="btn mini perigo" data-jog-zerar="${esc(l.email)}" title="Apaga as jogadas do aluno neste caso">Zerar</button>` : ''}</td>
-        </tr>`).join('') : '<tr><td colspan="9" class="vazio">Nenhum aluno nesta turma.</td></tr>') + '</tbody>';
-  }
-
   function renderResultadosMissao(r) {
-    $('jog-res-legenda').innerHTML = '<strong>Degrau atual</strong> = versão que o aluno vai jogar na próxima missão. <strong>Degrau jogado</strong> = versão desta missão que ele fez. ' +
-      '<strong>Trilha</strong> = missões concluídas.<br>' + CORES;
+    $('jog-res-legenda').innerHTML = '<strong>Degrau atual</strong> = versão que o aluno joga agora. <strong>Degrau jogado</strong> = versão deste caso que ele fez. ' +
+      '<strong>Trilha</strong> = missões da Trilha Base concluídas. Só a 1ª jogada conta; as outras são treino.<br>' + CORES;
     $('jog-res-tabela').innerHTML = `<thead><tr><th>Aluno</th><th>Degrau atual</th><th>Trilha</th><th>Situação</th><th>Degrau jogado</th><th>Pontos</th><th>Por cadeado</th><th>Dicas</th><th>Erros</th><th>Frase final</th><th></th></tr></thead><tbody>` +
       (r.linhas.length ? r.linhas.map((l) => `
         <tr>
@@ -212,8 +272,63 @@
           <td>${l.situacao === 'nao' ? '' : l.dicas}</td>
           <td>${l.situacao === 'nao' ? '' : l.erros}</td>
           <td class="jog-frase">${fraseHtml(l)}</td>
-          <td>${l.situacao !== 'nao' ? `<button class="btn mini perigo" data-jog-zerar="${esc(l.email)}" title="Apaga as jogadas do aluno nesta missão">Zerar</button>` : ''}</td>
+          <td>${l.situacao !== 'nao' ? `<button class="btn mini perigo" data-jog-zerar="${esc(l.email)}" title="Apaga as jogadas do aluno neste caso">Zerar</button>` : ''}</td>
         </tr>`).join('') : '<tr><td colspan="11" class="vazio">Nenhum aluno nesta turma.</td></tr>') + '</tbody>';
+  }
+
+  // ---------- Resultados de um ciclo ----------
+  async function abrirResultadosCiclo(id) {
+    const c = jog.ciclos.find((x) => x.id === id);
+    jog.modo = 'ciclo';
+    jog.alvo = id;
+    prepararResultados(`📅 ${c.titulo} · ${c.turma}`, [], '');
+    renderResultadosCiclo(await chamar('profResultadosCiclo', id));
+  }
+
+  function renderResultadosCiclo(r) {
+    $('jog-res-legenda').innerHTML = `Prazo da turma: <strong>${dataBrJ(r.ciclo.prazo)}</strong> · ${r.ciclo.status === 'fechado' ? 'ciclo <strong>fechado</strong> (notas congeladas)' : 'ciclo aberto'}. ` +
+      'Em cada caso: degrau jogado e pontos. ✔ = concluído no prazo · ⏰ = concluído depois do prazo (não vale). ' +
+      '<strong>Nota</strong> = média dos casos (os não concluídos no prazo valem 0); vazio = sem nota no mês.';
+    $('jog-res-tabela').innerHTML = `<thead><tr><th>Aluno</th><th>Degrau atual</th>${r.missoes.map((m) => `<th>${esc(m.titulo)}</th>`).join('')}<th>Nota</th><th>Prazo</th><th></th></tr></thead><tbody>` +
+      (r.linhas.length ? r.linhas.map((l) => `
+        <tr>
+          <td>${esc(l.nome)}</td>
+          <td class="jog-estrelas">${estrelas(l.degrauAtual)}</td>
+          ${l.itens.map((i) => `<td>${i.situacao === 'nao' ? '<span class="jog-sit nao">Não jogou</span>'
+            : `<span class="jog-estrelas">${estrelas(i.degrau)}</span> <strong>${i.pontos == null ? '—' : i.pontos}</strong>
+               ${i.situacao === 'andamento' ? '<span class="jog-sit andamento">jogando</span>' : (i.noPrazo ? ' ✔' : ' <span class="jog-sit fora">⏰ fora do prazo</span>')}`}</td>`).join('')}
+          <td class="jog-nota">${l.nota == null ? '—' : l.nota}</td>
+          <td>${dataBrJ(l.prazo)}${l.prorrogado ? '<div class="suave pequeno">prorrogado</div>' : ''}</td>
+          <td><button class="btn mini" data-jog-prazo="${esc(l.email)}" data-nome="${esc(l.nome)}" data-prazo="${esc(l.prazo)}">Prazo</button></td>
+        </tr>`).join('') : `<tr><td colspan="${r.missoes.length + 5}" class="vazio">Nenhum aluno nesta turma.</td></tr>`) + '</tbody>';
+  }
+
+  // ---------- Novo / editar ciclo ----------
+  function casosDaSerie(serie, marcados) {
+    const lista = missoesAno().filter((m) => m.serie === serie);
+    $('jc-casos').innerHTML = lista.length ? lista.map((m) => `
+      <label><input type="checkbox" value="${esc(m.missao)}" ${marcados.includes(m.missao) ? 'checked' : ''}>
+        <span><strong>${esc(m.titulo)}</strong> <span class="suave pequeno">· ${esc(m.mes)} · ${m.versoes.map((v) => estrelas(v.degrau)).join(' ')}</span></span></label>`).join('')
+      : '<p class="suave pequeno" style="margin:0">Nenhum caso desta série. Clique em "Carregar casos do ano".</p>';
+  }
+  function turmasDaSerie(serie) {
+    $('jc-turmas').innerHTML = estado.resumo.turmas.filter((t) => t.serie === serie).map((t) => `
+      <label><input type="checkbox" value="${esc(t.turma)}"> ${esc(t.turma)}</label>`).join('');
+  }
+  function abrirCiclo(c) {
+    $('jog-ciclo-titulo').textContent = c ? `Editar ciclo · ${c.turma}` : 'Novo ciclo';
+    $('jc-id').value = c ? c.id : '';
+    $('jc-serie').innerHTML = opcoesSerie(false);
+    $('jc-serie').value = c ? c.serie : ($('jog-serie').value || estado.resumo.series[0]);
+    $('jc-serie').disabled = !!c;
+    $('jc-turmas-campo').hidden = !!c;
+    const hoje = hojeJ();
+    $('jc-mes').value = c ? c.mes : hoje.slice(0, 7);
+    $('jc-titulo').value = c ? c.titulo : '';
+    $('jc-prazo').value = c ? c.prazo : '';
+    turmasDaSerie($('jc-serie').value);
+    casosDaSerie($('jc-serie').value, c ? c.missoes.map((m) => m.missao) : []);
+    $('modal-jog-ciclo').showModal();
   }
 
   function configurarJogos() {
@@ -221,6 +336,77 @@
     document.querySelector('.abas button[data-aba="jogos"]').addEventListener('click', () => carregarJogos());
     $('jog-serie').addEventListener('change', renderJogos);
 
+    // Ciclos
+    $('jog-ciclo-novo').addEventListener('click', () => abrirCiclo(null));
+    $('jc-serie').addEventListener('change', () => { turmasDaSerie($('jc-serie').value); casosDaSerie($('jc-serie').value, []); });
+    $('form-jog-ciclo').addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const dados = {
+        id: $('jc-id').value || undefined,
+        turmas: [...document.querySelectorAll('#jc-turmas input:checked')].map((i) => i.value),
+        titulo: $('jc-titulo').value, mes: $('jc-mes').value, prazo: $('jc-prazo').value,
+        missoes: [...document.querySelectorAll('#jc-casos input:checked')].map((i) => i.value),
+      };
+      comBotao($('jc-salvar'), async () => {
+        jog.ciclos = await chamar('profSalvarCiclo', dados);
+        $('modal-jog-ciclo').close();
+        renderJogos();
+        avisar(dados.id ? 'Ciclo atualizado. As notas foram recalculadas.' : 'Ciclo criado. Os alunos já veem os casos em "Missions".');
+      });
+    });
+    $('jog-ciclos').addEventListener('change', async (ev) => {
+      const id = ev.target.dataset.jogCicloStatus;
+      if (!id) return;
+      ev.target.disabled = true;
+      try {
+        jog.ciclos = await chamar('profStatusCiclo', id, ev.target.value);
+        avisar(ev.target.value === 'fechado' ? 'Ciclo fechado: notas congeladas.' : 'Ciclo reaberto.');
+      } catch (e) { /* aviso já exibido */ }
+      renderJogos();
+    });
+    $('jog-ciclos').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      if (b.dataset.jogCicloRes) comBotao(b, () => abrirResultadosCiclo(b.dataset.jogCicloRes));
+      if (b.dataset.jogCicloEditar) abrirCiclo(jog.ciclos.find((c) => c.id === b.dataset.jogCicloEditar));
+      if (b.dataset.jogCicloExcluir) {
+        const c = jog.ciclos.find((x) => x.id === b.dataset.jogCicloExcluir);
+        if (!confirm(`Excluir o ciclo "${c.titulo}" da ${c.turma}? As notas de jogos deste ciclo saem do nível dos alunos (as jogadas ficam guardadas).`)) return;
+        comBotao(b, async () => { jog.ciclos = await chamar('profExcluirCiclo', c.id); renderJogos(); $('jog-res').hidden = true; });
+      }
+    });
+
+    // Prazo especial
+    $('jog-res-tabela').addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-jog-prazo]');
+      if (!b) return;
+      jog.prazoEmail = b.dataset.jogPrazo;
+      $('jp-aluno').textContent = b.dataset.nome;
+      $('jp-data').value = b.dataset.prazo;
+      $('modal-jog-prazo').showModal();
+    });
+    async function salvarPrazo(data) {
+      renderResultadosCiclo(await chamar('profProrrogarCiclo', jog.alvo, jog.prazoEmail, data));
+      $('modal-jog-prazo').close();
+      jog.ciclos = await chamar('profListarCiclos');
+      renderJogos();
+    }
+    $('form-jog-prazo').addEventListener('submit', (ev) => { ev.preventDefault(); salvarPrazo($('jp-data').value); });
+    $('jp-limpar').addEventListener('click', () => salvarPrazo(''));
+
+    // Casos do ano e trilha
+    $('jog-padrao').addEventListener('click', (ev) => comBotao(ev.target, async () => {
+      jog.casos = await chamar('profCarregarCasosPadrao');
+      renderJogos();
+      avisar('Casos do ano carregados (outubro e novembro, em 3 degraus). Crie um ciclo para valer nota.');
+    }));
+    $('jog-importar').addEventListener('click', () => { $('jog-json').value = ''; $('modal-jog-json').showModal(); });
+    $('jog-json-ok').addEventListener('click', (ev) => comBotao(ev.target, async () => {
+      jog.casos = await chamar('profImportarCasos', $('jog-json').value);
+      $('modal-jog-json').close();
+      renderJogos();
+      avisar('Casos importados.');
+    }));
     $('jog-trilha-carregar').addEventListener('click', (ev) => comBotao(ev.target, async () => {
       jog.casos = await chamar('profCarregarTrilhaBase');
       renderJogos();
@@ -231,66 +417,35 @@
       renderJogos();
       avisar('Trilha Base aberta para todas as turmas.');
     }));
-    $('jog-trilha').addEventListener('change', async (ev) => {
-      const missao = ev.target.dataset.jogMissaoStatus;
-      if (!missao) return;
-      ev.target.disabled = true;
-      try { jog.casos = await chamar('profStatusMissao', missao, ev.target.value); } catch (e) { /* aviso já exibido */ }
-      renderJogos();
-    });
-    $('jog-trilha').addEventListener('click', (ev) => {
-      const b = ev.target.closest('[data-jog-missao-res]');
-      if (b) comBotao(b, () => abrirResultadosMissao(b.dataset.jogMissaoRes, jog.turma));
-    });
 
-    $('jog-padrao').addEventListener('click', (ev) => comBotao(ev.target, async () => {
-      jog.casos = await chamar('profCarregarCasosPadrao');
-      renderJogos();
-      avisar('Casos padrão carregados. Mude a situação para "Aberto" para liberar aos alunos.');
-    }));
-
-    $('jog-importar').addEventListener('click', () => { $('jog-json').value = ''; $('modal-jog-json').showModal(); });
-    $('jog-json-ok').addEventListener('click', (ev) => comBotao(ev.target, async () => {
-      jog.casos = await chamar('profImportarCasos', $('jog-json').value);
-      $('modal-jog-json').close();
-      renderJogos();
-      avisar('Casos importados.');
-    }));
-
-    $('jog-lista').addEventListener('change', async (ev) => {
-      const id = ev.target.dataset.jogStatus;
-      if (!id) return;
-      ev.target.disabled = true;
-      try {
-        jog.casos = await chamar('profStatusCaso', id, ev.target.value);
-        avisar(ev.target.value === 'aberto' ? 'Caso liberado para os alunos.' : 'Caso voltou para rascunho.');
-      } catch (e) { /* aviso já exibido */ }
-      renderJogos();
+    ['jog-lista', 'jog-trilha'].forEach((idTabela) => {
+      $(idTabela).addEventListener('change', async (ev) => {
+        const missao = ev.target.dataset.jogMissaoStatus;
+        if (!missao) return;
+        ev.target.disabled = true;
+        try { jog.casos = await chamar('profStatusMissao', missao, ev.target.value); } catch (e) { /* aviso já exibido */ }
+        renderJogos();
+      });
+      $(idTabela).addEventListener('click', (ev) => {
+        const b = ev.target.closest('button');
+        if (!b) return;
+        if (b.dataset.jogMissaoRes) comBotao(b, () => abrirResultadosMissao(b.dataset.jogMissaoRes, jog.turma));
+        if (b.dataset.jogMissaoExcluir) {
+          const m = missoesAno().find((x) => x.missao === b.dataset.jogMissaoExcluir);
+          if (!confirm(`Excluir o caso "${m.titulo}" (todas as versões)? As jogadas ficam guardadas na planilha.`)) return;
+          comBotao(b, async () => { jog.casos = await chamar('profExcluirMissao', m.missao); renderJogos(); $('jog-res').hidden = true; });
+        }
+      });
     });
 
-    $('jog-lista').addEventListener('click', async (ev) => {
-      const b = ev.target.closest('button');
-      if (!b) return;
-      if (b.dataset.jogRes) comBotao(b, () => abrirResultadosJogo(b.dataset.jogRes, jog.turma));
-      if (b.dataset.jogExcluir) {
-        const c = jog.casos.find((x) => x.id === b.dataset.jogExcluir);
-        if (!confirm(`Excluir o caso "${c.titulo}"? ${c.jogaram ? 'As jogadas dos alunos ficam guardadas na planilha, mas o caso some da lista.' : ''}`)) return;
-        comBotao(b, async () => { jog.casos = await chamar('profExcluirCaso', c.id); renderJogos(); $('jog-res').hidden = true; });
-      }
-    });
-
-    $('jog-res-turma').addEventListener('change', () => {
-      if (jog.missao) abrirResultadosMissao(jog.missao, $('jog-res-turma').value);
-      else abrirResultadosJogo(jog.atual, $('jog-res-turma').value);
-    });
+    $('jog-res-turma').addEventListener('change', () => { if (jog.modo === 'missao') abrirResultadosMissao(jog.alvo, $('jog-res-turma').value); });
     $('jog-res-fechar').addEventListener('click', () => ($('jog-res').hidden = true));
     $('jog-res-tabela').addEventListener('click', (ev) => {
       const b = ev.target.closest('[data-jog-zerar]');
       if (!b) return;
-      if (!confirm('Zerar as jogadas deste aluno? Ele vai jogar de novo do começo.')) return;
+      if (!confirm('Zerar as jogadas deste aluno neste caso? Ele vai jogar de novo do começo, valendo.')) return;
       comBotao(b, async () => {
-        if (jog.missao) renderResultadosMissao(await chamar('profZerarMissao', jog.missao, b.dataset.jogZerar, jog.turma));
-        else renderResultadosJogo(await chamar('profZerarJogadas', jog.atual, b.dataset.jogZerar, jog.turma));
+        renderResultadosMissao(await chamar('profZerarMissao', jog.alvo, b.dataset.jogZerar, jog.turma));
         carregarJogos();
       });
     });

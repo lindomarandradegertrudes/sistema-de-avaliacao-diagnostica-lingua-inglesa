@@ -53,6 +53,9 @@
     .trilha-topo { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; justify-content: space-between; }
     .trilha-barra { height: 12px; border: 2px solid #121212; border-radius: 99px; background: #fff; overflow: hidden; margin: 6px 0 4px; }
     .trilha-barra i { display: block; height: 100%; background: #ffb547; }
+    .ciclo-topo { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; justify-content: space-between; }
+    .ciclo-topo .vencido { color: #c92a2a; font-weight: 700; }
+    .sep-ciclo { border: 0; border-top: 1px dashed var(--borda); margin: 14px 0; }
     .patente { display: inline-block; font-weight: 800; background: #ffd23f; border: 2px solid #121212; border-radius: 99px; padding: 2px 12px; }
     #aviso-saida {
       position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 20; max-width: calc(100vw - 32px);
@@ -305,18 +308,36 @@
     // ---------- Missões (jogos investigativos) ----------
     function renderMissoes(m, app) {
       const t = m && m.trilha;
-      $('missoes-card').hidden = !m || (!m.casos.length && !t);
+      const temCiclos = m && m.ciclos && m.ciclos.length;
+      $('missoes-card').hidden = !m || (!m.casos.length && !t && !temCiclos);
       if (!m) return;
       const p = m.patente;
       const SIT = { nova: 'Nova', andamento: 'Em andamento', concluida: 'Concluída', bloqueada: 'Bloqueada' };
       const BOTAO = { nova: 'PLAY', andamento: 'CONTINUE', concluida: 'OPEN' };
       const link = (id) => `${esc(app)}?caso=${encodeURIComponent(id)}`;
       const estrelas = (n) => (n ? '★'.repeat(n) + '☆'.repeat(3 - n) : '');
+      const dataBr = (iso) => { const [a, mm, d] = String(iso || '').split('-'); return d ? `${d}/${mm}` : ''; };
+      const linhaCaso = (c, extra) => `
+          <div class="missao">
+            <div style="flex:1"><span class="num-caso">CASE ${esc(c.numero)}</span> <strong>${esc(c.titulo)}</strong>
+              ${c.degrau ? `<span class="estrelas">${estrelas(c.degrau)}</span>` : ''}
+              <div class="suave pequeno">${c.travas} cadeados · ${SIT[c.situacao]}${c.pontos != null ? ' · ' + c.pontos + ' pontos' : ''}${extra || ''}</div></div>
+            <a class="btn-jogo ${c.situacao === 'concluida' ? 'alt' : ''}" href="${link(c.id)}">${BOTAO[c.situacao]} ›</a>
+          </div>`;
+
+      const ciclos = temCiclos ? m.ciclos.map((ci) => `
+        <div class="ciclo-topo">
+          <strong>📅 ${esc(ci.titulo)}</strong>
+          <span class="pequeno ${ci.vencido ? 'vencido' : ''}">${ci.vencido ? 'prazo encerrado em ' : 'até '}${dataBr(ci.prazo)} · vale nota</span>
+        </div>` +
+        ci.missoes.map((c) => linhaCaso(c, c.situacao === 'concluida' && !c.noPrazo ? ' · ⏰ depois do prazo' : '')).join('') +
+        `<p class="pequeno" style="margin:6px 0 0">Média do ciclo: <strong>${ci.nota != null ? ci.nota + ' pontos' : '—'}</strong>
+          <span class="suave">· casos não concluídos no prazo valem 0</span></p>`).join('<hr class="sep-ciclo">') : '';
 
       const trilha = t ? `
-        <div class="trilha-topo">
+        <div class="trilha-topo" ${temCiclos ? 'style="margin-top:18px"' : ''}>
           <strong>🎓 Detective Academy</strong>
-          <span class="suave pequeno">${t.feitas} de ${t.total} missões · seu degrau: <span class="estrelas">${estrelas(t.degrau)}</span></span>
+          <span class="suave pequeno">${t.feitas} de ${t.total} missões · seu degrau: <span class="estrelas">${estrelas(t.degrau)}</span> · treino, não vale nota</span>
         </div>
         <div class="trilha-barra"><i style="width:${Math.round((100 * t.feitas) / Math.max(t.total, 1))}%"></i></div>` +
         t.missoes.map((c) => `
@@ -328,18 +349,14 @@
               : `<a class="btn-jogo ${c.situacao === 'concluida' ? 'alt' : ''}" href="${link(c.id)}">${BOTAO[c.situacao]} ›</a>`}
           </div>`).join('') : '';
 
-      const anuais = m.casos.length ? `
-        <h3 style="margin:18px 0 4px">🕵️ Casos do ano</h3>
+      const livres = m.casos.length ? `
+        <h3 style="margin:18px 0 4px">🕵️ Casos para treinar</h3>
         <p class="pequeno" style="margin:0 0 4px">Rank: <span class="patente">${esc(p.nome)}</span>
-          ${p.proxima ? `<span class="suave"> · faltam ${p.faltam} ${p.faltam === 1 ? 'caso' : 'casos'} para ${esc(p.proxima)}</span>` : ''}</p>` +
-        m.casos.map((c) => `
-          <div class="missao">
-            <div style="flex:1"><span class="num-caso">CASE ${esc(c.numero)}</span> <strong>${esc(c.titulo)}</strong>
-              <div class="suave pequeno">${c.travas} cadeados · ${SIT[c.situacao]}${c.pontos != null ? ' · ' + c.pontos + ' pontos' : ''}${c.treinando ? ' · treino em andamento' : ''}</div></div>
-            <a class="btn-jogo ${c.situacao === 'concluida' ? 'alt' : ''}" href="${link(c.id)}">${BOTAO[c.situacao]} ›</a>
-          </div>`).join('') : '';
+          ${p.proxima ? `<span class="suave"> · faltam ${p.faltam} ${p.faltam === 1 ? 'caso' : 'casos'} para ${esc(p.proxima)}</span>` : ''}
+          <span class="suave"> · treino, não vale nota</span></p>` +
+        m.casos.map((c) => linhaCaso(c)).join('') : '';
 
-      $('missoes').innerHTML = trilha + anuais;
+      $('missoes').innerHTML = ciclos + trilha + livres;
     }
 
     // ---------- Tarefas diárias (bônus) ----------

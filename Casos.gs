@@ -264,7 +264,7 @@ function patente_(serie, concluidos) {
 }
 
 // ============================================================
-// Trilha Base: degraus e liberação em sequência
+// Degraus (um por aluno, para a Trilha Base e os casos do ano) e versões de cada missão
 // ============================================================
 
 const DEGRAU_SOBE = 80;
@@ -273,26 +273,27 @@ const SEGUIDAS_PARA_SUBIR = 2;
 
 function ehTrilha_(c) { return c.serie === SERIE_TODAS && c.dados.trilha === 'base'; }
 
+/** Chave da missão: as versões (degraus) de um mesmo caso compartilham a chave. Casos antigos sem "missao" ficam sozinhos. */
+function missaoDe_(c) { return c.dados.missao || c.id; }
+
 function degrauInicial_(nivel) {
   if (nivel === 'Avançado') return 3;
   if (nivel === 'Básico' || nivel === 'Intermediário') return 2;
   return 1;
 }
 
-/** "dd/MM/yyyy HH:mm" → "yyyyMMddHHmm", para ordenar as conclusões. */
-function chaveData_(t) {
-  const m = String(t || '').match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/);
-  return m ? m[3] + m[2] + m[1] + m[4] + m[5] : '';
-}
-
 /**
- * Degrau atual do aluno na Trilha Base: começa pelo nível do sistema
- * (Iniciante ou sem nível = 1; Básico/Intermediário = 2; Avançado = 3) e depois segue o desempenho:
- * sobe com 80+ em 2 missões seguidas; desce com menos de 40. Só contam as 1ªs jogadas concluídas (sem o tutorial).
+ * Degrau atual do aluno: começa pelo nível do sistema (Iniciante ou sem nível = 1; Básico/Intermediário = 2; Avançado = 3)
+ * e depois segue o desempenho em todas as missões com degrau (Trilha Base e casos do ano):
+ * sobe com 80+ em 2 missões seguidas; desce com menos de 40. Só contam as 1ªs jogadas concluídas; o tutorial não conta.
+ * A data vem de chaveData_ (Relatorios.gs).
  */
-function degrauDoAluno_(nivel, concluidasBase) {
+function degrauDoAluno_(email, nivel, casos, jogadas) {
+  const comDegrau = {};
+  casos.forEach(function (c) { if (Number(c.dados.degrau)) comDegrau[c.id] = true; });
   let d = degrauInicial_(nivel), seguidas = 0;
-  concluidasBase.slice().sort(function (a, b) { return chaveData_(a.concluido_em).localeCompare(chaveData_(b.concluido_em)) || a._linha - b._linha; })
+  jogadas.filter(function (j) { return j.email === email && j.numero === 1 && j.status === 'concluido' && comDegrau[j.caso_id]; })
+    .sort(function (a, b) { return chaveData_(a.concluido_em).localeCompare(chaveData_(b.concluido_em)) || a._linha - b._linha; })
     .forEach(function (j) {
       if (j.pontos >= DEGRAU_SOBE) {
         seguidas++;
@@ -305,69 +306,101 @@ function degrauDoAluno_(nivel, concluidasBase) {
   return d;
 }
 
-/** Monta a trilha do aluno: uma linha por missão, na versão do degrau dele; cada missão libera a seguinte. */
-function trilhaDoAluno_(email, casos, jogadas, nivel) {
+/** Agrupa os casos por missão: { chave: { missao, ordem, tema, titulo, serie, mes, versoes:[...] } }. */
+function agruparMissoes_(casos) {
+  const m = {};
+  casos.forEach(function (c) {
+    const k = missaoDe_(c);
+    if (!m[k]) m[k] = { missao: k, ordem: Number(c.dados.ordem) || 0, tema: c.dados.tema || '', titulo: c.titulo, serie: c.serie, mes: c.mes, versoes: [] };
+    m[k].versoes.push(c);
+  });
+  return m;
+}
+
+/**
+ * Versão da missão para o aluno: a que ele já começou (1ª jogada) ou, se nunca jogou, a do degrau dele
+ * (ou a mais próxima, para missões sem os 3 degraus). Devolve { caso, jogada }.
+ */
+function versaoPara_(versoes, email, jogadas, degrau) {
+  const ids = {};
+  versoes.forEach(function (c) { ids[c.id] = c; });
+  const jogada = jogadas.filter(function (j) { return j.email === email && j.numero === 1 && ids[j.caso_id]; })[0] || null;
+  if (jogada) return { caso: ids[jogada.caso_id], jogada: jogada };
+  const caso = versoes.slice().sort(function (a, b) {
+    return Math.abs((Number(a.dados.degrau) || degrau) - degrau) - Math.abs((Number(b.dados.degrau) || degrau) - degrau);
+  })[0];
+  return { caso: caso, jogada: null };
+}
+
+function itemMissao_(m, v) {
+  const feita = !!(v.jogada && v.jogada.status === 'concluido');
+  return {
+    id: v.caso.id, missao: m.missao, ordem: m.ordem, tema: m.tema, titulo: m.titulo, numero: v.caso.dados.numero || '', mes: m.mes,
+    degrau: Number(v.caso.dados.degrau) || 0, travas: (v.caso.dados.travas || []).length,
+    situacao: !v.jogada ? 'nova' : (feita ? 'concluida' : 'andamento'),
+    pontos: feita ? v.jogada.pontos : null,
+    concluido_em: feita ? v.jogada.concluido_em : '',
+  };
+}
+
+/** Trilha Base do aluno: uma linha por missão, na versão do degrau dele; cada missão libera a seguinte. */
+function trilhaDoAluno_(email, casos, jogadas, degrau) {
   const base = casos.filter(function (c) { return ehTrilha_(c) && c.status === 'aberto'; });
   if (!base.length) return null;
-  const porId = {};
-  base.forEach(function (c) { porId[c.id] = c; });
-  const minhas = jogadas.filter(function (j) { return j.email === email && j.numero === 1 && porId[j.caso_id]; });
-  const concluidas = minhas.filter(function (j) { return j.status === 'concluido' && porId[j.caso_id].dados.missao !== 'tutorial'; });
-  const degrau = degrauDoAluno_(nivel, concluidas);
-
-  const missoes = {};
-  base.forEach(function (c) {
-    const k = c.dados.missao;
-    if (!missoes[k]) missoes[k] = { missao: k, ordem: Number(c.dados.ordem) || 0, tema: c.dados.tema || '', titulo: c.titulo, versoes: [] };
-    missoes[k].versoes.push(c);
-  });
+  const grupos = agruparMissoes_(base);
   let anteriorFeita = true;
-  const lista = Object.keys(missoes).map(function (k) { return missoes[k]; })
+  const lista = Object.keys(grupos).map(function (k) { return grupos[k]; })
     .sort(function (a, b) { return a.ordem - b.ordem; })
     .map(function (m) {
-      const jogada = minhas.filter(function (j) { return porId[j.caso_id].dados.missao === m.missao; })[0];
-      let caso = jogada ? porId[jogada.caso_id] : null;
-      if (!caso) {
-        // Versão do degrau atual; se não existir (ex.: tutorial), a mais próxima.
-        caso = m.versoes.slice().sort(function (a, b) {
-          return Math.abs((Number(a.dados.degrau) || degrau) - degrau) - Math.abs((Number(b.dados.degrau) || degrau) - degrau);
-        })[0];
-      }
-      const feita = !!(jogada && jogada.status === 'concluido');
-      const item = {
-        id: caso.id, missao: m.missao, ordem: m.ordem, tema: m.tema, titulo: m.titulo, numero: caso.dados.numero || '',
-        degrau: Number(caso.dados.degrau) || 0, travas: (caso.dados.travas || []).length,
-        situacao: !anteriorFeita ? 'bloqueada' : (!jogada ? 'nova' : (feita ? 'concluida' : 'andamento')),
-        pontos: feita ? jogada.pontos : null,
-      };
-      anteriorFeita = feita;
+      const item = itemMissao_(m, versaoPara_(m.versoes, email, jogadas, degrau));
+      if (!anteriorFeita) item.situacao = 'bloqueada';
+      anteriorFeita = item.situacao === 'concluida';
       return item;
     });
   return { degrau: degrau, missoes: lista, feitas: lista.filter(function (m) { return m.situacao === 'concluida'; }).length, total: lista.length };
 }
 
-/** Lista para o painel do aluno: casos abertos da série + Trilha Base. */
+/** Nível e degrau do aluno, com uma só leitura das respostas. */
+function degrauAtualDoAluno_(email, casos, jogadas) {
+  const nivel = (calcularNiveis_(lerConfig_())[email] || {}).nivel || '';
+  return degrauDoAluno_(email, nivel, casos, jogadas);
+}
+
+/** Painel do aluno: ciclos (valem nota), casos livres do ano e Trilha Base. */
 function alunoMissoes_(email, turma) {
   const serie = serieDaTurma_(turma);
   const jogadas = lerJogadas_();
-  const todos = lerCasos_();
-  const minhas = jogadas.filter(function (j) { return j.email === email; });
-  const casos = todos.filter(function (c) { return c.status === 'aberto' && c.serie === serie; })
-    .sort(function (a, b) { return a.mes.localeCompare(b.mes) || a.titulo.localeCompare(b.titulo); });
-  const lista = casos.map(function (c) {
-    const js = minhas.filter(function (j) { return j.caso_id === c.id; });
-    const primeira = js.filter(function (j) { return j.numero === 1; })[0];
-    const andamento = js.filter(function (j) { return j.status === 'andamento'; })[0];
-    return {
-      id: c.id, titulo: c.titulo, mes: c.mes, numero: c.dados.numero || '', travas: (c.dados.travas || []).length,
-      situacao: !primeira ? 'nova' : (primeira.status === 'concluido' ? 'concluida' : 'andamento'),
-      pontos: primeira && primeira.status === 'concluido' ? primeira.pontos : null,
-      treinando: !!(andamento && andamento.numero > 1),
-    };
+  const casos = lerCasos_();
+  const degrau = degrauAtualDoAluno_(email, casos, jogadas);
+  const grupos = agruparMissoes_(casos.filter(function (c) { return !ehTrilha_(c) && c.serie === serie; }));
+
+  const ciclos = lerCiclos_().filter(function (ci) { return ci.turma === turma && ci.status === 'aberto'; }).map(function (ci) {
+    const prazo = prazoDoAluno_(ci, email);
+    const itens = ci.missoes.filter(function (k) { return grupos[k]; }).map(function (k) {
+      const item = itemMissao_(grupos[k], versaoPara_(grupos[k].versoes, email, jogadas, degrau));
+      item.noPrazo = item.situacao === 'concluida' && dentroDoPrazo_(item.concluido_em, prazo);
+      return item;
+    });
+    const nota = notaDoCiclo_(itens);
+    return { id: ci.id, titulo: ci.titulo, prazo: prazo, vencido: hojeIso_() > prazo, missoes: itens, nota: nota };
   });
-  const concluidos = lista.filter(function (c) { return c.situacao === 'concluida'; }).length;
-  const nivel = (calcularNiveis_(lerConfig_())[email] || {}).nivel || '';
-  return { casos: lista, patente: patente_(serie, concluidos), saga: serie, trilha: trilhaDoAluno_(email, todos, jogadas, nivel) };
+  const noCiclo = {};
+  ciclos.forEach(function (ci) { ci.missoes.forEach(function (m) { noCiclo[m.missao] = true; }); });
+
+  // Casos do ano liberados para treino livre (situação "Aberto"), fora dos ciclos.
+  const livres = Object.keys(grupos).map(function (k) { return grupos[k]; })
+    .filter(function (m) { return !noCiclo[m.missao] && m.versoes.some(function (c) { return c.status === 'aberto'; }); })
+    .sort(function (a, b) { return a.mes.localeCompare(b.mes) || a.titulo.localeCompare(b.titulo); })
+    .map(function (m) { return itemMissao_(m, versaoPara_(m.versoes.filter(function (c) { return c.status === 'aberto'; }), email, jogadas, degrau)); });
+
+  const concluidos = Object.keys(grupos).filter(function (k) {
+    const v = versaoPara_(grupos[k].versoes, email, jogadas, degrau);
+    return v.jogada && v.jogada.status === 'concluido';
+  }).length;
+  return {
+    degrau: degrau, ciclos: ciclos, casos: livres, patente: patente_(serie, concluidos), saga: serie,
+    trilha: trilhaDoAluno_(email, casos, jogadas, degrau),
+  };
 }
 
 /** Abre o caso: continua a jogada em andamento ou mostra a última concluída. */
@@ -375,32 +408,34 @@ function alunoAbrirCaso(id) {
   const eu = jogador_();
   const caso = buscarCaso_(id);
   const jogadas = lerJogadas_();
-  let trilha = null;
+  let trilha = null, ciclo = null, painel = null;
   if (!eu.professor) {
-    if (caso.status !== 'aberto') throw new Error('Este caso não está disponível agora.');
     if (caso.serie !== SERIE_TODAS && caso.serie !== serieDaTurma_(eu.turma)) throw new Error('Este caso é de outra série.');
+    painel = alunoMissoes_(eu.email, eu.turma);
+    const k = missaoDe_(caso);
+    let item = null;
     if (ehTrilha_(caso)) {
-      const nivel = (calcularNiveis_(lerConfig_())[eu.email] || {}).nivel || '';
-      trilha = trilhaDoAluno_(eu.email, lerCasos_(), jogadas, nivel);
-      const item = trilha && trilha.missoes.filter(function (m) { return m.missao === caso.dados.missao; })[0];
-      if (!item) throw new Error('Esta missão não está disponível agora.');
-      if (item.situacao === 'bloqueada') throw new Error('Termine a missão anterior primeiro.');
-      if (item.id !== caso.id) throw new Error('Esta versão é de outro degrau. Abra a missão pelo painel "Missions".');
+      item = painel.trilha && painel.trilha.missoes.filter(function (m) { return m.missao === k; })[0];
+      if (item && item.situacao === 'bloqueada') throw new Error('Termine a missão anterior primeiro.');
+      trilha = painel.trilha;
+    } else {
+      painel.ciclos.forEach(function (ci) {
+        ci.missoes.forEach(function (m) { if (m.missao === k && !item) { item = m; ciclo = { titulo: ci.titulo, prazo: ci.prazo }; } });
+      });
+      if (!item) item = painel.casos.filter(function (m) { return m.missao === k; })[0];
     }
+    if (!item) throw new Error('Este caso não está disponível agora.');
+    if (item.id !== caso.id) throw new Error('Esta versão é de outro degrau. Abra o caso pelo painel "Missions".');
   }
   const minhas = jogadas.filter(function (j) { return j.email === eu.email && j.caso_id === caso.id; })
     .sort(function (a, b) { return b.numero - a.numero; });
   let j = minhas[0] ? buscarJogada_(minhas[0].id) : null;
   if (!j) j = criarJogada_(caso, eu, 1);
-  const idsAnuais = {};
-  lerCasos_().forEach(function (c) { if (c.serie !== SERIE_TODAS) idsAnuais[c.id] = true; });
-  const anuais = eu.professor ? 0 : jogadas.filter(function (x) {
-    return x.email === eu.email && x.numero === 1 && x.status === 'concluido' && idsAnuais[x.caso_id];
-  }).length;
   return {
     caso: casoParaAluno_(caso), jogada: visaoJogada_(caso, j), professor: eu.professor,
-    patente: patente_(caso.serie, anuais),
+    patente: painel ? painel.patente : patente_(caso.serie, 0),
     trilha: trilha ? { degrau: trilha.degrau, feitas: trilha.feitas, total: trilha.total } : null,
+    ciclo: ciclo,
     appUrl: ScriptApp.getService().getUrl(),
   };
 }
@@ -452,7 +487,7 @@ function comTravaDoUsuario_(fn) {
 function alunoVerificar(jogadaId, indice, respostas) {
   return comTravaDoUsuario_(function () {
     const x = minhaJogada_(jogadaId);
-    const j = x.j, caso = x.caso;
+    const j = x.j, caso = x.caso, eu = x.eu;
     indice = Number(indice);
     if (j.status !== 'andamento') throw new Error('Esta jogada já terminou.');
     if (indice !== j.estado.atual) throw new Error('Este cadeado não é o atual. Recarregue a página.');
@@ -474,6 +509,7 @@ function alunoVerificar(jogadaId, indice, respostas) {
     }
     if (t.aberta) avancar_(j);
     gravarJogada_(j);
+    if (j.status === 'concluido' && j.numero === 1 && !eu.professor) atualizarNotasDoAluno_(j.email, j.turma, j.caso_id);
     return { resultado: resultado, msg: r.msg || '', jogada: visaoJogada_(caso, j) };
   });
 }
@@ -555,7 +591,7 @@ function profListarCasos() {
     const js = jogadas.filter(function (j) { return j.caso_id === c.id && j.numero === 1; });
     return {
       id: c.id, serie: c.serie, mes: c.mes, titulo: c.titulo, status: c.status, numero: c.dados.numero || '',
-      trilha: ehTrilha_(c), missao: c.dados.missao || '', ordem: Number(c.dados.ordem) || 0, tema: c.dados.tema || '', degrau: Number(c.dados.degrau) || 0,
+      trilha: ehTrilha_(c), missao: missaoDe_(c), ordem: Number(c.dados.ordem) || 0, tema: c.dados.tema || '', degrau: Number(c.dados.degrau) || 0,
       travas: (c.dados.travas || []).length,
       etiquetas: etiquetasCaso_(c),
       jogaram: js.length, concluiram: js.filter(function (j) { return j.status === 'concluido'; }).length,
@@ -602,7 +638,7 @@ function profImportarCasos(texto) {
 
 function profCarregarCasosPadrao() {
   exigirProfessor_();
-  return salvarCasos_(CASOS_PADRAO.map(function (c, i) { return validarCaso_(c, i + 1); }));
+  return salvarCasos_(CASOS_PADRAO.concat(casosAno_()).map(function (c, i) { return validarCaso_(c, i + 1); }));
 }
 
 function salvarCasos_(casos) {
@@ -710,14 +746,14 @@ function profCarregarTrilhaBase() {
   return salvarCasos_(CASOS_BASE.map(function (c, i) { return validarCaso_(c, i + 1); }));
 }
 
-/** Abre ou fecha todas as versões (degraus) de uma missão da trilha; missao vazia = a trilha inteira. */
+/** Abre ou fecha todas as versões (degraus) de uma missão (trilha ou caso do ano); missao vazia = a Trilha Base inteira. */
 function profStatusMissao(missao, status) {
   exigirProfessor_();
   if (STATUS_CASO.indexOf(status) === -1) throw new Error('Situação inválida.');
   comTrava_(function () {
     const aba = garantirAba_('Casos');
     const col = CABECALHOS.Casos.indexOf('status') + 1;
-    lerCasos_().filter(function (c) { return ehTrilha_(c) && (!missao || c.dados.missao === missao); })
+    lerCasos_().filter(function (c) { return missao ? missaoDe_(c) === missao : ehTrilha_(c); })
       .forEach(function (c) { aba.getRange(c._linha, col).setValue(status); });
   });
   return profListarCasos();
@@ -727,7 +763,7 @@ function profStatusMissao(missao, status) {
 function profResultadosMissao(missao, turma) {
   exigirProfessor_();
   const casos = lerCasos_();
-  const versoes = casos.filter(function (c) { return ehTrilha_(c) && c.dados.missao === missao; })
+  const versoes = casos.filter(function (c) { return missaoDe_(c) === missao; })
     .sort(function (a, b) { return (Number(a.dados.degrau) || 0) - (Number(b.dados.degrau) || 0); });
   if (!versoes.length) throw new Error('Missão não encontrada.');
   const ids = versoes.map(function (c) { return c.id; });
@@ -741,7 +777,8 @@ function profResultadosMissao(missao, turma) {
     const email = String(a.email).toLowerCase();
     const js = jogadas.filter(function (j) { return j.email === email && ids.indexOf(j.caso_id) !== -1; });
     const v = js.filter(function (j) { return j.numero === 1; })[0];
-    const trilha = trilhaDoAluno_(email, casos.map(function (c) { return ehTrilha_(c) ? Object.assign({}, c, { status: 'aberto' }) : c; }), jogadas, (niveis[email] || {}).nivel || '');
+    const degrau = degrauDoAluno_(email, (niveis[email] || {}).nivel || '', casos, jogadas);
+    const trilha = trilhaDoAluno_(email, casos.map(function (c) { return ehTrilha_(c) ? Object.assign({}, c, { status: 'aberto' }) : c; }), jogadas, degrau);
     return {
       email: email, nome: String(a.nome), degrauAtual: trilha ? trilha.degrau : 1,
       degrau: v ? Number(porId[v.caso_id].dados.degrau) || 0 : null,
@@ -767,12 +804,26 @@ function profResultadosMissao(missao, turma) {
 function profZerarMissao(missao, email, turma) {
   exigirProfessor_();
   email = String(email || '').toLowerCase();
-  const ids = lerCasos_().filter(function (c) { return ehTrilha_(c) && c.dados.missao === missao; }).map(function (c) { return c.id; });
+  const ids = lerCasos_().filter(function (c) { return missaoDe_(c) === missao; }).map(function (c) { return c.id; });
   comTrava_(function () {
     const aba = garantirAba_('Jogadas');
     lerJogadas_().filter(function (j) { return ids.indexOf(j.caso_id) !== -1 && j.email === email; })
       .sort(function (a, b) { return b._linha - a._linha; })
       .forEach(function (j) { aba.deleteRow(j._linha); });
   });
+  lerCiclos_().filter(function (c) { return c.turma === turma && c.missoes.indexOf(missao) !== -1; })
+    .forEach(function (c) { gravarNotasCiclo_(c, [email]); });
   return profResultadosMissao(missao, turma);
+}
+
+/** Exclui todas as versões de um caso do ano (as jogadas ficam guardadas na planilha). */
+function profExcluirMissao(missao) {
+  exigirProfessor_();
+  comTrava_(function () {
+    const aba = garantirAba_('Casos');
+    lerCasos_().filter(function (c) { return missaoDe_(c) === missao && !ehTrilha_(c); })
+      .sort(function (a, b) { return b._linha - a._linha; })
+      .forEach(function (c) { aba.deleteRow(c._linha); });
+  });
+  return profListarCasos();
 }

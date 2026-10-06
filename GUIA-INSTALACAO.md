@@ -4,6 +4,31 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# Etapa 2 · Ciclos com nota e casos do ano em degraus
+
+## A. Atualizar o código
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `Ciclos` | **arquivo novo:** **+ > Script**, nome `Ciclos`, cole **Ciclos.gs** |
+| `CasosAno` | **arquivo novo:** **+ > Script**, nome `CasosAno`, cole **CasosAno.gs** |
+| `Casos`, `CasosPadrao`, `Codigo`, `Relatorios` | apague tudo e cole as novas versões (.gs) |
+| `CasoMotor`, `ProfJogos`, `Aluno`, `Professor` | apague tudo e cole as novas versões (.html) |
+
+Depois: **Salvar** → **Implantar > Gerenciar implantações > ✏️ > Nova versão > Implantar** → abra o app e aperte **F5**. Não precisa rodar `instalar` (a aba **Ciclos** é criada sozinha).
+
+## B. Usar
+1. Aba **Jogos** → **Carregar casos do ano**: entram outubro e novembro, cada caso com ★, ★★ e ★★★.
+2. Se você tinha deixado o caso de outubro "Aberto" na Etapa 1, a coluna **Treino livre** vai mostrar **Misto**: escolha **Rascunho** (só no ciclo) ou **Aberto** (treino para todos).
+3. **+ Novo ciclo**: escolha a série, marque as turmas, o título, o mês, o prazo e de 1 a 3 casos. É criado um ciclo para cada turma.
+4. O aluno vê o ciclo no topo de **🕵️ Missions**, com o prazo, e joga a versão do seu degrau. Dentro do jogo aparece "vale nota até…".
+5. **Resultados** do ciclo: degrau e pontos de cada caso (✔ no prazo, ⏰ fora do prazo), a **nota** e o botão **Prazo** para prorrogar só para um aluno.
+6. **Fechar** o ciclo congela as notas. Reabrir volta a aceitar conclusões dentro do prazo.
+
+**Regras da nota:** média dos casos do ciclo (todas as versões valem 100). Caso não concluído no prazo vale 0. Quem não concluiu nenhum caso no prazo fica **sem nota** no mês. A nota aparece no nível com o mesmo peso de um questionário mensal e nos Relatórios como "Jogos".
+
+---
+
 # Trilha Base · Detective Academy (reposição de aprendizagem)
 
 ## A. Atualizar o código

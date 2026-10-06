@@ -67,7 +67,7 @@
   };
   var CORES = { pop: '#FF4F6D', sun: '#FFD23F', go: '#22B573', blue: '#2F5BFF', orange: '#FF8A3D' };
 
-  var C = null, J = null, PROF = false, PAT = null, TRI = null, S = { tab: null, texto: {}, textoParte: {}, ajuda: false, resp: [], ocupado: false, concluidoAoAbrir: false };
+  var C = null, J = null, PROF = false, PAT = null, TRI = null, CIC = null, S = { tab: null, texto: {}, textoParte: {}, ajuda: false, resp: [], ocupado: false, concluidoAoAbrir: false };
   var $ = function (id) { return document.getElementById(id); };
 
   function chamar(fn) {
@@ -196,9 +196,14 @@
 
   function desenharModo() {
     var m = $('modo');
-    m.hidden = !(PROF || J.numero > 1);
-    m.className = 'modo' + (PROF ? ' prof' : '');
-    m.textContent = PROF ? 'Teste do professor · nada vale nota' : 'Practice · não vale nota';
+    var valeNota = !PROF && CIC && J.numero === 1;
+    m.hidden = !(PROF || J.numero > 1 || valeNota);
+    m.className = 'modo' + (PROF || valeNota ? ' prof' : '');
+    if (PROF) m.textContent = 'Teste do professor · nada vale nota';
+    else if (valeNota) {
+      var p = String(CIC.prazo || '').split('-');
+      m.textContent = '📅 ' + CIC.titulo + ' · vale nota até ' + (p.length === 3 ? p[2] + '/' + p[1] : '');
+    } else m.textContent = 'Practice · não vale nota';
   }
 
   function desenharStatus() {
@@ -698,7 +703,7 @@
 
   if (!CASO_ID) { erro('Caso não informado.'); return; }
   chamar('alunoAbrirCaso', CASO_ID).then(function (r) {
-    C = r.caso; J = r.jogada; PROF = !!r.professor; PAT = r.patente; TRI = r.trilha || null;
+    C = r.caso; J = r.jogada; PROF = !!r.professor; PAT = r.patente; TRI = r.trilha || null; CIC = r.ciclo || null;
     if (r.appUrl) APP = r.appUrl;
     S.concluidoAoAbrir = J.status === 'concluido';
     $('carregando').hidden = true;
