@@ -4,6 +4,66 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# Trilha Base · Detective Academy (reposição de aprendizagem)
+
+## A. Atualizar o código
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `CasosBase` | **arquivo novo:** **+ > Script**, nome `CasosBase`, cole **CasosBase.gs** |
+| `Casos` | apague tudo e cole **Casos.gs** |
+| `CasoMotor` | apague tudo e cole **CasoMotor.html** |
+| `CasoEstilo` | apague tudo e cole **CasoEstilo.html** |
+| `ProfJogos` | apague tudo e cole **ProfJogos.html** |
+| `Aluno` | apague tudo e cole **Aluno.html** |
+
+Depois: **Salvar** → **Implantar > Gerenciar implantações > ✏️ > Nova versão > Implantar**. Não precisa rodar `instalar`. Se a tela não mudar, recarregue com **F5**.
+
+## B. Usar
+1. Aba **Jogos** → **Carregar Trilha Base** → **Abrir a trilha inteira**.
+2. Teste: na linha de cada missão, os botões **Tutorial / ★ / ★★ / ★★★** abrem cada degrau.
+3. O aluno vê em **🕵️ Missions** a **Detective Academy**: começa pela **Mission 0** (tutorial guiado) e cada missão libera a seguinte.
+4. O degrau é automático: Iniciante ou sem nível = ★, Básico/Intermediário = ★★, Avançado = ★★★. Sobe com 80+ pontos em 2 missões seguidas e desce abaixo de 40.
+5. **Resultados** de cada missão mostram, por turma, o degrau atual do aluno, o degrau que ele jogou, quantas missões já fez e os pontos por cadeado.
+
+A Trilha Base **não vale nota**. Os casos do ano continuam na mesma aba, logo abaixo.
+
+---
+
+# Jogos investigativos — Etapa 1 (motor dos casos)
+
+## A. Atualizar o código
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `Casos.gs` | **arquivo novo:** clique em **+ > Script**, dê o nome `Casos` e cole **Casos.gs** |
+| `CasosPadrao.gs` | **arquivo novo:** **+ > Script**, nome `CasosPadrao`, cole **CasosPadrao.gs** |
+| `Caso.html` | **arquivo novo:** **+ > HTML**, nome `Caso`, cole **Caso.html** |
+| `CasoEstilo.html` | **arquivo novo:** **+ > HTML**, nome `CasoEstilo`, cole **CasoEstilo.html** |
+| `CasoMotor.html` | **arquivo novo:** **+ > HTML**, nome `CasoMotor`, cole **CasoMotor.html** |
+| `ProfJogos.html` | **arquivo novo:** **+ > HTML**, nome `ProfJogos`, cole **ProfJogos.html** |
+| `Codigo.gs`, `Professor.html`, `Aluno.html` | apague tudo e cole as novas versões |
+
+Depois:
+1. Execute **instalar**. Ela cria as abas **Casos** e **Jogadas**.
+2. Publique em **Implantar > Gerenciar implantações > ✏️ > Nova versão**.
+
+## B. Usar
+1. No painel, abra a aba **Jogos** e clique em **Carregar casos padrão**. Entram 4 casos de outubro, um por série, todos como **Rascunho**.
+2. Clique em **Testar** para jogar como aluno. As suas jogadas de teste não aparecem nos resultados. Dentro do jogo, **PLAY AGAIN** recomeça.
+3. Mude a situação para **Aberto**. O caso aparece para os alunos da série no cartão **🕵️ Missions**.
+4. Em **Resultados**, escolha a turma e veja os pontos de cada aluno por cadeado (verde = cheio, amarelo = perdeu pontos, vermelho = 0 ou revelado), as dicas, os erros e a frase final. **Zerar** apaga as jogadas do aluno nesse caso, e ele joga de novo valendo.
+
+**Regras:** cada caso vale 100 pontos, divididos entre os cadeados. Cada dica custa 5 pontos e cada tentativa errada custa 4. Na 3ª tentativa errada, a resposta aparece e o cadeado vale 0. Resposta incompleta não custa nada. Só a **1ª jogada** vale; as seguintes são treino. A correção é feita no servidor: a resposta certa nunca vai para o computador do aluno.
+
+**Frase final:** é um bônus, sem nota. Se a chave da API do Claude estiver cadastrada em Configurações, o aluno recebe um comentário curto em português. Sem a chave, aparece só "Obrigado! O professor vai ler", e você lê a frase em Resultados.
+
+**Nesta etapa os jogos ainda não entram no nível.** Os ciclos com prazo por turma e a nota mensal chegam na Etapa 2.
+
+**Voz e Chromebook:** o áudio usa a voz em inglês do Chrome, a mesma do English Kids App. O botão **📄 TEXT** mostra a transcrição.
+
+---
+
 # Exceção do monitoramento de tela (uso do Canva)
 
 Substitua **Codigo.gs, Questionarios.gs, Tda.gs, Professor.html e Aluno.html**. Depois execute **instalar**, que acrescenta a coluna `monitorar` na aba Questionarios, e publique uma **nova versão**.

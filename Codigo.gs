@@ -19,6 +19,8 @@ const CABECALHOS = {
   Periodos: ['id', 'nome', 'inicio', 'fim', 'status', 'fechado_em', 'planilha_url'],
   Aulas: ['id', 'turma', 'data', 'descricao', 'criado_em'],
   EntregasDiarias: ['aula_id', 'email', 'status', 'atualizado_em'],
+  Casos: ['id', 'serie', 'mes', 'titulo', 'status', 'dados_json', 'criado_em'],
+  Jogadas: ['id', 'caso_id', 'email', 'turma', 'numero', 'status', 'pontos', 'total', 'estado_json', 'final_texto', 'final_feedback', 'iniciado_em', 'atualizado_em', 'concluido_em'],
 };
 
 const CONFIG_PADRAO = [
@@ -181,9 +183,18 @@ function validarAluno_(email, cfg) {
 // Páginas
 // ============================================================
 
-function doGet() {
+function doGet(e) {
   try {
     const email = usuarioAtual_();
+    const caso = e && e.parameter ? String(e.parameter.caso || '') : '';
+    if (caso) {
+      // Tela do jogo (caso investigativo), em página própria.
+      const tc = HtmlService.createTemplateFromFile('Caso');
+      tc.casoId = caso.replace(/[^\w-]/g, '');
+      tc.appUrl = ScriptApp.getService().getUrl();
+      return tc.evaluate().setTitle('English Learning App – Missions')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    }
     const pagina = ehProfessor_(email) ? 'Professor' : 'Aluno';
     const t = HtmlService.createTemplateFromFile(pagina);
     t.email = email;
@@ -238,6 +249,8 @@ function alunoObterEstado() {
     questionarios: aluno ? pendentesDoAluno_(email, String(aluno.turma)) : [],
     tdas: aluno ? alunoTdas_(email, String(aluno.turma)) : [],
     diarias: aluno ? alunoDiarias_(email, String(aluno.turma), cfg) : null,
+    missoes: aluno ? alunoMissoes_(email, String(aluno.turma)) : null,
+    appUrl: ScriptApp.getService().getUrl(),
   };
 }
 
@@ -353,7 +366,7 @@ function profSalvarAluno(dados) {
 }
 
 function trocarEmailNoHistorico_(antigo, novo) {
-  ['Respostas', 'Grupos'].forEach(function (nome) {
+  ['Respostas', 'Grupos', 'Jogadas'].forEach(function (nome) {
     const aba = aba_(nome);
     const col = CABECALHOS[nome].indexOf('email') + 1;
     const n = aba.getLastRow() - 1;

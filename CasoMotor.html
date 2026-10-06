@@ -1,0 +1,710 @@
+<div class="wrap" id="app">
+  <div class="carregando" id="carregando">LOADING…</div>
+  <div class="panel erro-caixa" id="erro" hidden></div>
+  <div id="jogo" hidden>
+    <header class="top">
+      <a class="voltar" id="voltar" href="#">← Missions</a>
+      <div class="logo" id="logo"></div>
+      <div class="issue" id="issue"></div>
+      <span class="modo" id="modo" hidden></span>
+      <div class="status">
+        <div class="locks" id="locks" aria-label="Locks"></div>
+        <div class="points"><small>POINTS</small><span id="pts">0</span></div>
+      </div>
+    </header>
+    <section class="panel strip" id="abertura"></section>
+    <div class="grid" id="grade">
+      <section id="sec-ev">
+        <p class="caption">EVIDENCE</p>
+        <div class="panel ev">
+          <div class="tabs" role="tablist" id="tabs"></div>
+          <div id="evidence" role="tabpanel"></div>
+        </div>
+      </section>
+      <section aria-live="polite">
+        <p class="caption">CASE FILE</p>
+        <div class="panel desk" id="desk"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var CASO_ID = document.body.getAttribute('data-caso');
+  var APP = document.body.getAttribute('data-app');
+
+  var SAGAS = {
+    '6º': { nome: 'LOST & FOUND AGENCY', ceu: '#7ED957', pontos: '#69C443', patentes: ['Trainee', 'Agent', 'Senior Agent'] },
+    '7º': { nome: 'TIME DETECTIVES', ceu: '#B39DFF', pontos: '#A08AF0', patentes: ['Cadet', 'Detective', 'Chief Detective'] },
+    '8º': { nome: 'FUTURE LAB 2050', ceu: '#5EE6D0', pontos: '#45D4BD', patentes: ['Intern', 'Scientist', 'Lead Scientist'] },
+    '9º': { nome: 'FACT CHECKERS HQ', ceu: '#4FC3F7', pontos: '#3AA9DE', patentes: ['Junior Checker', 'Checker', 'Senior Checker'] },
+    base: { nome: 'DETECTIVE ACADEMY', ceu: '#FFB547', pontos: '#F5A021', patentes: ['Trainee', 'Agent', 'Senior Agent'] }
+  };
+  var LIMITES_PATENTE = [0, 2, 5];
+
+  var PERSONAGENS = {
+    nadia: { fundo: '#FF4F6D', pele: '#C98A5E', cabelo: '#3B2314', estilo: 'longo', oculos: 1 },
+    marcos: { fundo: '#22B573', pele: '#F1C7A0', cabelo: '#121212', estilo: 'curto' },
+    kai: { fundo: '#2F5BFF', pele: '#8D5A3B', cabelo: '#121212', estilo: 'bone' },
+    paulo: { fundo: '#FF8A3D', pele: '#F1C7A0', cabelo: '#9A9A9A', estilo: 'careca', bigode: 1 },
+    ana: { fundo: '#FF7AB6', pele: '#C98A5E', cabelo: '#121212', estilo: 'longo' },
+    leo: { fundo: '#22B573', pele: '#F1C7A0', cabelo: '#E0A100', estilo: 'curto' },
+    bia: { fundo: '#FFD23F', pele: '#8D5A3B', cabelo: '#3B2314', estilo: 'coque' },
+    clock: { fundo: '#7B5CFF', pele: '#F1C7A0', cabelo: '#5A3A1A', estilo: 'curto', oculos: 1, bigode: 1 },
+    nina: { fundo: '#FFD23F', pele: '#F1C7A0', cabelo: '#B5651D', estilo: 'coque' },
+    pedro: { fundo: '#4FC3F7', pele: '#C98A5E', cabelo: '#121212', estilo: 'curto' },
+    lu: { fundo: '#22B573', pele: '#E8B98F', cabelo: '#121212', estilo: 'longo', oculos: 1 },
+    ravi: { fundo: '#FF8A3D', pele: '#8D5A3B', cabelo: '#121212', estilo: 'curto', oculos: 1 },
+    max: { fundo: '#FF4F6D', pele: '#C98A5E', cabelo: '#121212', estilo: 'bone' },
+    ben: { fundo: '#4FC3F7', pele: '#F1C7A0', cabelo: '#6B3E1E', estilo: 'curto' },
+    lucy: { fundo: '#FF7AB6', pele: '#F1C7A0', cabelo: '#6B3E1E', estilo: 'coque' },
+    tom: { fundo: '#22B573', pele: '#F1C7A0', cabelo: '#3B2314', estilo: 'curto', oculos: 1, bigode: 1 },
+    rosa: { fundo: '#FF8A3D', pele: '#C98A5E', cabelo: '#121212', estilo: 'longo' },
+    sam: { fundo: '#7B5CFF', pele: '#8D5A3B', cabelo: '#121212', estilo: 'curto' },
+    mia: { fundo: '#FFD23F', pele: '#E8B98F', cabelo: '#B5651D', estilo: 'longo' }
+  };
+  var CORES = { pop: '#FF4F6D', sun: '#FFD23F', go: '#22B573', blue: '#2F5BFF', orange: '#FF8A3D' };
+
+  var C = null, J = null, PROF = false, PAT = null, TRI = null, S = { tab: null, texto: {}, textoParte: {}, ajuda: false, resp: [], ocupado: false, concluidoAoAbrir: false };
+  var $ = function (id) { return document.getElementById(id); };
+
+  function chamar(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (ok, falha) {
+      var r = google.script.run.withSuccessHandler(ok).withFailureHandler(falha);
+      r[fn].apply(r, args);
+    });
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+  }
+  /* Texto com marcações: [[palavra|tradução]], ==destaque==, **negrito**, ~~riscado~~. */
+  function fmt(s) {
+    return esc(s)
+      .replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g, function (m, w, t) { return '<button type="button" class="g" data-pt="' + t + '">' + w + '</button>'; })
+      .replace(/==(.+?)==/g, '<mark>$1</mark>')
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+      .replace(/~~(.+?)~~/g, '<s>$1</s>');
+  }
+  function limpo(s) {
+    return String(s || '').replace(/\[\[([^|\]]+)\|[^\]]*\]\]/g, '$1').replace(/==|\*\*|~~/g, '');
+  }
+
+  /* ---------- Personagens desenhados ---------- */
+  function rosto(id, classe) {
+    var p = PERSONAGENS[id];
+    if (!p) return '<span class="av-letra ' + (classe || '') + '" style="background:#FFD23F">?</span>';
+    var k = 'stroke="#121212" stroke-width="3"', s = '';
+    s += '<circle cx="42" cy="42" r="39" fill="' + p.fundo + '" ' + k + '/>';
+    if (p.estilo === 'longo') s += '<path d="M20 50c0-20 10-30 22-30s22 10 22 30v14H20z" fill="' + p.cabelo + '"/>';
+    if (p.estilo === 'coque') s += '<circle cx="42" cy="25" r="9" fill="' + p.cabelo + '" stroke="#121212" stroke-width="2.5"/>';
+    s += '<ellipse cx="42" cy="48" rx="17" ry="20" fill="' + p.pele + '" ' + k + '/>';
+    if (p.estilo === 'curto') s += '<path d="M24 40c0-12 8-19 18-19s18 7 18 19c-4-5-10-7-18-7s-14 2-18 7z" fill="' + p.cabelo + '" stroke="#121212" stroke-width="2.5"/>';
+    if (p.estilo === 'longo' || p.estilo === 'coque') s += '<path d="M25 43c1-10 8-16 17-16s16 6 17 16c-5-4-11-6-17-6s-12 2-17 6z" fill="' + p.cabelo + '"/>';
+    if (p.estilo === 'bone') s += '<path d="M23 38c0-11 9-17 19-17s19 6 19 17H23z" fill="#121212"/><path d="M18 37h48v6H18z" fill="#FFD23F" stroke="#121212" stroke-width="2.5"/>';
+    if (p.estilo === 'careca') s += '<path d="M25 40c3-9 10-13 17-13s14 4 17 13" fill="none" stroke="' + p.cabelo + '" stroke-width="6" stroke-linecap="round"/>';
+    s += '<circle cx="36" cy="48" r="2.6" fill="#121212"/><circle cx="48" cy="48" r="2.6" fill="#121212"/>';
+    if (p.oculos) s += '<rect x="28" y="42" width="13" height="10" rx="3" fill="none" stroke="#121212" stroke-width="2.5"/><rect x="43" y="42" width="13" height="10" rx="3" fill="none" stroke="#121212" stroke-width="2.5"/>';
+    if (p.bigode) s += '<path d="M34 56h16" stroke="#5A5A5A" stroke-width="5" stroke-linecap="round"/>';
+    s += '<path d="M35 59q7 6 14 0" fill="none" stroke="#121212" stroke-width="2.5" stroke-linecap="round"/>';
+    return '<svg class="' + (classe || 'face') + '" viewBox="0 0 84 84" aria-hidden="true">' + s + '</svg>';
+  }
+  function avatar(b) {
+    if (b.personagem) return rosto(b.personagem, 'av');
+    var a = b.avatar || {};
+    if (a.personagem) return rosto(a.personagem, 'av');
+    return '<span class="av-letra" style="background:' + (CORES[a.cor] || a.cor || '#FFD23F') + '">' + esc(a.letra || '?') + '</span>';
+  }
+  function relogio(h, m) {
+    var ticks = '';
+    for (var i = 0; i < 12; i++) {
+      var a = i * Math.PI / 6;
+      ticks += '<line x1="' + (50 + 36 * Math.sin(a)).toFixed(1) + '" y1="' + (50 - 36 * Math.cos(a)).toFixed(1) + '" x2="' + (50 + 41 * Math.sin(a)).toFixed(1) + '" y2="' + (50 - 41 * Math.cos(a)).toFixed(1) + '" stroke="#121212" stroke-width="' + (i % 3 ? 2 : 4) + '"/>';
+    }
+    return '<svg class="relogio" viewBox="0 0 100 100" role="img" aria-label="clock"><circle cx="50" cy="50" r="46" fill="#FFFFFF" stroke="#121212" stroke-width="4"/>' + ticks +
+      '<text x="50" y="24" text-anchor="middle" font-size="11" font-family="Bangers, sans-serif" fill="#121212">12</text>' +
+      '<line x1="50" y1="50" x2="50" y2="28" stroke="#FF4F6D" stroke-width="5" stroke-linecap="round" transform="rotate(' + ((h % 12) * 30 + m * 0.5) + ' 50 50)"/>' +
+      '<line x1="50" y1="50" x2="50" y2="14" stroke="#121212" stroke-width="3.5" stroke-linecap="round" transform="rotate(' + (m * 6) + ' 50 50)"/>' +
+      '<circle cx="50" cy="50" r="4" fill="#121212"/></svg>';
+  }
+
+  /* ---------- Glossário (toque na palavra) ---------- */
+  var tipEl = null, tipDono = null;
+  function esconderTip() { if (tipEl) tipEl.remove(); if (tipDono) tipDono.setAttribute('aria-expanded', 'false'); tipEl = tipDono = null; }
+  function mostrarTip(b) {
+    esconderTip();
+    tipEl = document.createElement('span');
+    tipEl.className = 'tip';
+    tipEl.textContent = b.getAttribute('data-pt');
+    document.body.appendChild(tipEl);
+    var r = b.getBoundingClientRect(), w = tipEl.offsetWidth;
+    var esq = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+    tipEl.style.left = (esq + window.scrollX) + 'px';
+    tipEl.style.top = (r.top + window.scrollY - tipEl.offsetHeight - 6) + 'px';
+    tipDono = b;
+    b.setAttribute('aria-expanded', 'true');
+  }
+  window.addEventListener('scroll', esconderTip, { passive: true });
+
+  /* ---------- Voz (leitura em inglês do Chrome) ---------- */
+  function evidenciaAudio(id) {
+    var ev = (C.dados.evidencias || []).filter(function (e) { return e.id === id; })[0];
+    if (!ev) return null;
+    return (ev.blocos || []).filter(function (b) { return b.tipo === 'audio'; })[0] || null;
+  }
+  function tocar(id, lento) {
+    var b = evidenciaAudio(id);
+    if (b) falarTexto(b.fala, lento ? 0.65 : (b.velocidade || 0.9));
+  }
+  function falarTexto(fala, velocidade) {
+    if (!('speechSynthesis' in window)) { avisoVoz('Este navegador não tem voz em inglês. Use o Chrome e abra o texto.'); return; }
+    speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance(limpo(fala));
+    u.lang = 'en-US';
+    u.rate = velocidade;
+    var vozes = speechSynthesis.getVoices().filter(function (v) { return /^en(-|_)US/i.test(v.lang); });
+    if (vozes.length) u.voice = vozes[0];
+    u.onstart = function () { var w = $('wave'); if (w) w.classList.add('playing'); };
+    u.onend = u.onerror = function () { var w = $('wave'); if (w) w.classList.remove('playing'); };
+    speechSynthesis.speak(u);
+  }
+  function avisoVoz(msg) { var a = document.querySelector('.aviso-voz'); if (a) a.textContent = msg; }
+
+  /* ---------- Cabeçalho, abertura, evidências ---------- */
+  function desenharTudo() {
+    var saga = SAGAS[C.dados.saga] || SAGAS[C.serie] || SAGAS['9º'];
+    document.documentElement.style.setProperty('--sky', saga.ceu);
+    document.documentElement.style.setProperty('--dots', saga.pontos);
+    document.body.className = C.serie === '6º' ? 's6' : '';
+    document.title = C.titulo + ' · ' + saga.nome;
+    $('voltar').href = APP;
+    $('logo').textContent = saga.nome;
+    var d = Number(C.dados.degrau) || 0;
+    $('issue').textContent = 'CASE ' + (C.dados.numero || '') + ' · ' + C.titulo.toUpperCase() + (d ? ' · ' + '★★★'.slice(0, d) + '☆☆☆'.slice(0, 3 - d) : '');
+    var semPistas = !(C.dados.evidencias || []).length;
+    $('sec-ev').hidden = semPistas;
+    $('grade').classList.toggle('sem-pistas', semPistas);
+    var ab = C.dados.abertura || {};
+    $('abertura').innerHTML = rosto(ab.personagem) + '<div class="balloon"><span class="name">' + esc(ab.nome || '') + '</span>' + fmt(ab.texto || '') +
+      '<p class="pt">Toque nas palavras sublinhadas para ver a tradução.</p></div>';
+    if (!S.tab && !semPistas) S.tab = C.dados.evidencias[0].id;
+    if (!semPistas) desenharEvidencias();
+    desenharMesa();
+  }
+
+  function desenharModo() {
+    var m = $('modo');
+    m.hidden = !(PROF || J.numero > 1);
+    m.className = 'modo' + (PROF ? ' prof' : '');
+    m.textContent = PROF ? 'Teste do professor · nada vale nota' : 'Practice · não vale nota';
+  }
+
+  function desenharStatus() {
+    desenharModo();
+    $('locks').innerHTML = J.travas.map(function (t, i) {
+      var cls = t.revelada ? 'revealed' : (t.aberta ? 'open' : (i === J.atual && J.status !== 'concluido' ? 'now' : ''));
+      return '<div class="lock-ic ' + cls + '" title="Lock ' + (i + 1) + '">' + (t.aberta ? (t.revelada ? '✗' : '✓') : (i + 1)) + '</div>';
+    }).join('');
+    $('pts').textContent = J.travas.reduce(function (s, t) { return s + (t.aberta ? t.pontos : 0); }, 0);
+  }
+
+  function desenharEvidencias() {
+    $('tabs').innerHTML = C.dados.evidencias.map(function (e) {
+      return '<button class="tab" role="tab" type="button" data-tab="' + esc(e.id) + '" aria-selected="' + (S.tab === e.id) + '">' + esc(e.aba) + '</button>';
+    }).join('');
+    var ev = C.dados.evidencias.filter(function (e) { return e.id === S.tab; })[0] || C.dados.evidencias[0];
+    $('evidence').innerHTML = '<div class="moldura ' + esc(ev.moldura || '') + '">' + (ev.blocos || []).map(function (b) { return bloco(b, ev.id); }).join('') + '</div>';
+    var w = $('wave');
+    if (w) {
+      var h = '';
+      for (var i = 0; i < 30; i++) h += '<i style="height:' + (8 + Math.round(Math.abs(Math.sin(i * 1.7)) * 24)) + 'px"></i>';
+      w.innerHTML = h;
+    }
+  }
+
+  function bloco(b, evId) {
+    switch (b.tipo) {
+      case 'perfil':
+        return '<div class="who">' + avatar(b) + '<div><div class="handle">' + esc(b.nome) + '</div><div class="meta">' + fmt(b.meta || '') + '</div></div></div>';
+      case 'post':
+        return '<div class="post">' + (b.meta ? '<div class="meta">' + fmt(b.meta) + '</div>' : '') + (b.foto ? '<div class="foto"><span>' + esc(b.foto) + '</span></div>' : '') +
+          '<p>' + fmt(b.texto) + '</p>' + (b.selo ? '<span class="selo">' + esc(b.selo) + '</span>' : '') + '</div>';
+      case 'manchete': return '<div class="manchete">' + fmt(b.texto) + '</div>';
+      case 'texto': return '<p>' + fmt(b.texto) + '</p>';
+      case 'meta': return '<div class="meta">' + fmt(b.texto) + '</div>';
+      case 'semana':
+        return '<div class="semana"><h3>' + esc(b.titulo || '') + '</h3><div class="week">' + b.dias.map(function (d) {
+          return '<div class="day"><span class="em">' + esc(d[1]) + '</span>' + esc(d[0]) + '</div>';
+        }).join('') + '</div></div>';
+      case 'itens':
+        return '<div class="itens">' + b.itens.map(function (it) { return '<div class="item"><span class="em">' + esc(it[0]) + '</span><span>' + fmt(it[1]) + '</span></div>'; }).join('') + '</div>';
+      case 'fichas':
+        return '<div class="fichas">' + b.fichas.map(function (f) {
+          return '<div class="ficha">' + rosto(f.personagem) + '<div><h3>' + esc(f.nome) + '</h3><ul>' + f.linhas.map(function (l) { return '<li>' + fmt(l) + '</li>'; }).join('') + '</ul></div></div>';
+        }).join('') + '</div>';
+      case 'linha':
+        return '<ol class="linha-tempo">' + b.itens.map(function (it) { return '<li><b>' + esc(it[0]) + '</b>' + fmt(it[1]) + '</li>'; }).join('') + '</ol>';
+      case 'audio':
+        var aberto = !!S.texto[evId];
+        return '<div class="who">' + avatar(b) + '<div><div class="handle">' + esc(b.nome) + '</div><div class="meta">' + esc(b.meta || '') + '</div></div></div>' +
+          '<div class="wave" id="wave" aria-hidden="true"></div>' + botoesAudio(evId) +
+          (aberto ? '<div class="transcript"><b>Text</b><br>' + fmt(b.fala) + '</div>' : '') +
+          '<p class="aviso-voz">Use fones de ouvido.</p>';
+    }
+    return '';
+  }
+  function botoesAudio(evId) {
+    return '<div class="audio-btns"><button class="btn blue" type="button" data-play="' + esc(evId) + '">🎧 PLAY</button>' +
+      '<button class="btn alt" type="button" data-play="' + esc(evId) + '" data-lento="1">🐢 SLOWER</button>' +
+      '<button class="btn alt" type="button" data-texto="' + esc(evId) + '">📄 ' + (S.texto[evId] ? 'HIDE TEXT' : 'TEXT') + '</button></div>';
+  }
+
+  /* ---------- Mesa: cadeado atual ou fim do caso ---------- */
+  function passos(lista) {
+    return '<ol class="steps">' + (lista || []).map(function (p) {
+      return '<li><span class="ic" aria-hidden="true">' + esc(p[0]) + '</span><span><b>' + esc(p[1]) + '</b>' + (S.ajuda ? '<span class="ptline">' + esc(p[2]) + '</span>' : '') + '</span></li>';
+    }).join('') + '</ol><button type="button" class="helpbtn" data-ajuda="1" aria-pressed="' + S.ajuda + '">? ' + (S.ajuda ? 'Esconder ajuda' : 'Ajuda em português') + '</button>';
+  }
+
+  function desenharMesa() {
+    desenharStatus();
+    if (J.status === 'concluido') { S.mesa = -1; return desenharFim(); }
+    var i = J.atual, T = C.dados.travas[i];
+    S.mesa = i;
+    S.textoParte = {};
+    S.resp = T.partes.map(function (p) { return respostaInicial(p); });
+    $('desk').innerHTML =
+      '<div class="lock-top"><span class="kind">LOCK ' + (i + 1) + '/' + J.travas.length + ' · ' + esc(String(T.tipo || '').toUpperCase()) + '</span><span class="worth" id="worth"></span></div>' +
+      '<h2>' + esc(T.titulo) + '</h2><div id="passos">' + passos(T.passos) + '</div>' +
+      '<div class="body" id="partes"></div><div class="body" id="dicas"></div><div id="fala"></div>' +
+      '<div class="actions" id="acoes"><button class="btn" id="conferir" type="button">CHECK!</button>' +
+      '<button class="btn alt" id="dica" type="button">HINT</button><span class="cost" id="custo"></span></div>' +
+      '<div class="burst" id="burst"><svg viewBox="0 0 170 120"><polygon points="85,2 101,30 135,8 124,42 168,44 132,64 160,98 116,86 104,118 85,92 64,118 56,86 10,98 38,64 2,44 46,42 36,8 70,30" fill="#FFD23F" stroke="#121212" stroke-width="4"/></svg><span id="burst-txt"></span></div>';
+    desenharPartes();
+    desenharDicas();
+    $('conferir').onclick = conferir;
+    $('dica').onclick = pedirDica;
+  }
+
+  function desenharDicas() {
+    var i = J.atual, T = C.dados.travas[i], E = J.travas[i];
+    $('worth').textContent = 'worth now: ' + E.pontos + ' / ' + E.valor;
+    $('dicas').innerHTML = E.dicas.map(function (d, k) { return '<div class="hint"><b class="h">HINT ' + (k + 1) + '</b>' + fmt(d) + '</div>'; }).join('');
+    var b = $('dica');
+    if (b) b.disabled = E.dicas.length >= T.totalDicas;
+    var c = $('custo');
+    if (c) c.textContent = 'hint −5 · wrong −4 · tries left: ' + (3 - E.erros);
+  }
+
+  function falar(tipo, html) {
+    var p = (C.dados.abertura || {}).personagem;
+    $('fala').innerHTML = '<div class="say ' + tipo + '">' + rosto(p) + '<div class="balloon">' + html + '</div></div>';
+  }
+
+  /* ---------- Partes ---------- */
+  function respostaInicial(p) {
+    if (p.tipo === 'classificar') return p.itens.map(function () { return null; });
+    if (p.tipo === 'montar') return ((p.frase || '').match(/___/g) || []).map(function () { return null; });
+    if (p.tipo === 'associar') return p.alvos.map(function () { return null; });
+    if (p.tipo === 'separar') return p.itens.map(function () { return null; });
+    if (p.tipo === 'ordenar') return p.itens.map(function (it) { return it.indice; });
+    return null;
+  }
+
+  function desenharPartes() {
+    var T = C.dados.travas[J.atual];
+    $('partes').innerHTML = T.partes.map(function (p, k) { return '<div class="parte" data-parte="' + k + '">' + parte(p, k) + '</div>'; }).join('');
+  }
+  function redesenharParte(k) {
+    var T = C.dados.travas[J.atual];
+    var el = document.querySelector('[data-parte="' + k + '"]');
+    if (el) el.innerHTML = parte(T.partes[k], k);
+  }
+
+  function parte(p, k) {
+    var r = S.resp[k];
+    var perg = p.pergunta ? '<p class="q">' + fmt(p.pergunta) + '</p>' : '';
+    switch (p.tipo) {
+      case 'audio':
+        if (!p.fala) return botoesAudio(p.evidencia);
+        return '<div class="audio-btns"><button class="btn blue" type="button" data-play-parte="' + k + '">🎧 PLAY</button>' +
+          '<button class="btn alt" type="button" data-play-parte="' + k + '" data-lento="1">🐢 SLOWER</button>' +
+          '<button class="btn alt" type="button" data-texto-parte="' + k + '">📄 ' + (S.textoParte[k] ? 'HIDE TEXT' : 'TEXT') + '</button></div>' +
+          (S.textoParte[k] ? '<div class="transcript">' + fmt(p.fala) + '</div>' : '');
+      case 'pista':
+        return '<div class="moldura ' + esc(p.moldura || 'pista-in') + '">' + (p.blocos || []).map(function (b) { return bloco(b, 'p' + k); }).join('') + '</div>';
+      case 'exemplos':
+        return '<ul class="examples">' + p.itens.map(function (t) { return '<li>' + fmt(t) + '</li>'; }).join('') + '</ul>';
+      case 'classificar':
+        return perg + p.itens.map(function (it, i) {
+          return '<div class="row"><span>"' + fmt(it.texto) + '"</span><span class="seg">' + p.categorias.map(function (c, ci) {
+            return '<button type="button" class="pill c' + ci + '" data-k="' + k + '" data-cls="' + i + '" data-v="' + ci + '" aria-pressed="' + (r[i] === ci) + '">' + esc(c) + '</button>';
+          }).join('') + '</span></div>';
+        }).join('');
+      case 'escolha':
+        var est = p.estilo || '';
+        var fig = p.figura ? '<span class="fig" aria-hidden="true">' + esc(p.figura) + '</span>' : (p.figuraPersonagem ? rosto(p.figuraPersonagem) : '');
+        return perg + (fig ? '<div class="linha-fig">' + fig : '') + '<div class="choices ' + esc(est) + '">' + p.opcoes.map(function (o, i) {
+          var conteudo;
+          if (typeof o === 'string') conteudo = fmt(o);
+          else if (o.personagem) conteudo = rosto(o.personagem) + esc(o.texto || '');
+          else conteudo = (o.emoji ? '<span class="em">' + esc(o.emoji) + '</span>' : '') + fmt(o.texto || '');
+          return '<button type="button" class="choice" data-k="' + k + '" data-op="' + i + '" aria-pressed="' + (r === i) + '">' + conteudo + '</button>';
+        }).join('') + '</div>' + (fig ? '</div>' : '');
+      case 'montar':
+        var n = 0;
+        var frase = esc(p.frase).replace(/___/g, function () {
+          var i = n++, v = r[i];
+          return '<button type="button" class="slot' + (v != null ? ' filled' : '') + '" data-k="' + k + '" data-slot="' + i + '">' + (v != null ? esc(p.blocos[v]) : '&nbsp;') + '</button>';
+        });
+        return perg + '<div class="build">' + (p.figura ? '<span class="fig-p" aria-hidden="true">' + esc(p.figura) + '</span>' : '') + frase + '</div><div class="tiles">' + p.blocos.map(function (b, i) {
+          return '<button type="button" class="tile" data-k="' + k + '" data-bloco="' + i + '"' + (r.indexOf(i) !== -1 ? ' disabled' : '') + '>' + esc(b) + '</button>';
+        }).join('') + '</div>';
+      case 'associar':
+        return perg + '<div class="alvos">' + p.alvos.map(function (a, i) {
+          var v = r[i], vis = '';
+          if (a.relogio) vis = relogio(a.relogio[0], a.relogio[1]);
+          else if (a.emoji) vis = '<span class="em">' + esc(a.emoji) + '</span>';
+          if (a.texto) vis += '<span class="grande">' + fmt(a.texto) + '</span>';
+          return '<div class="alvo">' + vis + (a.rotulo ? '<span class="rot">' + esc(a.rotulo) + '</span>' : '') +
+            '<button type="button" class="slot' + (v != null ? ' filled' : '') + '" data-k="' + k + '" data-slot="' + i + '">' + (v != null ? esc(p.blocos[v]) : '&nbsp;') + '</button></div>';
+        }).join('') + '</div><div class="tiles">' + p.blocos.map(function (b, i) {
+          return '<button type="button" class="tile" data-k="' + k + '" data-bloco="' + i + '"' + (r.indexOf(i) !== -1 ? ' disabled' : '') + '>' + esc(b) + '</button>';
+        }).join('') + '</div>';
+      case 'separar':
+        var chips = function (caixa) {
+          return p.itens.map(function (it, i) { return (r[i] === caixa) ? '<span class="chip" tabindex="0" draggable="true" data-k="' + k + '" data-chip="' + i + '">' + esc(it.texto) + '</span>' : ''; }).join('');
+        };
+        return perg + '<p class="pt" style="margin:0">Arraste ou toque na palavra para trocar de caixa.</p><div class="bins"><div class="bin pool" data-k="' + k + '" data-caixa=""><div class="chips">' + chips(null) + '</div></div>' +
+          p.caixas.map(function (c, ci) { return '<div class="bin b' + ci + '" data-k="' + k + '" data-caixa="' + ci + '"><h4>' + esc(c) + '</h4><div class="chips">' + chips(ci) + '</div></div>'; }).join('') + '</div>';
+      case 'ordenar':
+        var porIndice = {};
+        p.itens.forEach(function (it) { porIndice[it.indice] = it.texto; });
+        return perg + '<ol class="order">' + r.map(function (ind, pos) {
+          return '<li draggable="true" data-k="' + k + '" data-pos="' + pos + '"><span>' + fmt(porIndice[ind]) + '</span><span class="mv">' +
+            '<button type="button" data-k="' + k + '" data-sobe="' + pos + '" aria-label="Move up">↑</button><button type="button" data-k="' + k + '" data-desce="' + pos + '" aria-label="Move down">↓</button></span></li>';
+        }).join('') + '</ol>';
+    }
+    return '';
+  }
+
+  /* Cliques dentro das partes. */
+  function cliqueParte(alvo) {
+    var kEl = alvo.closest('[data-k]');
+    if (!kEl || S.mesa !== J.atual || S.ocupado) return false;
+    var k = Number(kEl.getAttribute('data-k'));
+    var p = C.dados.travas[J.atual].partes[k];
+    var r = S.resp[k], d;
+    if ((d = alvo.closest('[data-cls]'))) { r[Number(d.getAttribute('data-cls'))] = Number(d.getAttribute('data-v')); }
+    else if ((d = alvo.closest('[data-op]'))) { S.resp[k] = Number(d.getAttribute('data-op')); }
+    else if ((d = alvo.closest('[data-bloco]'))) { var livre = r.indexOf(null); if (livre !== -1) r[livre] = Number(d.getAttribute('data-bloco')); }
+    else if ((d = alvo.closest('[data-slot]'))) { r[Number(d.getAttribute('data-slot'))] = null; }
+    else if ((d = alvo.closest('[data-chip]'))) { var i = Number(d.getAttribute('data-chip')); r[i] = r[i] === null ? 0 : (r[i] + 1 < p.caixas.length ? r[i] + 1 : null); }
+    else if ((d = alvo.closest('[data-sobe]'))) { mover(r, Number(d.getAttribute('data-sobe')), -1); }
+    else if ((d = alvo.closest('[data-desce]'))) { mover(r, Number(d.getAttribute('data-desce')), 1); }
+    else return false;
+    redesenharParte(k);
+    return true;
+  }
+  function mover(lista, pos, delta) {
+    var q = pos + delta;
+    if (q < 0 || q >= lista.length) return;
+    var t = lista[pos]; lista[pos] = lista[q]; lista[q] = t;
+  }
+
+  /* Arrastar e soltar (mouse/touchpad). No toque, os cliques fazem o mesmo trabalho. */
+  var arrasto = null;
+  document.addEventListener('dragstart', function (e) {
+    var chip = e.target.closest && e.target.closest('[data-chip]');
+    var li = e.target.closest && e.target.closest('[data-pos]');
+    if (chip) arrasto = { k: Number(chip.getAttribute('data-k')), chip: Number(chip.getAttribute('data-chip')) };
+    else if (li) arrasto = { k: Number(li.getAttribute('data-k')), pos: Number(li.getAttribute('data-pos')) };
+    else return;
+    try { e.dataTransfer.setData('text/plain', 'x'); } catch (er) { /* alguns navegadores exigem */ }
+  });
+  document.addEventListener('dragover', function (e) {
+    if (!arrasto) return;
+    var alvo = e.target.closest && (e.target.closest('[data-caixa]') || e.target.closest('[data-pos]'));
+    if (alvo) { e.preventDefault(); alvo.classList.add('sobre'); }
+  });
+  document.addEventListener('dragleave', function (e) {
+    var alvo = e.target.closest && (e.target.closest('[data-caixa]') || e.target.closest('[data-pos]'));
+    if (alvo) alvo.classList.remove('sobre');
+  });
+  document.addEventListener('drop', function (e) {
+    if (!arrasto) return;
+    e.preventDefault();
+    var r = S.resp[arrasto.k];
+    var caixa = e.target.closest && e.target.closest('[data-caixa]');
+    var li = e.target.closest && e.target.closest('[data-pos]');
+    if (arrasto.chip != null && caixa) {
+      var v = caixa.getAttribute('data-caixa');
+      r[arrasto.chip] = v === '' ? null : Number(v);
+    } else if (arrasto.pos != null && li) {
+      var para = Number(li.getAttribute('data-pos'));
+      var item = r.splice(arrasto.pos, 1)[0];
+      r.splice(para, 0, item);
+    }
+    var k = arrasto.k;
+    arrasto = null;
+    redesenharParte(k);
+  });
+  document.addEventListener('dragend', function () { arrasto = null; });
+  document.addEventListener('keydown', function (e) {
+    var chip = e.target.closest && e.target.closest('[data-chip]');
+    if (chip && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); cliqueParte(chip); }
+  });
+
+  /* ---------- Conferir e dicas (sempre no servidor) ---------- */
+  function ocupar(sim) {
+    S.ocupado = sim;
+    ['conferir', 'dica'].forEach(function (id) { var b = $(id); if (b) b.disabled = sim || (id === 'dica' && J.travas[J.atual] && J.travas[J.atual].dicas.length >= C.dados.travas[J.atual].totalDicas); });
+    var b = $('conferir');
+    if (b) b.textContent = sim ? 'CHECKING…' : 'CHECK!';
+  }
+
+  function conferir() {
+    if (S.ocupado) return;
+    var i = J.atual;
+    ocupar(true);
+    chamar('alunoVerificar', J.id, i, S.resp).then(function (r) {
+      J = r.jogada;
+      ocupar(false);
+      if (r.resultado === 'incompleto') { falar('bad', fmt(r.msg)); return; }
+      if (r.resultado === 'errado') {
+        desenharStatus(); desenharDicas();
+        falar('bad', '<span class="name">HMM...</span>' + fmt(r.msg) + ' Try again!');
+        return;
+      }
+      abriu(i, r.resultado === 'revelado');
+    }).catch(function (e) { ocupar(false); falar('bad', '<span class="name">OOPS!</span>' + esc(e.message) + ' Tente de novo.'); });
+  }
+
+  function abriu(i, revelado) {
+    var E = J.travas[i], T = C.dados.travas[i];
+    desenharStatus();
+    $('worth').textContent = 'points: ' + E.pontos + ' / ' + E.valor;
+    if (revelado) falar('bad', '<span class="name">OUT OF TRIES</span>Here is the answer: ' + fmt(E.solucao));
+    else {
+      falar('ok', '<span class="name">GREAT JOB!</span>' + fmt(E.solucao));
+      $('burst-txt').textContent = T.onomatopeia || 'CLICK!';
+      $('burst').classList.add('show');
+    }
+    var ultima = J.status === 'concluido';
+    $('acoes').innerHTML = '<button class="btn" id="proximo" type="button">' + (ultima ? 'CLOSE THE CASE ›' : 'NEXT LOCK ›') + '</button>';
+    $('proximo').onclick = function () { desenharMesa(); $('desk').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    $('proximo').focus();
+  }
+
+  function pedirDica() {
+    if (S.ocupado) return;
+    ocupar(true);
+    chamar('alunoDica', J.id, J.atual).then(function (r) {
+      J = r.jogada;
+      ocupar(false);
+      desenharStatus(); desenharDicas();
+    }).catch(function (e) { ocupar(false); falar('bad', esc(e.message)); });
+  }
+
+  /* ---------- Fim do caso ---------- */
+  function patente() {
+    if (TRI) {
+      var feitas = TRI.feitas + (J.numero === 1 && !S.concluidoAoAbrir && !PROF ? 1 : 0);
+      return '<div class="rank">ACADEMY: ' + feitas + ' / ' + TRI.total + ' missions' +
+        '<div class="bar"><span style="width:' + Math.max(Math.round(100 * feitas / Math.max(TRI.total, 1)), 4) + '%"></span></div>' +
+        '<span class="pt" style="margin:0">A próxima missão já está liberada no painel. O seu degrau pode mudar conforme os seus pontos.</span></div>';
+    }
+    var saga = SAGAS[C.dados.saga] || SAGAS[C.serie] || SAGAS['9º'];
+    var n = PAT ? PAT.concluidos : 0;
+    if (J.numero === 1 && !S.concluidoAoAbrir && !PROF) n++;
+    var i = 0;
+    while (i < 2 && n >= LIMITES_PATENTE[i + 1]) i++;
+    var falta = i < 2 ? LIMITES_PATENTE[i + 1] - n : 0;
+    var pct = i < 2 ? Math.round(100 * (n - LIMITES_PATENTE[i]) / (LIMITES_PATENTE[i + 1] - LIMITES_PATENTE[i])) : 100;
+    return '<div class="rank">RANK: ' + esc(saga.patentes[i]) + (i < 2 ? ' → ' + esc(saga.patentes[i + 1]) + ' (' + falta + (falta === 1 ? ' case' : ' cases') + ' to go)' : ' ★') +
+      '<div class="bar"><span style="width:' + Math.max(pct, 4) + '%"></span></div></div>';
+  }
+
+  function desenharFim() {
+    var total = J.travas.reduce(function (s, t) { return s + t.pontos; }, 0);
+    var F = C.dados.final || {};
+    var treino = J.numero > 1 || PROF;
+    var html = '<span class="kind">CASE CLOSED</span><div><span class="big-stamp' + (treino ? ' treino' : '') + '">' + (treino ? 'PRACTICE DONE!' : 'CASE CLOSED!') + '</span></div>' +
+      '<h2>' + total + ' / 100 POINTS</h2>' + (treino ? '<p class="pt">' + (PROF ? 'Teste do professor: não entra em nenhum relatório.' : 'Treino: só a primeira jogada vale nota.') + '</p>' : '') +
+      '<div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Lock</th><th class="n">Hints</th><th class="n">Wrong</th><th class="n">Points</th></tr></thead><tbody>' +
+      J.travas.map(function (t, i) {
+        return '<tr><td>' + (i + 1) + '. ' + esc(C.dados.travas[i].titulo) + '</td><td class="n">' + t.dicas.length + '</td><td class="n">' + t.erros + '</td><td class="n">' + t.pontos + ' / ' + t.valor + '</td></tr>';
+      }).join('') + '</tbody></table></div>' + patente();
+    if (F.passos) {
+      html += '<div class="actions" style="display:block"><span class="kind" style="background:var(--pop)">BONUS · NO POINTS</span>' +
+        '<h2 style="font-size:1.7rem;margin-top:8px">' + esc(F.titulo || 'Write!') + '</h2><div id="passos">' + passos(F.passos) + '</div>';
+      if (J.final_texto) {
+        html += '<p class="q">Your text:</p><div class="enviada">' + esc(J.final_texto) + '</div>' +
+          (J.final_feedback ? '<div class="say ok">' + rosto(F.personagem || (C.dados.abertura || {}).personagem) + '<div class="balloon"><span class="name">FEEDBACK</span>' + esc(J.final_feedback) + '</div></div>' : '');
+      } else {
+        html += '<textarea id="final-texto" spellcheck="false" autocomplete="off" maxlength="400">' + esc(F.inicio || '') + '</textarea>' +
+          '<div style="margin-top:10px"><button class="btn" id="enviar-final" type="button">SEND</button></div><div id="fala"></div>';
+      }
+      html += '</div>';
+    }
+    html += '<div class="actions"><a class="btn alt" href="' + esc(APP) + '">← MISSIONS</a>' +
+      '<button class="btn blue" id="de-novo" type="button">PLAY AGAIN' + (PROF ? '' : ' (PRACTICE)') + '</button></div>';
+    $('desk').innerHTML = html;
+    var env = $('enviar-final');
+    if (env) env.onclick = enviarFinal;
+    $('de-novo').onclick = jogarDeNovo;
+  }
+
+  function enviarFinal() {
+    var b = $('enviar-final');
+    b.disabled = true;
+    b.textContent = 'SENDING…';
+    chamar('alunoEnviarFinal', J.id, $('final-texto').value).then(function (r) {
+      J = r.jogada;
+      desenharFim();
+    }).catch(function (e) {
+      b.disabled = false;
+      b.textContent = 'SEND';
+      falar('bad', esc(e.message));
+    });
+  }
+
+  function jogarDeNovo() {
+    var b = $('de-novo');
+    b.disabled = true;
+    chamar('alunoNovaJogada', C.id).then(function (r) {
+      J = r.jogada;
+      S.concluidoAoAbrir = true;
+      desenharMesa();
+      window.scrollTo(0, 0);
+    }).catch(function (e) { b.disabled = false; alert(e.message); });
+  }
+
+  /* ---------- Cliques gerais ---------- */
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    var gl = t.closest('.g');
+    if (gl) { e.preventDefault(); if (tipDono === gl) esconderTip(); else mostrarTip(gl); return; }
+    esconderTip();
+    var d;
+    if ((d = t.closest('[data-tab]'))) { S.tab = d.getAttribute('data-tab'); desenharEvidencias(); return; }
+    if ((d = t.closest('[data-play]'))) {
+      var id = d.getAttribute('data-play');
+      if (S.tab !== id) { S.tab = id; desenharEvidencias(); }
+      tocar(id, d.hasAttribute('data-lento'));
+      return;
+    }
+    if ((d = t.closest('[data-play-parte]'))) {
+      var pp = C.dados.travas[J.atual].partes[Number(d.getAttribute('data-play-parte'))];
+      if (pp) falarTexto(pp.fala, d.hasAttribute('data-lento') ? 0.65 : (pp.velocidade || 0.85));
+      return;
+    }
+    if ((d = t.closest('[data-texto-parte]'))) {
+      var kk = Number(d.getAttribute('data-texto-parte'));
+      S.textoParte[kk] = !S.textoParte[kk];
+      redesenharParte(kk);
+      return;
+    }
+    if ((d = t.closest('[data-texto]'))) {
+      var ev = d.getAttribute('data-texto');
+      S.texto[ev] = !S.texto[ev];
+      S.tab = ev;
+      desenharEvidencias();
+      if ($('partes') && S.mesa === J.atual) desenharPartes();
+      if (window.innerWidth < 880) $('evidence').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if ((d = t.closest('[data-ajuda]'))) {
+      S.ajuda = !S.ajuda;
+      var lista = J.status === 'concluido' ? (C.dados.final || {}).passos : C.dados.travas[J.atual].passos;
+      var caixa = $('passos');
+      if (caixa) caixa.innerHTML = passos(lista);
+      return;
+    }
+    if ($('partes') && $('partes').contains(t)) cliqueParte(t);
+  });
+
+  /* ---------- Tutorial guiado (Missão 0): destaca uma parte da tela e explica em português ---------- */
+  var TUT = { passos: null, i: 0, luz: null, balao: null, timer: null, rolou: -1 };
+  function iniciarTutorial(lista) {
+    TUT.passos = lista;
+    TUT.i = 0;
+    TUT.luz = document.createElement('div');
+    TUT.luz.className = 'tut-luz';
+    TUT.balao = document.createElement('div');
+    TUT.balao.className = 'tut-balao';
+    TUT.balao.setAttribute('role', 'dialog');
+    document.body.appendChild(TUT.luz);
+    document.body.appendChild(TUT.balao);
+    TUT.timer = setInterval(posicionarTutorial, 250);
+    posicionarTutorial();
+  }
+  function fimTutorial() {
+    clearInterval(TUT.timer);
+    if (TUT.luz) TUT.luz.remove();
+    if (TUT.balao) TUT.balao.remove();
+    TUT.passos = null;
+  }
+  function avancarTutorial() {
+    TUT.i++;
+    if (!TUT.passos || TUT.i >= TUT.passos.length) { fimTutorial(); return; }
+    posicionarTutorial();
+  }
+  function posicionarTutorial() {
+    if (!TUT.passos) return;
+    var p = TUT.passos[TUT.i];
+    var alvo = document.querySelector(p.alvo), texto = p.texto;
+    if (!alvo && p.alt) { alvo = document.querySelector(p.alt.alvo); texto = p.alt.texto; }
+    if (!alvo) { TUT.luz.hidden = true; TUT.balao.hidden = true; return; }
+    if (TUT.rolou !== TUT.i) { TUT.rolou = TUT.i; alvo.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    var r = alvo.getBoundingClientRect(), m = 6;
+    TUT.luz.hidden = false;
+    TUT.luz.style.left = (r.left + window.scrollX - m) + 'px';
+    TUT.luz.style.top = (r.top + window.scrollY - m) + 'px';
+    TUT.luz.style.width = (r.width + 2 * m) + 'px';
+    TUT.luz.style.height = (r.height + 2 * m) + 'px';
+    var chave = TUT.i + '|' + texto;
+    if (TUT.balao.getAttribute('data-chave') !== chave) {
+      TUT.balao.setAttribute('data-chave', chave);
+      TUT.balao.innerHTML = '<div class="tut-num">' + (TUT.i + 1) + ' / ' + TUT.passos.length + '</div><p>' + fmt(texto) + '</p>' +
+        '<div class="tut-acoes">' + (p.botao ? '<button type="button" class="btn" data-tut="ok">' + esc(p.botao) + '</button>' : '') +
+        '<button type="button" class="tut-pular" data-tut="pular">Pular tutorial</button></div>';
+    }
+    TUT.balao.hidden = false;
+    var w = TUT.balao.offsetWidth, h = TUT.balao.offsetHeight;
+    var esq = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+    var cima = r.bottom + 14 + h < window.innerHeight ? r.bottom + 14 : Math.max(8, r.top - h - 14);
+    TUT.balao.style.left = (esq + window.scrollX) + 'px';
+    TUT.balao.style.top = (cima + window.scrollY) + 'px';
+  }
+  document.addEventListener('click', function (e) {
+    if (!TUT.passos) return;
+    var b = e.target.closest && e.target.closest('[data-tut]');
+    if (b) { e.stopPropagation(); if (b.getAttribute('data-tut') === 'pular') fimTutorial(); else avancarTutorial(); return; }
+    var p = TUT.passos[TUT.i];
+    if (p && p.esperar && e.target.closest && e.target.closest(p.esperar) && document.querySelector(p.alvo)) {
+      setTimeout(avancarTutorial, 80);
+    }
+  }, true);
+
+  /* ---------- Início ---------- */
+  function erro(msg) {
+    $('carregando').hidden = true;
+    $('erro').hidden = false;
+    $('erro').innerHTML = '<h2>OOPS!</h2><p>' + esc(msg) + '</p><p><a class="btn alt" href="' + esc(APP) + '">← Voltar</a></p>';
+  }
+
+  if (!CASO_ID) { erro('Caso não informado.'); return; }
+  chamar('alunoAbrirCaso', CASO_ID).then(function (r) {
+    C = r.caso; J = r.jogada; PROF = !!r.professor; PAT = r.patente; TRI = r.trilha || null;
+    if (r.appUrl) APP = r.appUrl;
+    S.concluidoAoAbrir = J.status === 'concluido';
+    $('carregando').hidden = true;
+    $('jogo').hidden = false;
+    desenharTudo();
+    if (C.dados.tutorial && J.status !== 'concluido') setTimeout(function () { iniciarTutorial(C.dados.tutorial); }, 400);
+  }).catch(function (e) { erro(e.message); });
+})();
+</script>

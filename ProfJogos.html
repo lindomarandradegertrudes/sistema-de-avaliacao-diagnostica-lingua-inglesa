@@ -1,0 +1,298 @@
+<!-- Jogos investigativos: Trilha Base (degraus) e casos do ano. Lista, liberação, teste e resultados. Incluída em Professor.html -->
+<style>
+  .jog-chip { display: inline-block; font-size: .72rem; background: var(--primaria-clara); color: var(--primaria); border-radius: 99px; padding: 1px 8px; margin: 2px 2px 0 0; white-space: nowrap; }
+  .jog-trava { display: inline-block; min-width: 34px; text-align: center; font-size: .78rem; font-weight: 700; border-radius: 6px; padding: 2px 4px; margin-right: 2px; background: #d3f9d8; color: #2b8a3e; }
+  .jog-trava.parcial { background: #fff3bf; color: #a05a00; }
+  .jog-trava.zero { background: #ffe3e3; color: #c92a2a; }
+  .jog-trava.pendente { background: #f1f3f5; color: #adb5bd; }
+  .jog-sit { font-size: .78rem; font-weight: 600; padding: 2px 9px; border-radius: 99px; white-space: nowrap; }
+  .jog-sit.nao { background: #f1f3f5; color: #868e96; }
+  .jog-sit.andamento { background: #fff3bf; color: #a05a00; }
+  .jog-sit.concluido { background: #d3f9d8; color: #2b8a3e; }
+  .jog-frase { max-width: 260px; font-size: .82rem; }
+  .jog-frase .fb { color: var(--suave); font-style: italic; }
+  .jog-estrelas { color: #e8590c; font-weight: 700; letter-spacing: .05em; white-space: nowrap; }
+  #jog-lista td, #jog-trilha td, #jog-res-tabela td { vertical-align: top; }
+</style>
+
+<section id="aba-jogos" class="pilha" hidden>
+  <div class="cartao pilha">
+    <div class="linha">
+      <h2 style="margin:0">🎓 Trilha Base · Detective Academy</h2>
+      <span class="espaco"></span>
+      <button class="btn" id="jog-trilha-carregar">Carregar Trilha Base</button>
+      <button class="btn primario" id="jog-trilha-abrir">Abrir a trilha inteira</button>
+    </div>
+    <p class="suave pequeno" style="margin:0">
+      Reposição de aprendizagem, igual para o 6º ao 9º ano. <strong>Não vale nota.</strong> Cada missão tem 3 degraus (★ ★★ ★★★); o aluno joga a versão do degrau dele:
+      começa pelo nível (Iniciante ou sem nível = ★, Básico/Intermediário = ★★, Avançado = ★★★), <strong>sobe</strong> com 80+ pontos em 2 missões seguidas e <strong>desce</strong> abaixo de 40.
+      As missões abrem em sequência: a próxima libera quando o aluno termina a anterior (a 1ª é o tutorial).
+    </p>
+    <div class="tabela-rolagem">
+      <table>
+        <thead><tr><th>#</th><th>Missão</th><th>Tema</th><th>Testar</th><th>Situação</th><th>Jogaram</th><th></th></tr></thead>
+        <tbody id="jog-trilha"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="cartao pilha">
+    <div class="linha">
+      <h2 style="margin:0">🕵️ Casos do ano</h2>
+      <select id="jog-serie" style="width:auto"></select>
+      <span class="espaco"></span>
+      <button class="btn" id="jog-padrao">Carregar casos padrão</button>
+      <button class="btn" id="jog-importar">Importar JSON</button>
+    </div>
+    <p class="suave pequeno" style="margin:0">
+      Casos <strong>abertos</strong> aparecem para os alunos da série em "Missions". Só a 1ª jogada vale; as outras são treino.
+      Por enquanto os jogos <strong>não entram no nível</strong>. Use <strong>Testar</strong> para jogar como aluno: suas jogadas de teste não aparecem nos resultados.
+    </p>
+    <div class="tabela-rolagem">
+      <table>
+        <thead><tr><th>Série</th><th>Caso</th><th>Habilidades (sigla · foco)</th><th>Situação</th><th>Jogaram</th><th></th></tr></thead>
+        <tbody id="jog-lista"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="cartao" id="jog-res" hidden>
+    <div class="linha">
+      <h2 style="margin:0" id="jog-res-titulo"></h2>
+      <span class="espaco"></span>
+      <select id="jog-res-turma" style="width:auto"></select>
+      <button class="btn" id="jog-res-fechar">Fechar</button>
+    </div>
+    <p class="suave pequeno" id="jog-res-legenda"></p>
+    <div class="tabela-rolagem">
+      <table id="jog-res-tabela"></table>
+    </div>
+  </div>
+</section>
+
+<dialog id="modal-jog-json" style="width:min(720px, calc(100vw - 32px))">
+  <h2>Importar casos (JSON)</h2>
+  <p class="suave pequeno">Cole um caso ou uma lista de casos no formato dos jogos. Caso com o mesmo "id" é substituído (a situação aberto/rascunho é mantida).</p>
+  <textarea id="jog-json" rows="14" spellcheck="false" style="font-family:monospace;font-size:.82rem"></textarea>
+  <div class="rodape-modal">
+    <button class="btn" type="button" data-fechar>Cancelar</button>
+    <button class="btn primario" type="button" id="jog-json-ok">Importar</button>
+  </div>
+</dialog>
+
+<script>
+  const jog = { casos: [], atual: null, missao: null, turma: '' };
+  const estrelas = (n) => (n ? '★'.repeat(n) + '☆'.repeat(3 - n) : '—');
+  const linkTeste = (id) => `${esc(estado.resumo.link)}?caso=${encodeURIComponent(id)}`;
+
+  /** Agrupa os casos da trilha por missão (uma linha por missão, com os 3 degraus). */
+  function missoesTrilha() {
+    const m = {};
+    jog.casos.filter((c) => c.trilha).forEach((c) => {
+      if (!m[c.missao]) m[c.missao] = { missao: c.missao, ordem: c.ordem, titulo: c.titulo, tema: c.tema, versoes: [], jogaram: 0, concluiram: 0, status: c.status, misto: false };
+      const x = m[c.missao];
+      x.versoes.push(c);
+      x.jogaram += c.jogaram;
+      x.concluiram += c.concluiram;
+      if (c.status !== x.status) x.misto = true;
+    });
+    return Object.values(m).sort((a, b) => a.ordem - b.ordem).map((x) => { x.versoes.sort((a, b) => a.degrau - b.degrau); return x; });
+  }
+
+  function renderJogos() {
+    const missoes = missoesTrilha();
+    $('jog-trilha').innerHTML = missoes.length ? missoes.map((m) => `
+      <tr>
+        <td><strong>${m.ordem}</strong></td>
+        <td><strong>${esc(m.titulo)}</strong></td>
+        <td class="suave pequeno">${esc(m.tema)}</td>
+        <td style="white-space:nowrap">${m.versoes.map((v) => `<a class="btn mini" href="${linkTeste(v.id)}" target="_blank" rel="noopener" title="Testar este degrau">${v.degrau ? '★'.repeat(v.degrau) : 'Tutorial'}</a>`).join(' ')}</td>
+        <td><select data-jog-missao-status="${esc(m.missao)}" style="width:auto">
+          <option value="rascunho" ${m.status === 'rascunho' && !m.misto ? 'selected' : ''}>Rascunho</option>
+          <option value="aberto" ${m.status === 'aberto' && !m.misto ? 'selected' : ''}>Aberto</option>
+          ${m.misto ? '<option selected disabled>Misto</option>' : ''}</select></td>
+        <td>${m.concluiram} concluíram<div class="suave pequeno">${m.jogaram - m.concluiram} em andamento</div></td>
+        <td><button class="btn mini" data-jog-missao-res="${esc(m.missao)}">Resultados</button></td>
+      </tr>`).join('')
+      : '<tr><td colspan="7" class="vazio">A trilha ainda não foi carregada. Clique em "Carregar Trilha Base".</td></tr>';
+
+    const serie = $('jog-serie').value;
+    const lista = jog.casos.filter((c) => !c.trilha && (!serie || c.serie === serie));
+    $('jog-lista').innerHTML = lista.length ? lista.map((c) => `
+      <tr>
+        <td><strong>${esc(c.serie)}</strong><div class="suave pequeno">${esc(c.mes)}</div></td>
+        <td><strong>${esc(c.titulo)}</strong><div class="suave pequeno">Case ${esc(c.numero)} · ${c.travas} cadeados</div></td>
+        <td>${c.etiquetas.map((e) => `<span class="jog-chip">${esc(e)}</span>`).join('')}</td>
+        <td><select data-jog-status="${esc(c.id)}" style="width:auto">
+          <option value="rascunho" ${c.status === 'rascunho' ? 'selected' : ''}>Rascunho</option>
+          <option value="aberto" ${c.status === 'aberto' ? 'selected' : ''}>Aberto</option></select></td>
+        <td>${c.concluiram} concluíram<div class="suave pequeno">${c.jogaram - c.concluiram} em andamento</div></td>
+        <td style="white-space:nowrap">
+          <a class="btn mini" href="${linkTeste(c.id)}" target="_blank" rel="noopener">Testar</a>
+          <button class="btn mini" data-jog-res="${esc(c.id)}">Resultados</button>
+          <button class="btn mini perigo" data-jog-excluir="${esc(c.id)}">Excluir</button>
+        </td>
+      </tr>`).join('')
+      : `<tr><td colspan="6" class="vazio">Nenhum caso${serie ? ' nesta série' : ''}. Clique em "Carregar casos padrão".</td></tr>`;
+  }
+
+  async function carregarJogos() {
+    jog.casos = await chamar('profListarCasos');
+    renderJogos();
+  }
+
+  function classeTrava(t) {
+    if (!t.aberta) return 'pendente';
+    if (t.revelada || t.pontos === 0) return 'zero';
+    return t.pontos < t.valor ? 'parcial' : '';
+  }
+
+  function prepararResultados(titulo, turmas, turma) {
+    if (!turma || !turmas.some((t) => t.turma === turma)) turma = turmas[0] ? turmas[0].turma : '';
+    jog.turma = turma;
+    $('jog-res-turma').innerHTML = turmas.map((t) => `<option value="${esc(t.turma)}" ${t.turma === turma ? 'selected' : ''}>${esc(t.turma)}</option>`).join('');
+    $('jog-res').hidden = false;
+    $('jog-res-titulo').textContent = titulo;
+    $('jog-res-tabela').innerHTML = '<tr><td class="vazio">Carregando…</td></tr>';
+    $('jog-res').scrollIntoView({ behavior: 'smooth' });
+    return turma;
+  }
+
+  async function abrirResultadosJogo(id, turma) {
+    const caso = jog.casos.find((c) => c.id === id);
+    jog.atual = id;
+    jog.missao = null;
+    turma = prepararResultados(caso.titulo, estado.resumo.turmas.filter((t) => t.serie === caso.serie), turma);
+    renderResultadosJogo(await chamar('profResultadosCaso', id, turma));
+  }
+
+  async function abrirResultadosMissao(missao, turma) {
+    const m = missoesTrilha().find((x) => x.missao === missao);
+    jog.missao = missao;
+    jog.atual = null;
+    turma = prepararResultados('🎓 ' + m.titulo, estado.resumo.turmas, turma);
+    renderResultadosMissao(await chamar('profResultadosMissao', missao, turma));
+  }
+
+  const SIT = { nao: 'Não jogou', andamento: 'Em andamento', concluido: 'Concluído' };
+  const travasHtml = (l) => l.travas.map((t) => `<span class="jog-trava ${classeTrava(t)}" title="${t.dicas} dica(s), ${t.erros} erro(s)">${t.aberta ? t.pontos : '·'}</span>`).join('');
+  const fraseHtml = (l) => (l.final_texto ? `${esc(l.final_texto)}${l.final_feedback ? `<div class="fb">${esc(l.final_feedback)}</div>` : ''}` : '');
+  const CORES = 'Cores: verde = pontos cheios · amarelo = perdeu pontos (dica/erro) · vermelho = 0 ou resposta revelada · cinza = ainda não abriu.';
+
+  function renderResultadosJogo(r) {
+    $('jog-res-legenda').innerHTML = 'Cadeados: ' + r.travas.map((t, i) => `<strong>${i + 1}</strong> ${esc(t.titulo)} <span class="suave">(${t.etiquetas.map(esc).join('; ')})</span>`).join(' · ') + '<br>' + CORES;
+    $('jog-res-tabela').innerHTML = `<thead><tr><th>Aluno</th><th>Situação</th><th>Pontos</th><th>Por cadeado</th><th>Dicas</th><th>Erros</th><th>Treinos</th><th>Frase final</th><th></th></tr></thead><tbody>` +
+      (r.linhas.length ? r.linhas.map((l) => `
+        <tr>
+          <td>${esc(l.nome)}</td>
+          <td><span class="jog-sit ${l.situacao}">${SIT[l.situacao]}</span>${l.concluido_em ? `<div class="suave pequeno">${esc(l.concluido_em)}</div>` : ''}</td>
+          <td><strong>${l.pontos == null ? '—' : l.pontos}</strong></td>
+          <td style="white-space:nowrap">${travasHtml(l)}</td>
+          <td>${l.situacao === 'nao' ? '' : l.dicas}</td>
+          <td>${l.situacao === 'nao' ? '' : l.erros}</td>
+          <td>${l.treinos || ''}</td>
+          <td class="jog-frase">${fraseHtml(l)}</td>
+          <td>${l.situacao !== 'nao' ? `<button class="btn mini perigo" data-jog-zerar="${esc(l.email)}" title="Apaga as jogadas do aluno neste caso">Zerar</button>` : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="9" class="vazio">Nenhum aluno nesta turma.</td></tr>') + '</tbody>';
+  }
+
+  function renderResultadosMissao(r) {
+    $('jog-res-legenda').innerHTML = '<strong>Degrau atual</strong> = versão que o aluno vai jogar na próxima missão. <strong>Degrau jogado</strong> = versão desta missão que ele fez. ' +
+      '<strong>Trilha</strong> = missões concluídas.<br>' + CORES;
+    $('jog-res-tabela').innerHTML = `<thead><tr><th>Aluno</th><th>Degrau atual</th><th>Trilha</th><th>Situação</th><th>Degrau jogado</th><th>Pontos</th><th>Por cadeado</th><th>Dicas</th><th>Erros</th><th>Frase final</th><th></th></tr></thead><tbody>` +
+      (r.linhas.length ? r.linhas.map((l) => `
+        <tr>
+          <td>${esc(l.nome)}</td>
+          <td class="jog-estrelas">${estrelas(l.degrauAtual)}</td>
+          <td>${l.feitas}/${l.total}</td>
+          <td><span class="jog-sit ${l.situacao}">${SIT[l.situacao]}</span>${l.concluido_em ? `<div class="suave pequeno">${esc(l.concluido_em)}</div>` : ''}</td>
+          <td class="jog-estrelas">${l.degrau == null ? '' : estrelas(l.degrau)}</td>
+          <td><strong>${l.pontos == null ? '—' : l.pontos}</strong></td>
+          <td style="white-space:nowrap">${travasHtml(l)}</td>
+          <td>${l.situacao === 'nao' ? '' : l.dicas}</td>
+          <td>${l.situacao === 'nao' ? '' : l.erros}</td>
+          <td class="jog-frase">${fraseHtml(l)}</td>
+          <td>${l.situacao !== 'nao' ? `<button class="btn mini perigo" data-jog-zerar="${esc(l.email)}" title="Apaga as jogadas do aluno nesta missão">Zerar</button>` : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="11" class="vazio">Nenhum aluno nesta turma.</td></tr>') + '</tbody>';
+  }
+
+  function configurarJogos() {
+    $('jog-serie').innerHTML = opcoesSerie(true);
+    document.querySelector('.abas button[data-aba="jogos"]').addEventListener('click', () => carregarJogos());
+    $('jog-serie').addEventListener('change', renderJogos);
+
+    $('jog-trilha-carregar').addEventListener('click', (ev) => comBotao(ev.target, async () => {
+      jog.casos = await chamar('profCarregarTrilhaBase');
+      renderJogos();
+      avisar('Trilha Base carregada. Clique em "Abrir a trilha inteira" para liberar aos alunos.');
+    }));
+    $('jog-trilha-abrir').addEventListener('click', (ev) => comBotao(ev.target, async () => {
+      jog.casos = await chamar('profStatusMissao', '', 'aberto');
+      renderJogos();
+      avisar('Trilha Base aberta para todas as turmas.');
+    }));
+    $('jog-trilha').addEventListener('change', async (ev) => {
+      const missao = ev.target.dataset.jogMissaoStatus;
+      if (!missao) return;
+      ev.target.disabled = true;
+      try { jog.casos = await chamar('profStatusMissao', missao, ev.target.value); } catch (e) { /* aviso já exibido */ }
+      renderJogos();
+    });
+    $('jog-trilha').addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-jog-missao-res]');
+      if (b) comBotao(b, () => abrirResultadosMissao(b.dataset.jogMissaoRes, jog.turma));
+    });
+
+    $('jog-padrao').addEventListener('click', (ev) => comBotao(ev.target, async () => {
+      jog.casos = await chamar('profCarregarCasosPadrao');
+      renderJogos();
+      avisar('Casos padrão carregados. Mude a situação para "Aberto" para liberar aos alunos.');
+    }));
+
+    $('jog-importar').addEventListener('click', () => { $('jog-json').value = ''; $('modal-jog-json').showModal(); });
+    $('jog-json-ok').addEventListener('click', (ev) => comBotao(ev.target, async () => {
+      jog.casos = await chamar('profImportarCasos', $('jog-json').value);
+      $('modal-jog-json').close();
+      renderJogos();
+      avisar('Casos importados.');
+    }));
+
+    $('jog-lista').addEventListener('change', async (ev) => {
+      const id = ev.target.dataset.jogStatus;
+      if (!id) return;
+      ev.target.disabled = true;
+      try {
+        jog.casos = await chamar('profStatusCaso', id, ev.target.value);
+        avisar(ev.target.value === 'aberto' ? 'Caso liberado para os alunos.' : 'Caso voltou para rascunho.');
+      } catch (e) { /* aviso já exibido */ }
+      renderJogos();
+    });
+
+    $('jog-lista').addEventListener('click', async (ev) => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      if (b.dataset.jogRes) comBotao(b, () => abrirResultadosJogo(b.dataset.jogRes, jog.turma));
+      if (b.dataset.jogExcluir) {
+        const c = jog.casos.find((x) => x.id === b.dataset.jogExcluir);
+        if (!confirm(`Excluir o caso "${c.titulo}"? ${c.jogaram ? 'As jogadas dos alunos ficam guardadas na planilha, mas o caso some da lista.' : ''}`)) return;
+        comBotao(b, async () => { jog.casos = await chamar('profExcluirCaso', c.id); renderJogos(); $('jog-res').hidden = true; });
+      }
+    });
+
+    $('jog-res-turma').addEventListener('change', () => {
+      if (jog.missao) abrirResultadosMissao(jog.missao, $('jog-res-turma').value);
+      else abrirResultadosJogo(jog.atual, $('jog-res-turma').value);
+    });
+    $('jog-res-fechar').addEventListener('click', () => ($('jog-res').hidden = true));
+    $('jog-res-tabela').addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-jog-zerar]');
+      if (!b) return;
+      if (!confirm('Zerar as jogadas deste aluno? Ele vai jogar de novo do começo.')) return;
+      comBotao(b, async () => {
+        if (jog.missao) renderResultadosMissao(await chamar('profZerarMissao', jog.missao, b.dataset.jogZerar, jog.turma));
+        else renderResultadosJogo(await chamar('profZerarJogadas', jog.atual, b.dataset.jogZerar, jog.turma));
+        carregarJogos();
+      });
+    });
+  }
+</script>
