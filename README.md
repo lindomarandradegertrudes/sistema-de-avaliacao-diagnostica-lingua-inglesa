@@ -43,6 +43,13 @@ Roda **gratuitamente** no Google Workspace da escola: Google Apps Script e Googl
   - mapa da turma (aluno × habilidade) e ficha do aluno;
   - grupos de reforço sugeridos.
 - **Meu reforço:** treinos curtos de 4 cadeados, sem nota, nas habilidades mais fracas de cada aluno.
+- **Banco do ano inteiro:** 2 casos por período do Mapa 2026 em cada série (6º ao 9º), cada um em 3 degraus, e exercícios avulsos de leitura e gramática para o Meu reforço.
+- **Criar com IA, sem custo:** o app monta um pedido com as regras dos jogos e o Mapa do período; o professor cola no claude.ai (conta gratuita) e importa a resposta. O app converte, valida (apontando onde está o erro) e salva como rascunho. Exercícios curtos gerados só entram no Meu reforço depois de liberados.
+- **Relatórios de jogos:**
+  - turma por caso (pontos, erros, dicas e cadeados para retomar em aula);
+  - evolução do aluno (degrau mês a mês, ciclos e habilidades: começo × agora);
+  - resumo para a coordenação por trimestre, com impressão em PDF;
+  - exportação de todos os dados dos jogos para uma planilha nova no Drive.
 
 ## Estrutura
 
@@ -63,9 +70,12 @@ Roda **gratuitamente** no Google Workspace da escola: Google Apps Script e Googl
 | `Habilidades.gs` | Catálogo de habilidades do Mapa e etiquetagem automática |
 | `Dificuldades.gs` | Dificuldades por habilidade, mapa da turma e treinos "Meu reforço" |
 | `CasosBase.gs` | Trilha Base: tutorial e 8 missões em 3 degraus |
-| `CasosPadrao.gs` / `CasosAno.gs` | Casos do ano (outubro e novembro/2026, 6º–9º) em 3 degraus |
+| `CasosPadrao.gs` / `CasosAno.gs` | Casos do ano de outubro e novembro (6º–9º) em 3 degraus |
+| `CasosAno6.gs` … `CasosAno9.gs` | Banco do ano inteiro de cada série e exercícios avulsos do Meu reforço |
+| `Gerador.gs` | Criar com IA: pedido para o claude.ai, conversão e validação da resposta |
+| `RelatoriosJogos.gs` / `ProfRelJogos.html` | Aba "Relatórios de jogos": turma por caso, evolução, coordenação e exportação |
 | `Caso.html` / `CasoEstilo.html` / `CasoMotor.html` | Tela do jogo (visual de HQ e motor no navegador) |
-| `ProfJogos.html` | Aba "Jogos" do professor: ciclos, casos do ano, Trilha Base e resultados |
+| `ProfJogos.html` | Aba "Jogos" do professor: ciclos, casos do ano, Criar com IA, Trilha Base e resultados |
 | `ProfDificuldades.html` | Aba "Habilidades" do professor: mapa da turma, ficha e grupos de reforço |
 | `Aluno.html` | Tela do aluno (inclui o cartão Missions) |
 | `Estilo.html` | Estilos compartilhados |
@@ -84,7 +94,8 @@ Siga o passo a passo em [GUIA-INSTALACAO.md](GUIA-INSTALACAO.md). Em resumo:
 
 Todos os dados dos alunos ficam somente na planilha do professor, dentro da conta Google da escola. O uso de IA é opcional:
 - a geração de questões envia apenas o conteúdo pedagógico;
-- o comentário da frase final dos jogos envia somente a frase escrita pelo aluno e a tarefa, sem nome nem e-mail.
+- o comentário da frase final dos jogos envia somente a frase escrita pelo aluno e a tarefa, sem nome nem e-mail;
+- o pedido para criar casos com IA é copiado pelo professor e leva apenas a série, o período do Mapa e o tema, sem dados de alunos.
 
 ## Autor
 

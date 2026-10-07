@@ -620,7 +620,7 @@ function profListarCasos() {
     return {
       id: c.id, serie: c.serie, mes: c.mes, titulo: c.titulo, status: c.status, numero: c.dados.numero || '',
       trilha: ehTrilha_(c), missao: missaoDe_(c), ordem: Number(c.dados.ordem) || 0, tema: c.dados.tema || '', degrau: Number(c.dados.degrau) || 0,
-      travas: (c.dados.travas || []).length,
+      travas: (c.dados.travas || []).length, gerado: !!c.dados.gerado,
       etiquetas: etiquetasCaso_(c),
       jogaram: js.length, concluiram: js.filter(function (j) { return j.status === 'concluido'; }).length,
     };

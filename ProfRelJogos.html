@@ -1,0 +1,335 @@
+<!-- Etapa 5 (parte B): aba "Relatórios de jogos" do painel do professor (incluída em Professor.html) -->
+<style>
+  .rj-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .rj-kpi { border: 1px solid var(--borda); border-radius: 10px; padding: 8px 12px; }
+  .rj-kpi .valor { font-size: 1.4rem; font-weight: 700; }
+  .rj-tab { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  .rj-tab th, .rj-tab td { border-bottom: 1px solid var(--borda); padding: 6px 8px; text-align: center; white-space: nowrap; }
+  .rj-tab th:first-child, .rj-tab td:first-child { text-align: left; }
+  .rj-tab td.esq { text-align: left; white-space: normal; }
+  .rj-pts { display: inline-block; min-width: 42px; border-radius: 6px; font-weight: 700; padding: 1px 6px; }
+  .rj-pts.verde { background: #d3f9d8; color: #2b8a3e; }
+  .rj-pts.amarelo { background: #fff3bf; color: #a05a00; }
+  .rj-pts.vermelho { background: #ffe3e3; color: #c92a2a; }
+  .rj-estrela { color: #f08c00; letter-spacing: -1px; }
+  .rj-retomar { background: #fff4e6; }
+  .rj-selo { display: inline-block; font-size: .72rem; font-weight: 700; border-radius: 99px; padding: 1px 8px; background: #ffe8cc; color: #a05a00; }
+  .rj-barra { height: 8px; border-radius: 99px; background: var(--fundo); overflow: hidden; min-width: 80px; }
+  .rj-barra i { display: block; height: 100%; background: var(--primaria); }
+  .rj-linha-tempo { display: flex; gap: 8px; flex-wrap: wrap; }
+  .rj-mes { border: 1px solid var(--borda); border-radius: 10px; padding: 6px 10px; text-align: center; min-width: 84px; }
+  .rj-mes b { display: block; font-size: .8rem; color: var(--suave); font-weight: 600; }
+  .rj-tend.melhorou { color: #2b8a3e; font-weight: 700; }
+  .rj-tend.piorou { color: #c92a2a; font-weight: 700; }
+  .rj-tend.estavel { color: var(--suave); }
+  .rj-tri { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .rj-deg { display: flex; height: 14px; border-radius: 5px; overflow: hidden; background: var(--borda); min-width: 110px; }
+  .rj-deg span { display: block; height: 100%; }
+  .rj-d1 { background: #ffc9c9; } .rj-d2 { background: #ffe066; } .rj-d3 { background: #8ce99a; }
+  #impressao .rj-tab th, #impressao .rj-tab td { border: 1px solid #000; padding: 3px 6px; font-size: 10pt; }
+  #impressao h2 { margin: 10px 0 6px; }
+</style>
+
+<section id="aba-reljogos" class="pilha" hidden>
+  <div class="linha">
+    <div class="chips" id="rj-vistas">
+      <button class="btn ativa" data-vista="caso">Turma por caso</button>
+      <button class="btn" data-vista="aluno">Evolução do aluno</button>
+      <button class="btn" data-vista="coord">Resumo para coordenação</button>
+    </div>
+    <span class="espaco"></span>
+    <button class="btn primario" id="rj-exportar">Exportar dados dos jogos</button>
+  </div>
+  <div id="rj-exportado" class="link-box" hidden></div>
+
+  <!-- Turma por caso -->
+  <div id="rj-caso" class="pilha">
+    <div class="linha">
+      <select id="rj-caso-turma" style="width:auto"></select>
+      <select id="rj-caso-missao" style="width:auto;max-width:100%"></select>
+    </div>
+    <div id="rj-caso-conteudo"></div>
+  </div>
+
+  <!-- Evolução do aluno -->
+  <div id="rj-aluno" class="pilha" hidden>
+    <div class="linha">
+      <select id="rj-al-turma" style="width:auto"></select>
+      <select id="rj-al-aluno" style="width:auto"></select>
+    </div>
+    <div id="rj-al-conteudo"></div>
+  </div>
+
+  <!-- Resumo para a coordenação -->
+  <div id="rj-coord" class="pilha" hidden>
+    <div class="linha">
+      <div class="chips" id="rj-tris"></div>
+      <span class="espaco"></span>
+      <button class="btn" id="rj-datas">Datas dos trimestres</button>
+      <button class="btn" id="rj-imprimir" disabled>Imprimir / PDF</button>
+    </div>
+    <div id="rj-coord-conteudo"></div>
+  </div>
+</section>
+
+<dialog id="modal-rj-datas" style="width:min(520px, calc(100vw - 32px))">
+  <h2 style="margin-top:0">Datas dos trimestres</h2>
+  <p class="suave pequeno">O resumo junta os jogos concluídos e os ciclos com prazo dentro de cada trimestre. Ajuste quando o calendário da rede sair.</p>
+  <div id="rj-datas-campos" class="pilha"></div>
+  <div class="rodape-modal">
+    <button class="btn" type="button" data-fechar>Cancelar</button>
+    <button class="btn primario" type="button" id="rj-datas-salvar">Salvar</button>
+  </div>
+</dialog>
+
+<script>
+  const rj = { opcoes: null, vista: 'caso', tri: null, coord: null };
+  const RJ_SIT = { nao: 'Não jogou', andamento: 'Em andamento', concluido: 'Concluído' };
+
+  function rjEstrelas(d) { return d ? `<span class="rj-estrela">${'★'.repeat(d)}</span>` : '–'; }
+  function rjPts(p, sufixo) {
+    if (p == null) return '–';
+    const cor = p >= 80 ? 'verde' : (p >= 60 ? 'amarelo' : 'vermelho');
+    return `<span class="rj-pts ${cor}">${Math.round(p)}${sufixo || ''}</span>`;
+  }
+  function rjMes(m) {
+    const nomes = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const p = String(m || '').split('-');
+    return p.length >= 2 ? `${nomes[Number(p[1]) - 1] || p[1]}/${p[0].slice(2)}` : esc(m);
+  }
+  function rjData(iso) { const p = String(iso || '').split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : esc(iso); }
+  function rjKpi(rotulo, valor, extra) { return `<div class="rj-kpi"><div class="suave pequeno">${rotulo}</div><div class="valor">${valor}</div>${extra ? `<div class="suave pequeno">${extra}</div>` : ''}</div>`; }
+  function rjDegraus(d, total) {
+    const t = total || (d[1] + d[2] + d[3]) || 1;
+    return `<div class="rj-deg" title="★ ${d[1]} · ★★ ${d[2]} · ★★★ ${d[3]}">${[1, 2, 3].map((k) => d[k] ? `<span class="rj-d${k}" style="width:${(d[k] / t) * 100}%"></span>` : '').join('')}</div>
+      <div class="suave pequeno">★ ${d[1]} · ★★ ${d[2]} · ★★★ ${d[3]}</div>`;
+  }
+
+  // ---------- Turma por caso ----------
+  async function rjCarregarMissoes() {
+    const turma = $('rj-caso-turma').value;
+    $('rj-caso-missao').innerHTML = '<option>Carregando…</option>';
+    const lista = await chamar('profRelJogosMissoes', turma);
+    if (!lista.length) {
+      $('rj-caso-missao').innerHTML = '<option value="">Nenhum caso jogado</option>';
+      $('rj-caso-conteudo').innerHTML = '<p class="vazio">Esta turma ainda não jogou nenhum caso e não tem ciclos.</p>';
+      return;
+    }
+    const ano = lista.filter((m) => m.tipo === 'ano'), trilha = lista.filter((m) => m.tipo === 'trilha');
+    const op = (m) => `<option value="${esc(m.missao)}">${m.numero ? esc(m.numero) + ' · ' : ''}${esc(m.titulo)}${m.ciclos.length ? ' · ciclo: ' + esc(m.ciclos.join(', ')) : ''} (${m.jogaram} jogaram)</option>`;
+    $('rj-caso-missao').innerHTML = (ano.length ? `<optgroup label="Casos do ano">${ano.map(op).join('')}</optgroup>` : '') +
+      (trilha.length ? `<optgroup label="Trilha Base">${trilha.map(op).join('')}</optgroup>` : '');
+    rjCarregarCaso();
+  }
+
+  async function rjCarregarCaso() {
+    const turma = $('rj-caso-turma').value, missao = $('rj-caso-missao').value;
+    if (!missao) return;
+    $('rj-caso-conteudo').innerHTML = '<p class="vazio">Carregando…</p>';
+    const d = await chamar('profRelTurmaCaso', turma, missao);
+    const r = d.resumo;
+    const cad = d.cadeados.map((v) => `
+      <div class="cartao pilha">
+        <h3 style="margin:0">Versão ${rjEstrelas(v.degrau)} <span class="suave pequeno">${v.jogadas} aluno(s)</span></h3>
+        <div class="tabela-rolagem"><table class="rj-tab">
+          <thead><tr><th>Cadeado</th><th>Habilidade</th><th>Chegaram</th><th>Acerto médio</th><th>Erros</th><th>Dicas</th><th>Resposta revelada</th></tr></thead>
+          <tbody>${v.travas.map((t) => `<tr class="${t.retomar ? 'rj-retomar' : ''}">
+            <td class="esq">${t.n}. ${esc(t.titulo)} ${t.retomar ? '<span class="rj-selo">retomar em aula</span>' : ''}</td>
+            <td class="esq pequeno">${esc(t.habilidade)}</td><td>${t.chegaram}</td>
+            <td>${rjPts(t.acerto, '%')}</td><td>${t.erros}</td><td>${t.dicas}</td><td>${t.revelados}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </div>`).join('');
+    $('rj-caso-conteudo').innerHTML = `
+      <div class="cartao pilha">
+        <h2 style="margin:0">${d.caso.numero ? esc(d.caso.numero) + ' · ' : ''}${esc(d.caso.titulo)} <span class="suave pequeno">${esc(d.turma)} · ${d.caso.tipo === 'trilha' ? 'Trilha Base (sem nota)' : 'caso do ano'}</span></h2>
+        ${d.ciclo ? `<p class="suave pequeno" style="margin:0">Ciclo <strong>${esc(d.ciclo.titulo)}</strong> · prazo ${rjData(d.ciclo.prazo)} · ${d.ciclo.status === 'fechado' ? 'fechado' : 'aberto'}</p>` : ''}
+        <div class="rj-kpis">
+          ${rjKpi('Jogaram', `${r.jogaram}/${r.alunos}`, `${r.concluiram} concluíram`)}
+          ${rjKpi('Média (concluídos)', r.media == null ? '–' : Math.round(r.media))}
+          ${d.ciclo ? rjKpi('No prazo', r.noPrazo) : ''}
+          ${rjKpi('Dicas por aluno', r.dicas == null ? '–' : r.dicas)}
+          ${rjKpi('Erros por aluno', r.erros == null ? '–' : r.erros)}
+          <div class="rj-kpi"><div class="suave pequeno">Versão jogada</div>${rjDegraus(r.porDegrau)}</div>
+        </div>
+      </div>
+      ${cad || ''}
+      <div class="cartao tabela-rolagem"><table class="rj-tab">
+        <thead><tr><th>Aluno</th><th>Situação</th><th>Versão</th><th>Pontos</th><th>Erros</th><th>Dicas</th><th>Revelados</th>${d.ciclo ? '<th>No prazo</th>' : ''}<th>Treinos</th><th>Degrau atual</th></tr></thead>
+        <tbody>${d.linhas.map((l) => `<tr>
+          <td>${esc(l.nome)}</td><td class="pequeno">${RJ_SIT[l.situacao] || esc(l.situacao)}</td><td>${rjEstrelas(l.degrau)}</td>
+          <td>${l.situacao === 'nao' ? '–' : (l.situacao === 'concluido' ? rjPts(l.pontos) : `<span class="suave">${l.pontos} (parcial)</span>`)}</td>
+          <td>${l.situacao === 'nao' ? '' : l.erros}</td><td>${l.situacao === 'nao' ? '' : l.dicas}</td><td>${l.situacao === 'nao' ? '' : l.revelados}</td>
+          ${d.ciclo ? `<td>${l.noPrazo == null ? '' : (l.noPrazo ? '✔' : 'fora')}</td>` : ''}
+          <td>${l.treinos || ''}</td><td>${rjEstrelas(l.degrauAtual)}</td></tr>`).join('')}</tbody>
+      </table></div>
+      <p class="suave pequeno">Só conta a 1ª jogada de cada aluno (a que vale). "Treinos" = vezes que jogou de novo. "Retomar em aula" marca os 2 cadeados com menor acerto (abaixo de 70%).</p>`;
+  }
+
+  // ---------- Evolução do aluno ----------
+  function rjPreencherAlunos() {
+    const turma = $('rj-al-turma').value;
+    const alunos = rj.opcoes.alunos.filter((a) => a.turma === turma);
+    $('rj-al-aluno').innerHTML = alunos.length ? alunos.map((a) => `<option value="${esc(a.email)}">${esc(a.nome)}</option>`).join('') : '<option value="">Nenhum aluno</option>';
+    rjCarregarAluno();
+  }
+
+  async function rjCarregarAluno() {
+    const email = $('rj-al-aluno').value;
+    if (!email) { $('rj-al-conteudo').innerHTML = ''; return; }
+    $('rj-al-conteudo').innerHTML = '<p class="vazio">Carregando…</p>';
+    const d = await chamar('profRelEvolucaoJogos', email);
+    const TEND = { melhorou: '▲ melhorou', piorou: '▼ piorou', estavel: '= estável', poucos: 'poucos dados' };
+    const meses = d.degrau.meses;
+    $('rj-al-conteudo').innerHTML = `
+      <div class="cartao pilha">
+        <h2 style="margin:0">${esc(d.nome)} <span class="suave pequeno">${esc(d.turma)} · nível ${esc(d.nivel || 'sem nível')}</span></h2>
+        <div class="rj-kpis">
+          ${rjKpi('Degrau atual', rjEstrelas(d.degrau.final), `começou em ${'★'.repeat(d.degrau.inicial)}`)}
+          ${rjKpi('Casos do ano', d.casosAno.concluidos, d.casosAno.media == null ? '' : `média ${Math.round(d.casosAno.media)}`)}
+          ${d.trilha ? rjKpi('Trilha Base', `${d.trilha.feitas}/${d.trilha.total}`, 'missões') : ''}
+          ${rjKpi('Meu reforço', d.reforco.concluidas, `de ${d.reforco.sessoes} sessões`)}
+        </div>
+      </div>
+      <div class="cartao pilha">
+        <h3 style="margin:0">Degrau mês a mês</h3>
+        ${meses.length ? `<div class="rj-linha-tempo">${meses.map((m) => `<div class="rj-mes"><b>${rjMes(m.mes)}</b>${rjEstrelas(m.degrau)}<div class="suave pequeno">${m.jogos} jogo(s) · ${Math.round(m.media)}</div></div>`).join('')}</div>`
+          : '<p class="vazio" style="padding:4px 0">Ainda não concluiu missões com degrau.</p>'}
+        <p class="suave pequeno" style="margin:0">Degrau ao fim de cada mês e média de pontos dos jogos concluídos (1ª jogada). Sobe com 80+ em 2 missões seguidas; desce com menos de 40.</p>
+      </div>
+      <div class="cartao pilha">
+        <h3 style="margin:0">Ciclos</h3>
+        ${d.ciclos.length ? `<div class="tabela-rolagem"><table class="rj-tab"><thead><tr><th>Ciclo</th><th>Mês</th><th>Prazo</th><th>Casos no prazo</th><th>Nota no nível</th><th>Situação</th></tr></thead>
+          <tbody>${d.ciclos.map((c) => `<tr><td>${esc(c.titulo)}</td><td>${rjMes(c.mes)}</td><td>${rjData(c.prazo)}</td><td>${c.noPrazo}/${c.casos}</td>
+            <td>${c.nota != null ? rjPts(c.nota) : (c.parcial != null ? `<span class="suave">${Math.round(c.parcial)} (parcial)</span>` : '–')}</td>
+            <td class="pequeno">${c.status === 'fechado' ? 'fechado' : 'aberto'}</td></tr>`).join('')}</tbody></table></div>`
+          : '<p class="vazio" style="padding:4px 0">A turma ainda não tem ciclos.</p>'}
+      </div>
+      <div class="cartao pilha">
+        <h3 style="margin:0">Habilidades: começo × agora</h3>
+        ${d.habilidades.length ? `<div class="tabela-rolagem"><table class="rj-tab"><thead><tr><th>Habilidade</th><th>Itens</th><th>Começo</th><th>Agora</th><th>Mudança</th></tr></thead>
+          <tbody>${d.habilidades.map((h) => `<tr><td class="esq">${esc(h.nome)} <span class="suave pequeno">${esc(h.codigo)}</span></td><td>${h.n}</td>
+            <td>${h.inicio == null ? '–' : Math.round(h.inicio) + '%'}</td><td>${h.agora == null ? '–' : Math.round(h.agora) + '%'}</td>
+            <td><span class="rj-tend ${h.tendencia}">${TEND[h.tendencia]}${h.delta != null && h.tendencia !== 'estavel' ? ` (${h.delta > 0 ? '+' : ''}${Math.round(h.delta)})` : ''}</span></td></tr>`).join('')}</tbody></table></div>
+          <p class="suave pequeno" style="margin:0">Compara a 1ª metade com a 2ª metade dos itens de cada habilidade (questões, TDAs e cadeados), em ordem de data. Melhorou/piorou = mudança de 10 pontos ou mais; com menos de 4 itens aparece "poucos dados".</p>`
+          : '<p class="vazio" style="padding:4px 0">Sem dados de habilidades ainda.</p>'}
+      </div>`;
+  }
+
+  // ---------- Resumo para a coordenação ----------
+  function rjChipsTrimestres() {
+    $('rj-tris').innerHTML = rj.opcoes.trimestres.map((t, i) => `<button class="btn ${i === rj.tri ? 'ativa' : ''}" data-tri="${i}" title="${rjData(t.inicio)} a ${rjData(t.fim)}">${esc(t.nome)}</button>`).join('');
+  }
+
+  function rjHtmlCoord(d, impressao) {
+    const tab = `<table class="rj-tab"><thead><tr><th>Turma</th><th>Alunos</th><th>Participação</th><th>Ciclos</th><th>Média dos ciclos</th><th>Casos do ano</th><th>Média dos casos</th><th>Trilha</th><th>Reforço</th><th>Degraus</th><th>Maiores dificuldades</th></tr></thead>
+      <tbody>${d.turmas.map((t) => `<tr><td><strong>${esc(t.turma)}</strong></td><td>${t.alunos}</td>
+        <td>${t.participacao == null ? '–' : `${t.participantes} (${Math.round(t.participacao)}%)`}</td>
+        <td>${t.ciclos}</td><td>${t.mediaCiclos == null ? '–' : (impressao ? Math.round(t.mediaCiclos) : rjPts(t.mediaCiclos))}${t.comNota ? `<div class="suave pequeno">${t.comNota} nota(s)</div>` : ''}</td>
+        <td>${t.casosAno}</td><td>${t.mediaCasos == null ? '–' : (impressao ? Math.round(t.mediaCasos) : rjPts(t.mediaCasos))}</td>
+        <td>${t.trilha}</td><td>${t.reforco}</td>
+        <td>${impressao ? `★ ${t.degraus[1]} · ★★ ${t.degraus[2]} · ★★★ ${t.degraus[3]}` : rjDegraus(t.degraus, t.alunos)}</td>
+        <td class="esq pequeno">${t.fracas.length ? t.fracas.map((h) => `${esc(h.nome)} (${Math.round(h.pct)}%)`).join('<br>') : '–'}</td></tr>`).join('')}</tbody></table>`;
+    const ser = `<table class="rj-tab"><thead><tr><th>Série</th><th>Turmas</th><th>Alunos</th><th>Participação</th><th>Média dos ciclos</th><th>Casos do ano concluídos</th><th>Sessões de reforço</th></tr></thead>
+      <tbody>${d.series.map((s) => `<tr><td><strong>${esc(s.serie)} ano</strong></td><td>${s.turmas}</td><td>${s.alunos}</td>
+        <td>${s.participacao == null ? '–' : `${s.participantes} (${Math.round(s.participacao)}%)`}</td>
+        <td>${s.mediaCiclos == null ? '–' : Math.round(s.mediaCiclos)}</td><td>${s.casosAno}</td><td>${s.reforco}</td></tr>`).join('')}</tbody></table>`;
+    const titulo = `Jogos de Língua Inglesa – ${esc(d.trimestre.nome)} (${rjData(d.trimestre.inicio)} a ${rjData(d.trimestre.fim)})`;
+    const nota = 'Participação = alunos que concluíram ao menos um caso do ano ou missão da Trilha Base no trimestre. Média dos ciclos = notas de jogos que entraram no nível (ciclos do mês ou com prazo no trimestre). Degraus = situação dos alunos ao fim do trimestre (★ mais simples, ★★★ mais desafiador). Dificuldades = habilidades com acerto abaixo de 70% nos jogos do trimestre (mín. 5 itens).';
+    if (impressao) {
+      return `<h2>${titulo}</h2><p>Gerado em ${esc(d.gerado)}</p><h3>Por série</h3>${ser}<h3>Por turma</h3>${tab}<p style="font-size:9pt">${nota}</p>`;
+    }
+    return `<div class="cartao pilha"><h2 style="margin:0">${titulo}</h2><span class="suave pequeno">Gerado em ${esc(d.gerado)}</span>
+        <h3 style="margin:8px 0 0">Por série</h3><div class="tabela-rolagem">${ser}</div></div>
+      <div class="cartao pilha"><h3 style="margin:0">Por turma</h3><div class="tabela-rolagem">${tab}</div><p class="suave pequeno" style="margin:0">${nota}</p></div>`;
+  }
+
+  async function rjCarregarCoord() {
+    rjChipsTrimestres();
+    $('rj-imprimir').disabled = true;
+    $('rj-coord-conteudo').innerHTML = '<p class="vazio">Carregando…</p>';
+    rj.coord = await chamar('profRelCoordenacao', rj.tri);
+    $('rj-coord-conteudo').innerHTML = rjHtmlCoord(rj.coord, false);
+    $('rj-imprimir').disabled = false;
+  }
+
+  function rjTrimestreDeHoje() {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const i = rj.opcoes.trimestres.findIndex((t) => t.inicio <= hoje && hoje <= t.fim);
+    if (i !== -1) return i;
+    const passados = rj.opcoes.trimestres.map((t, k) => (t.fim < hoje ? k : -1)).filter((k) => k !== -1);
+    return passados.length ? passados[passados.length - 1] : 0;
+  }
+
+  function rjAbrirDatas() {
+    $('rj-datas-campos').innerHTML = rj.opcoes.trimestres.map((t, i) => `
+      <div class="linha"><strong style="min-width:110px">${i + 1}º trimestre</strong>
+        <input type="date" data-ini="${i}" value="${esc(t.inicio)}" style="width:auto"> a
+        <input type="date" data-fim="${i}" value="${esc(t.fim)}" style="width:auto"></div>`).join('');
+    $('modal-rj-datas').showModal();
+  }
+
+  // ---------- Início ----------
+  async function rjAoAbrir() {
+    if (!rj.opcoes) {
+      rj.opcoes = await chamar('profRelJogosOpcoes');
+      const turmas = rj.opcoes.turmas.map((t) => `<option value="${esc(t.turma)}">${esc(t.turma)}</option>`).join('');
+      $('rj-caso-turma').innerHTML = turmas;
+      $('rj-al-turma').innerHTML = turmas;
+      rj.tri = rjTrimestreDeHoje();
+      rjPreencherAlunos();
+    }
+    if (rj.vista === 'caso') rjCarregarMissoes();
+    if (rj.vista === 'coord') rjCarregarCoord();
+  }
+
+  function configurarRelJogos() {
+    document.querySelector('.abas button[data-aba="reljogos"]').addEventListener('click', rjAoAbrir);
+    $('rj-vistas').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button[data-vista]');
+      if (!b) return;
+      rj.vista = b.dataset.vista;
+      document.querySelectorAll('#rj-vistas button').forEach((x) => x.classList.toggle('ativa', x === b));
+      ['caso', 'aluno', 'coord'].forEach((v) => ($('rj-' + v).hidden = v !== rj.vista));
+      if (rj.vista === 'caso') rjCarregarMissoes();
+      if (rj.vista === 'coord') rjCarregarCoord();
+    });
+    $('rj-caso-turma').addEventListener('change', rjCarregarMissoes);
+    $('rj-caso-missao').addEventListener('change', rjCarregarCaso);
+    $('rj-al-turma').addEventListener('change', rjPreencherAlunos);
+    $('rj-al-aluno').addEventListener('change', rjCarregarAluno);
+    $('rj-tris').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button[data-tri]');
+      if (!b) return;
+      rj.tri = Number(b.dataset.tri);
+      rjCarregarCoord();
+    });
+    $('rj-datas').addEventListener('click', rjAbrirDatas);
+    $('rj-datas-salvar').addEventListener('click', (ev) => comBotao(ev.target, async () => {
+      const lista = [0, 1, 2].map((i) => ({
+        inicio: document.querySelector(`#rj-datas-campos [data-ini="${i}"]`).value,
+        fim: document.querySelector(`#rj-datas-campos [data-fim="${i}"]`).value,
+      }));
+      rj.opcoes.trimestres = await chamar('profSalvarTrimestres', lista);
+      $('modal-rj-datas').close();
+      avisar('Datas dos trimestres salvas.');
+      rjCarregarCoord();
+    }));
+    $('rj-imprimir').addEventListener('click', () => {
+      if (!rj.coord) return;
+      $('impressao').innerHTML = rjHtmlCoord(rj.coord, true);
+      document.body.classList.add('imprimindo');
+      setTimeout(() => { window.print(); document.body.classList.remove('imprimindo'); }, 50);
+    });
+    $('rj-exportar').addEventListener('click', (ev) => comBotao(ev.target, async () => {
+      $('rj-exportado').hidden = false;
+      $('rj-exportado').textContent = 'Criando planilha no seu Drive…';
+      try {
+        const url = await chamar('profRelExportarJogos');
+        $('rj-exportado').innerHTML = `<span style="flex:1">Planilha criada no seu Google Drive (abas Jogadas, Cadeados, Ciclos e Habilidades).</span><a class="btn mini" href="${esc(url)}" target="_blank" rel="noopener">Abrir planilha</a>`;
+      } catch (e) {
+        $('rj-exportado').hidden = true;
+        throw e;
+      }
+    }));
+  }
+</script>

@@ -34,7 +34,7 @@ function fonteDoCaso_(c) {
   return 'jogos';
 }
 
-/** Observações de um aluno: [{ hab, valor, peso, fonte, titulo }]. */
+/** Observações de um aluno: [{ hab, valor, peso, fonte, titulo, quando (yyyyMMddHHmm) }]. */
 function observacoes_(email, serie, ctx) {
   const obs = [];
   ctx.respostas.forEach(function (r) {
@@ -46,7 +46,7 @@ function observacoes_(email, serie, ctx) {
       r.detalhe.rubrica.forEach(function (nivel, i) {
         const crit = q.tda.rubrica[i];
         const h = crit ? habilidadeDe_(serie, crit.criterio, '') : null;
-        if (h && nivel) obs.push({ hab: h.id, valor: Number(nivel) / 4, peso: peso, fonte: 'tda', titulo: q.titulo });
+        if (h && nivel) obs.push({ hab: h.id, valor: Number(nivel) / 4, peso: peso, fonte: 'tda', titulo: q.titulo, quando: chaveData_(r.respondido_em) });
       });
       return;
     }
@@ -54,7 +54,7 @@ function observacoes_(email, serie, ctx) {
     r.detalhe.acertos.forEach(function (certo, i) {
       const questao = q.questoes[i];
       const h = questao ? habilidadeDe_(serie, questao.topico || '', '') : null;
-      if (h) obs.push({ hab: h.id, valor: certo ? 1 : 0, peso: peso, fonte: 'questionario', titulo: q.titulo });
+      if (h) obs.push({ hab: h.id, valor: certo ? 1 : 0, peso: peso, fonte: 'questionario', titulo: q.titulo, quando: chaveData_(r.respondido_em) });
     });
   });
   ctx.jogadas.forEach(function (j) {
@@ -71,7 +71,7 @@ function observacoes_(email, serie, ctx) {
         const h = habilidadeDe_(serie, e.foco, e.codigo);
         if (!h || vistos[h.id]) return;
         vistos[h.id] = true;
-        obs.push({ hab: h.id, valor: t.valor ? t.pontos / t.valor : 0, peso: peso, fonte: fonte, titulo: c.titulo });
+        obs.push({ hab: h.id, valor: t.valor ? t.pontos / t.valor : 0, peso: peso, fonte: fonte, titulo: c.titulo, quando: chaveData_(j.concluido_em || j.atualizado_em || j.iniciado_em) });
       });
     });
   });
@@ -171,6 +171,8 @@ function cadeadosParaTreino_(serie, casos) {
   const lista = [];
   Object.keys(casos).map(function (k) { return casos[k]; }).forEach(function (c) {
     if (c.dados.reforco || c.dados.missao === 'tutorial') return;
+    // Exercícios gerados com IA só entram depois de "Liberar para o reforço".
+    if (c.dados.gerado && ehAvulso_(c) && c.status !== 'aberto') return;
     if (c.serie !== serie && c.serie !== SERIE_TODAS) return;
     if ((c.dados.evidencias || []).length) return;
     (c.dados.travas || []).forEach(function (t, i) {

@@ -60,6 +60,7 @@
     <button data-aba="jogos">Jogos</button>
     <button data-aba="habilidades">Habilidades</button>
     <button data-aba="relatorios">Relatórios</button>
+    <button data-aba="reljogos">Relatórios de jogos</button>
     <button data-aba="config">Configurações</button>
   </nav>
 
@@ -211,6 +212,7 @@
     <?!= incluir('ProfDiarias'); ?>
     <?!= incluir('ProfJogos'); ?>
     <?!= incluir('ProfDificuldades'); ?>
+    <?!= incluir('ProfRelJogos'); ?>
 
     <!-- Configurações -->
     <section id="aba-config" class="pilha" hidden>
@@ -959,6 +961,7 @@
         configurarDiarias();
         configurarJogos();
         configurarDificuldades();
+        configurarRelJogos();
         $('carregando').hidden = true;
         abrirAba('turmas');
       } catch (e) {

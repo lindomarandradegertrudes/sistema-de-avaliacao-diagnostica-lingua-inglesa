@@ -64,6 +64,25 @@
 
   <div class="cartao pilha">
     <div class="linha">
+      <h2 style="margin:0">🤖 Criar com IA (sem custo)</h2>
+      <span class="espaco"></span>
+      <button class="btn primario" id="jog-ia-novo">+ Criar caso ou exercícios</button>
+    </div>
+    <p class="suave pequeno" style="margin:0">
+      O app monta um <strong>pedido</strong> com as regras dos jogos e o Mapa do período. Você cola no <strong>claude.ai</strong> (conta gratuita), copia a resposta e importa aqui.
+      <strong>Casos</strong> entram como Rascunho na lista acima (selo 🤖), nos 3 degraus: teste cada estrela antes de abrir ou colocar num ciclo.
+      <strong>Exercícios curtos</strong> ficam abaixo e só entram no 💪 Meu reforço depois de <strong>Liberar para o reforço</strong>.
+    </p>
+    <div class="tabela-rolagem">
+      <table>
+        <thead><tr><th>Série</th><th>Exercícios</th><th>Testar</th><th>Meu reforço</th><th></th></tr></thead>
+        <tbody id="jog-ia-pacotes"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="cartao pilha">
+    <div class="linha">
       <h2 style="margin:0">🎓 Trilha Base · Detective Academy</h2>
       <span class="espaco"></span>
       <button class="btn" id="jog-trilha-carregar">Carregar Trilha Base</button>
@@ -131,6 +150,37 @@
   </form>
 </dialog>
 
+<dialog id="modal-jog-ia" style="width:min(820px, calc(100vw - 32px))">
+  <div class="linha" style="margin-bottom:6px"><h2 style="margin:0">🤖 Criar com IA</h2><span class="espaco"></span>
+    <button class="btn" type="button" data-fechar>Fechar</button></div>
+  <div class="pilha">
+    <div><strong>1. O que criar</strong></div>
+    <div class="linha" style="flex-wrap:wrap;gap:8px">
+      <select id="ia-tipo" style="width:auto"><option value="caso">Caso completo (3 degraus)</option><option value="exercicios">Exercícios curtos (reforço)</option></select>
+      <select id="ia-serie" style="width:auto"></select>
+      <select id="ia-periodo" style="width:auto;max-width:100%"></select>
+      <label id="ia-qtd-campo" class="pequeno" hidden>Quantidade <input id="ia-qtd" type="number" min="4" max="18" value="10" style="width:70px"></label>
+    </div>
+    <input id="ia-tema" placeholder="Tema (opcional): ex.: meio ambiente, Copa do Mundo, festa junina, games">
+    <input id="ia-obs" placeholder="Observações (opcional): ex.: turma com muita dificuldade de leitura; usar lugares de Joinville">
+    <div class="linha"><button class="btn primario" type="button" id="ia-montar">Montar pedido</button></div>
+
+    <div id="ia-passo2" class="pilha" hidden>
+      <div><strong>2. Copie o pedido e cole no claude.ai</strong></div>
+      <textarea id="ia-pedido" rows="6" readonly spellcheck="false" style="font-family:monospace;font-size:.78rem"></textarea>
+      <div class="linha">
+        <button class="btn primario" type="button" id="ia-copiar">Copiar pedido</button>
+        <a class="btn" href="https://claude.ai/new" target="_blank" rel="noopener">Abrir claude.ai ↗</a>
+        <span class="suave pequeno">Cole o pedido numa conversa nova e espere a resposta terminar.</span>
+      </div>
+      <div><strong>3. Cole aqui a resposta do Claude</strong> <span class="suave pequeno">(pode colar a resposta inteira; o app acha o JSON)</span></div>
+      <textarea id="ia-resposta" rows="8" spellcheck="false" style="font-family:monospace;font-size:.78rem"></textarea>
+      <div class="linha"><button class="btn primario" type="button" id="ia-importar">Importar e validar</button></div>
+    </div>
+    <div id="ia-resultado"></div>
+  </div>
+</dialog>
+
 <dialog id="modal-jog-json" style="width:min(720px, calc(100vw - 32px))">
   <h2>Importar casos (JSON)</h2>
   <p class="suave pequeno">Cole um caso ou uma lista de casos no formato dos jogos. Caso com o mesmo "id" é substituído (a situação aberto/rascunho é mantida).</p>
@@ -152,7 +202,7 @@
   function agrupar(lista) {
     const m = {};
     lista.forEach((c) => {
-      if (!m[c.missao]) m[c.missao] = { missao: c.missao, ordem: c.ordem, titulo: c.titulo, tema: c.tema, serie: c.serie, mes: c.mes, numero: c.numero, versoes: [], jogaram: 0, concluiram: 0, status: c.status, misto: false, etiquetas: [] };
+      if (!m[c.missao]) m[c.missao] = { missao: c.missao, ordem: c.ordem, titulo: c.titulo, tema: c.tema, serie: c.serie, mes: c.mes, numero: c.numero, versoes: [], jogaram: 0, concluiram: 0, status: c.status, misto: false, etiquetas: [], gerado: c.gerado };
       const x = m[c.missao];
       x.versoes.push(c);
       x.jogaram += c.jogaram;
@@ -194,7 +244,7 @@
     $('jog-lista').innerHTML = ano.length ? ano.map((m) => `
       <tr>
         <td><strong>${esc(m.serie)}</strong><div class="suave pequeno">${esc(m.mes)}</div></td>
-        <td><strong>${esc(m.titulo)}</strong><div class="suave pequeno">Case ${esc(m.numero)} · ${m.versoes.length} versão(ões)</div></td>
+        <td><strong>${esc(m.titulo)}</strong>${m.gerado ? ' <span class="jog-chip" title="Criado com IA">🤖 IA</span>' : ''}<div class="suave pequeno">Case ${esc(m.numero)} · ${m.versoes.length} versão(ões)</div></td>
         <td>${m.etiquetas.map((e) => `<span class="jog-chip">${esc(e)}</span>`).join('')}</td>
         <td style="white-space:nowrap">${botoesTeste(m)}</td>
         <td>${seletorSituacao(m, 'data-jog-missao-status', 'Aberto')}</td>
@@ -340,9 +390,135 @@
     $('modal-jog-ciclo').showModal();
   }
 
+  // ---------- Criar com IA (pedido para o claude.ai + importação) ----------
+  const ia = { opcoes: null, pacotes: [], pedido: '', correcao: '' };
+
+  async function copiarTexto(texto, campo) {
+    try { await navigator.clipboard.writeText(texto); return true; } catch (e) { /* sem permissão: usa a seleção */ }
+    if (campo) { campo.hidden = false; campo.focus(); campo.select(); try { return document.execCommand('copy'); } catch (e) { return false; } }
+    return false;
+  }
+
+  function renderPacotes() {
+    $('jog-ia-pacotes').innerHTML = ia.pacotes.length ? ia.pacotes.map((p) => `
+      <tr>
+        <td><strong>${esc(p.serie)}</strong></td>
+        <td><strong>${esc(p.tema || 'Exercícios')}</strong> <span class="jog-chip">🤖 IA</span><div class="suave pequeno">${p.cadeados} exercício(s) · ${esc(String(p.criado_em).slice(0, 10))}</div></td>
+        <td style="white-space:nowrap">${p.casos.map((c, i) => `<a class="btn mini" href="${linkTeste(c.id)}" target="_blank" rel="noopener" title="${esc(c.titulo)}">Parte ${i + 1}</a>`).join(' ')}</td>
+        <td>${p.liberado ? '<span class="jog-sit aberto">Liberado</span>' : '<span class="jog-sit nao">Não liberado</span>'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn mini ${p.liberado ? '' : 'primario'}" data-ia-liberar="${esc(p.pacote)}" data-valor="${p.liberado ? '' : '1'}">${p.liberado ? 'Recolher' : 'Liberar para o reforço'}</button>
+          <button class="btn mini perigo" data-ia-excluir="${esc(p.pacote)}">Excluir</button>
+        </td>
+      </tr>`).join('')
+      : '<tr><td colspan="5" class="vazio">Nenhum pacote de exercícios criado com IA ainda.</td></tr>';
+  }
+
+  async function carregarPacotes() {
+    ia.pacotes = await chamar('profListarGerados');
+    renderPacotes();
+  }
+
+  function preencherPeriodosIa() {
+    const lista = ia.opcoes.periodos[$('ia-serie').value] || [];
+    $('ia-periodo').innerHTML = lista.map((p) => `<option value="${p.indice}">${esc(p.nome)} · ${esc(p.foco)}</option>`).join('');
+  }
+
+  async function abrirIa() {
+    if (!ia.opcoes) ia.opcoes = await chamar('profGeradorOpcoes');
+    $('ia-serie').innerHTML = Object.keys(ia.opcoes.periodos).map((s) => `<option value="${esc(s)}">${esc(s)} ano</option>`).join('');
+    preencherPeriodosIa();
+    $('ia-passo2').hidden = true;
+    $('ia-resultado').innerHTML = '';
+    $('ia-resposta').value = '';
+    $('modal-jog-ia').showModal();
+  }
+
+  function pedidoDeCorrecao(erro) {
+    return 'O aplicativo não aceitou o JSON que você enviou. Motivo:\n' + erro +
+      '\n\nCorrija só o necessário, mantendo as regras e o formato do pedido anterior, e envie de novo o JSON COMPLETO dentro de um bloco ```json.';
+  }
+
+  function resultadoIa(r) {
+    if (r.tipo === 'caso') {
+      return `<div class="link-box" style="display:block">
+        <strong>✔ Caso "${esc(r.titulo)}" importado (${esc(r.serie)}), como Rascunho.</strong>
+        <div class="suave pequeno" style="margin:4px 0 8px">Teste cada degrau. Se não gostar, peça ajustes ao Claude na mesma conversa e importe de novo; depois exclua a versão que não vai usar.</div>
+        ${r.versoes.map((v) => `<a class="btn mini" href="${linkTeste(v.id)}" target="_blank" rel="noopener">Testar ${'★'.repeat(v.degrau)} (${v.travas} cadeados)</a>`).join(' ')}
+      </div>`;
+    }
+    return `<div class="link-box" style="display:block">
+      <strong>✔ ${r.cadeados} exercícios importados (${esc(r.serie)}). Ainda NÃO estão no Meu reforço.</strong>
+      <div class="suave pequeno" style="margin:4px 0 8px">Teste e depois clique em "Liberar para o reforço".</div>
+      ${r.versoes.map((v, i) => `<a class="btn mini" href="${linkTeste(v.id)}" target="_blank" rel="noopener">Testar parte ${i + 1}</a>`).join(' ')}
+      <button class="btn mini primario" type="button" data-ia-liberar="${esc(r.pacote)}" data-valor="1">Liberar para o reforço</button>
+    </div>`;
+  }
+
+  async function liberarPacote(b) {
+    ia.pacotes = await chamar('profLiberarPacote', b.dataset.iaLiberar, !!b.dataset.valor);
+    renderPacotes();
+    avisar(b.dataset.valor ? 'Exercícios liberados para o Meu reforço.' : 'Exercícios recolhidos do Meu reforço.');
+    if (b.closest('#ia-resultado')) { b.textContent = 'Liberado ✔'; setTimeout(() => (b.disabled = true), 0); }
+  }
+
   function configurarJogos() {
     $('jog-serie').innerHTML = opcoesSerie(true);
-    document.querySelector('.abas button[data-aba="jogos"]').addEventListener('click', () => carregarJogos());
+    document.querySelector('.abas button[data-aba="jogos"]').addEventListener('click', () => { carregarJogos(); carregarPacotes(); });
+
+    // Criar com IA
+    $('jog-ia-novo').addEventListener('click', (ev) => comBotao(ev.target, abrirIa));
+    $('ia-serie').addEventListener('change', preencherPeriodosIa);
+    $('ia-tipo').addEventListener('change', () => ($('ia-qtd-campo').hidden = $('ia-tipo').value !== 'exercicios'));
+    $('ia-montar').addEventListener('click', (ev) => comBotao(ev.target, async () => {
+      ia.pedido = await chamar('profMontarPedido', { tipo: $('ia-tipo').value, serie: $('ia-serie').value, periodo: Number($('ia-periodo').value),
+        tema: $('ia-tema').value, observacoes: $('ia-obs').value, quantidade: Number($('ia-qtd').value) });
+      $('ia-pedido').value = ia.pedido;
+      $('ia-passo2').hidden = false;
+      $('ia-resultado').innerHTML = '';
+      $('ia-pedido').scrollIntoView({ block: 'nearest' });
+    }));
+    $('ia-copiar').addEventListener('click', async () => {
+      avisar((await copiarTexto(ia.pedido, $('ia-pedido'))) ? 'Pedido copiado. Cole no claude.ai (Ctrl+V).' : 'Selecione o texto do pedido e copie com Ctrl+C.');
+    });
+    $('ia-importar').addEventListener('click', (ev) => {
+      const b = ev.target;
+      if (!$('ia-resposta').value.trim()) { avisar('Cole a resposta do Claude no campo 3.', true); return; }
+      b.disabled = true;
+      $('ia-resultado').innerHTML = '<p class="vazio">Conferindo…</p>';
+      google.script.run
+        .withSuccessHandler((r) => {
+          b.disabled = false;
+          $('ia-resultado').innerHTML = resultadoIa(r);
+          carregarJogos();
+          carregarPacotes();
+        })
+        .withFailureHandler((e) => {
+          b.disabled = false;
+          ia.correcao = pedidoDeCorrecao(e.message);
+          $('ia-resultado').innerHTML = `<div class="link-box" style="display:block;border-color:var(--perigo)">
+            <strong>✖ O app não aceitou a resposta.</strong><div style="margin:6px 0">${esc(e.message)}</div>
+            <div class="linha"><button class="btn mini primario" type="button" id="ia-copiar-correcao">Copiar pedido de correção</button>
+            <span class="suave pequeno">Cole na MESMA conversa do claude.ai e importe a nova resposta.</span></div>
+            <textarea id="ia-correcao" rows="3" readonly hidden style="font-family:monospace;font-size:.78rem"></textarea></div>`;
+          $('ia-correcao').value = ia.correcao;
+        })
+        .profImportarGerado($('ia-resposta').value);
+    });
+    $('ia-resultado').addEventListener('click', async (ev) => {
+      if (ev.target.id === 'ia-copiar-correcao') avisar((await copiarTexto(ia.correcao, $('ia-correcao'))) ? 'Pedido de correção copiado.' : 'Selecione o texto e copie com Ctrl+C.');
+      const b = ev.target.closest('[data-ia-liberar]');
+      if (b) comBotao(b, () => liberarPacote(b));
+    });
+    $('jog-ia-pacotes').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      if (b.dataset.iaLiberar !== undefined) comBotao(b, () => liberarPacote(b));
+      if (b.dataset.iaExcluir) {
+        if (!confirm('Excluir este pacote de exercícios? Ele sai do Meu reforço.')) return;
+        comBotao(b, async () => { ia.pacotes = await chamar('profExcluirPacote', b.dataset.iaExcluir); renderPacotes(); });
+      }
+    });
     $('jog-serie').addEventListener('change', renderJogos);
 
     // Ciclos

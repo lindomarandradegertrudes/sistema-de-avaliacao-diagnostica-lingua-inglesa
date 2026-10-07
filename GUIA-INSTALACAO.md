@@ -4,6 +4,54 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# Etapa 5 · Parte A · Criar com IA (sem custo)
+
+**Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `Gerador` | **arquivo novo:** **+ > Script**, nome `Gerador`, cole **Gerador.gs** |
+| `ProfJogos` | apague tudo e cole a nova versão (.html) |
+| `Casos` | apague tudo e cole a nova versão (.gs) |
+| `Dificuldades` | apague tudo e cole a nova versão (.gs) |
+
+Depois: **Salvar** → **Nova versão** → **F5** no painel.
+
+## Como usar
+1. Aba **Jogos** → cartão **🤖 Criar com IA** → **+ Criar caso ou exercícios**.
+2. Escolha: caso completo ou exercícios curtos, série, período do Mapa, tema (opcional) e observações (opcional) → **Montar pedido** → **Copiar pedido**.
+3. Abra o **claude.ai** (conta gratuita), cole o pedido numa conversa nova e espere a resposta terminar.
+4. Copie a resposta inteira, cole no campo 3 e clique em **Importar e validar**.
+   - Se o app recusar, ele mostra onde está o problema: clique em **Copiar pedido de correção**, cole na **mesma conversa** do claude.ai e importe a nova resposta.
+5. **Caso:** entra como Rascunho, com selo 🤖 IA na lista de casos. Teste ★, ★★ e ★★★ antes de abrir ou colocar num ciclo.
+6. **Exercícios:** aparecem no cartão 🤖. Teste e clique em **Liberar para o reforço**; só então entram no 💪 Meu reforço. **Recolher** tira de novo.
+
+---
+
+# Etapa 5 · Parte B · Relatórios de jogos
+
+**Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `RelatoriosJogos` | **arquivo novo:** **+ > Script**, nome `RelatoriosJogos`, cole **RelatoriosJogos.gs** |
+| `ProfRelJogos` | **arquivo novo:** **+ > HTML**, nome `ProfRelJogos`, cole **ProfRelJogos.html** |
+| `Dificuldades` | apague tudo e cole a nova versão (.gs) |
+| `Professor` | apague tudo e cole a nova versão (.html) |
+
+Depois: **Salvar** → **Nova versão** → **F5** no painel.
+
+Na primeira exportação, o Google pode pedir autorização para criar planilhas no seu Drive: aceite com a conta institucional.
+
+## O que entra
+Nova aba **Relatórios de jogos** no painel do professor:
+- **Turma por caso:** quem jogou, versão (★/★★/★★★), pontos, erros, dicas e respostas reveladas; cadeados com menor acerto marcados "retomar em aula".
+- **Evolução do aluno:** degrau mês a mês, notas dos ciclos, Trilha Base, Meu reforço e habilidades (começo × agora).
+- **Resumo para coordenação:** por trimestre (datas ajustáveis em **Datas dos trimestres**), por série e por turma, com botão **Imprimir / PDF**.
+- **Exportar dados dos jogos:** cria uma planilha nova no seu Drive (abas Jogadas, Cadeados, Ciclos e Habilidades).
+
+---
+
 # Etapa 4 · Banco do ano (9º ano)
 
 **Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
