@@ -30,7 +30,7 @@ const HABILIDADES = {
     { id: '7-comida', nome: 'Food, countable and uncountable', codigo: 'EF07LI25-JO', chaves: ['food', 'countable', 'uncountable', 'quantifier', 'much', 'many', 'imperative', 'recipe', 'comida'] },
     { id: '7-present', nome: 'Simple present', codigo: 'EF07LI06', chaves: ['simple present'] },
     { id: '7-oral', nome: 'Listening', codigo: 'EF07LI04', chaves: ['compreensao oral', 'oral', 'listening'] },
-    { id: '7-global', nome: 'Reading: global meaning', codigo: 'EF07LI06', chaves: ['genero', 'lingua franca', 'inferencia', 'global', 'cruzar'] },
+    { id: '7-global', nome: 'Reading: global meaning', codigo: 'EF07LI06', chaves: ['genero', 'lingua franca', 'cognat', 'inferencia', 'global', 'cruzar'] },
     { id: '7-leitura', nome: 'Reading: specific information', codigo: 'EF07LI09', chaves: ['explicita', 'selecionar', 'localizar', 'leitura', 'informacao'] },
   ],
   '8º': [
@@ -41,7 +41,7 @@ const HABILIDADES = {
     { id: '8-prefixos', nome: 'Prefixes and suffixes', codigo: 'EF08LI13', chaves: ['prefix', 'suffix', 'prefixo', 'sufixo', 'palavras novas'] },
     { id: '8-relativos', nome: 'Relative pronouns', codigo: 'EF08LI17', chaves: ['relative', 'relativo', 'who', 'which', 'whose'] },
     { id: '8-oral', nome: 'Listening', codigo: 'EF08LI03', chaves: ['compreensao oral', 'oral', 'listening'] },
-    { id: '8-inferencia', nome: 'Reading: inference', codigo: 'EF08LI05', chaves: ['inferencia', 'inference', 'narrativa', 'implicita', 'cruzar'] },
+    { id: '8-inferencia', nome: 'Reading: inference and literature', codigo: 'EF08LI05', chaves: ['inferencia', 'inference', 'narrativa', 'implicita', 'literatura', 'rima', 'cultural', 'cruzar'] },
     { id: '8-leitura', nome: 'Reading: specific information', codigo: 'EF08LI05', chaves: ['explicita', 'localizar', 'leitura', 'informacao'] },
   ],
   '9º': [
@@ -51,7 +51,7 @@ const HABILIDADES = {
     { id: '9-modais', nome: 'Modals: should / must / have to', codigo: 'EF09LI16', chaves: ['modal', 'should', 'must', 'have to'] },
     { id: '9-conectores', nome: 'Connectors', codigo: 'EF09LI14', chaves: ['connector', 'conector'] },
     { id: '9-digital', nome: 'Digital language', codigo: 'EF09LI13', chaves: ['digital', 'abreviac', 'acronim'] },
-    { id: '9-expansao', nome: 'English in the world', codigo: 'EF09LI17', chaves: ['expansao', 'colonizac'] },
+    { id: '9-expansao', nome: 'English in the world', codigo: 'EF09LI17', chaves: ['expansao', 'expansion', 'colonizac', 'english in the world', 'emprestimo'] },
     { id: '9-fato', nome: 'Fact × opinion', codigo: 'EF09LI06', chaves: ['fato', 'opiniao', 'fact', 'opinion', 'fake news'] },
     { id: '9-argumentos', nome: 'Arguments and evidence', codigo: 'EF09LI07', chaves: ['argumento', 'evidencia'] },
     { id: '9-oral', nome: 'Listening', codigo: 'EF09LI07', chaves: ['compreensao oral', 'oral', 'listening'] },

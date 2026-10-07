@@ -215,6 +215,31 @@ const CASOS_BASE = [
 // o mesmo formato nos 3 degraus: ★ figuras + 2 opções (sem abas), ★★ pistas simples + 3 opções, ★★★ pistas cruzadas.
 // ============================================================
 
+/** Permutação fixa de 0..n-1 a partir de um texto (a mesma ordem toda vez que o caso é carregado). */
+function misturar_(n, semente) {
+  let h = 2166136261;
+  String(semente).split('').forEach(function (ch) { h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0; });
+  const p = [];
+  for (let i = 0; i < n; i++) p.push(i);
+  for (let i = n - 1; i > 0; i--) {
+    h = (Math.imul(h, 1103515245) + 12345) >>> 0;
+    const j = h % (i + 1);
+    const t = p[i]; p[i] = p[j]; p[j] = t;
+  }
+  return p;
+}
+
+/** Embaralha as opções de uma parte "escolha" (a certa não fica sempre em primeiro), ajustando resposta e feedback. */
+function escolhaMisturada_(p) {
+  const perm = misturar_(p.opcoes.length, (p.pergunta || '') + JSON.stringify(p.opcoes));
+  const novo = Object.assign({}, p, { opcoes: perm.map(function (j) { return p.opcoes[j]; }), resposta: perm.indexOf(p.resposta) });
+  if (p.feedback) {
+    novo.feedback = {};
+    Object.keys(p.feedback).forEach(function (k) { novo.feedback[perm.indexOf(Number(k))] = p.feedback[k]; });
+  }
+  return novo;
+}
+
 function negritoNaLacuna_(frase, palavras) {
   let i = 0;
   return frase.replace(/___/g, function () { return '**' + palavras[i++] + '**'; });
@@ -256,7 +281,8 @@ function bBlocos_(titulo, comando, ajuda, itens, dicas, foco, onomatopeia) {
     passos: [['🧩', comando, ajuda]],
     dicas: dicas,
     partes: itens.map(function (it) {
-      const p = { tipo: 'montar', frase: it[1], blocos: it[2], resposta: [it[3]] };
+      const ordem = misturar_(it[2].length, it[1] + it[2].join('|'));
+      const p = { tipo: 'montar', frase: it[1], blocos: ordem.map(function (j) { return it[2][j]; }), resposta: [it[3]] };
       if (it[0]) p.figura = it[0];
       if (it[4]) p.feedback = it[4];
       return p;
@@ -272,7 +298,7 @@ function bLerOuvir_(perguntas, dicas, foco) {
     titulo: 'Read and listen', tipo: 'Evidence', onomatopeia: 'YES!',
     passos: [['👀', 'Read message B.', 'Leia a mensagem (pista B).'], ['🎧', 'Listen to audio C.', 'Ouça o áudio (pista C).'], ['👆', 'Choose the answers.', 'Escolha as respostas.']],
     dicas: dicas,
-    partes: perguntas.map(function (q) { const p = { tipo: 'escolha', pergunta: q[0], opcoes: q[1], resposta: q[2] }; if (q[3]) p.feedback = q[3]; return p; }),
+    partes: perguntas.map(function (q) { const p = { tipo: 'escolha', pergunta: q[0], opcoes: q[1], resposta: q[2] }; if (q[3]) p.feedback = q[3]; return escolhaMisturada_(p); }),
     solucao: perguntas.map(function (q) { return q[0] + ' **' + q[1][q[2]] + '**'; }).join(' · '),
     etiquetas: [{ codigo: 'BASE', foco: foco }],
   };
@@ -284,7 +310,7 @@ function bQuem_(titulo, comando, ajuda, opcoes, resposta, feedback, dicas, soluc
     titulo: titulo, tipo: 'Evidence', onomatopeia: 'GOTCHA!',
     passos: [['🔎', 'Compare the clues.', 'Compare as pistas A e B.'], ['👆', comando, ajuda]],
     dicas: dicas,
-    partes: [{ tipo: 'escolha', estilo: estilo || 'pessoas', opcoes: opcoes, resposta: resposta, feedback: feedback }],
+    partes: [escolhaMisturada_({ tipo: 'escolha', estilo: estilo || 'pessoas', pergunta: '', opcoes: opcoes, resposta: resposta, feedback: feedback })],
     solucao: solucao,
     etiquetas: [{ codigo: 'BASE', foco: 'cruzar informações' }],
   };
@@ -296,7 +322,7 @@ function bOuvirPista_(titulo, perguntas, dicas, foco) {
     titulo: titulo, tipo: 'Listening', onomatopeia: 'YES!',
     passos: [['🎧', 'Listen to audio C.', 'Ouça o áudio (pista C). Pode repetir ou abrir o texto.'], ['👆', 'Answer the questions.', 'Responda às perguntas.']],
     dicas: dicas,
-    partes: [{ tipo: 'audio', evidencia: 'C' }].concat(perguntas.map(function (q) { return { tipo: 'escolha', pergunta: q[0], opcoes: q[1], resposta: q[2] }; })),
+    partes: [{ tipo: 'audio', evidencia: 'C' }].concat(perguntas.map(function (q) { return escolhaMisturada_({ tipo: 'escolha', pergunta: q[0], opcoes: q[1], resposta: q[2] }); })),
     solucao: perguntas.map(function (q) { return q[0] + ' **' + q[1][q[2]] + '**'; }).join(' · '),
     etiquetas: [{ codigo: 'BASE', foco: foco }],
   };

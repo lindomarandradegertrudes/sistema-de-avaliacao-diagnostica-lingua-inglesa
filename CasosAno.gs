@@ -16,9 +16,12 @@ const CHEFES_SAGA = {
 function aCaso_(serie, missao, mes, numero, titulo, degrau, abertura, evidencias, travas, codigos, final) {
   travas.forEach(function (t, i) { t.etiquetas.forEach(function (e) { e.codigo = codigos[i] || codigos[codigos.length - 1]; }); });
   const chefe = CHEFES_SAGA[serie];
+  // missao 'a6' (o 1º caso do mês, como outubro/novembro) ou um sufixo próprio (ex.: 'ids') para o 2º caso do mesmo mês.
+  const base = 'a' + serie.charAt(0);
+  const sufixo = missao === base ? '' : missao;
   return {
-    id: 'c' + serie.charAt(0) + '-' + mes + '-' + missao.split('-').pop() + '-d' + degrau,
-    serie: serie, missao: 'a' + serie.charAt(0) + '-' + mes, degrau: degrau, ordem: 10, mes: mes, numero: numero, titulo: titulo,
+    id: 'c' + serie.charAt(0) + '-' + mes + '-' + (sufixo || base) + '-d' + degrau,
+    serie: serie, missao: base + '-' + mes + (sufixo ? '-' + sufixo : ''), degrau: degrau, ordem: 10, mes: mes, numero: numero, titulo: titulo,
     abertura: { personagem: chefe.personagem, nome: chefe.nome, texto: abertura },
     evidencias: evidencias, travas: travas,
     final: { titulo: 'Your turn!', personagem: chefe.personagem, inicio: final[0], tarefa: final[1], foco: final[3] || titulo,
@@ -35,12 +38,16 @@ function bCaderno_(id, aba, meta, textos) {
 
 function casosAno_() {
   const L = [];
+  // Bancos de cada série (arquivos CasosAno6.gs, CasosAno7.gs…), quando existirem.
+  [typeof casosAno6_ === 'function' ? casosAno6_ : null, typeof casosAno7_ === 'function' ? casosAno7_ : null,
+    typeof casosAno8_ === 'function' ? casosAno8_ : null, typeof casosAno9_ === 'function' ? casosAno9_ : null]
+    .forEach(function (fn) { if (fn) fn().forEach(function (c) { L.push(c); }); });
   const NAO = "isn't", NAOS = "aren't";
 
   // ======================================================== OUTUBRO ★ e ★★ (a ★★★ está em CasosPadrao.gs)
 
   // ---------- 6º · The Lost Backpack (rotina, horas, dias, I play)
-  L.push(aCaso_('6º', 'a6', '2026-10', '#01', 'The Lost Backpack', 1, 'Hi, agent! We found a [[backpack|mochila]]. Let\'s learn the clues!', [], [
+  L.push(aCaso_('6º', 'a6', '2026-10', 'OCT·1', 'The Lost Backpack', 1, 'Hi, agent! We found a [[backpack|mochila]]. Let\'s learn the clues!', [], [
     bFiguras_([['⚽', ['play soccer', 'swim'], 0], ['🏊', ['read', 'swim'], 1], ['⏰', ['get up', 'go to bed'], 0], ['🏫', ['go to school', 'play'], 0]],
       ['==play soccer== = jogar futebol · ==swim== = nadar', '==get up== = levantar · ==go to school== = ir à escola'], 'vocabulário: rotina'),
     bOuvir_([['I play soccer on Monday.', ['MON', 'FRI'], 0, 'pilulas'], ['I get up at six thirty.', ['🕡', '🕖'], 0]],
@@ -51,7 +58,7 @@ function casosAno_() {
     ], ['I + verbo sem -s', 'I ==play== · I ==get== up'], 'rotina (I + verbo)'),
   ], ['EF06LI17', 'EF06LI04', 'EF06LI19'], ['I get up at ', 'dizer a que horas se levanta.', 'I get up at seven o\'clock.', 'rotina e horas']));
 
-  L.push(aCaso_('6º', 'a6', '2026-10', '#01', 'The Lost Backpack', 2, 'Hi, agent! We found a [[backpack|mochila]]. Whose is it? Read the clues!', [
+  L.push(aCaso_('6º', 'a6', '2026-10', 'OCT·1', 'The Lost Backpack', 2, 'Hi, agent! We found a [[backpack|mochila]]. Whose is it? Read the clues!', [
     { id: 'A', aba: 'A · The backpack', blocos: [{ tipo: 'semana', titulo: 'MY WEEK', dias: [['MON', '⚽'], ['TUE', ''], ['WED', '📘'], ['THU', ''], ['FRI', '🏊']] }, { tipo: 'itens', itens: [['⏰', '[[alarm clock|despertador]]: 6:30']] }] },
     bMsg_('leo', 'Leo', 'I [[get up|levanto]] at 6:30. I play soccer on Mondays. I swim on Fridays.'),
     bAudio_('paulo', 'Mr. Paulo', "Hello! I'm Paulo, the school janitor. I found a backpack on Monday, near the soccer field."),
@@ -72,7 +79,7 @@ function casosAno_() {
   ], ['EF06LI09', 'EF06LI19', 'EF06LI17'], ['I get up at ', 'contar a que horas se levanta e um esporte que pratica.', 'I get up at seven. I play soccer on Tuesdays.', 'rotina e horas']));
 
   // ---------- 7º · The Mixed-Up Diary (simple past, in/on/at)
-  L.push(aCaso_('7º', 'a7', '2026-10', '#01', 'The Mixed-Up Diary', 1, 'Hi, detective! Our [[time machine|máquina do tempo]] has an [[error|erro]]. Let\'s learn the past!', [], [
+  L.push(aCaso_('7º', 'a7', '2026-10', 'OCT·1', 'The Mixed-Up Diary', 1, 'Hi, detective! Our [[time machine|máquina do tempo]] has an [[error|erro]]. Let\'s learn the past!', [], [
     bFiguras_([['✈️', ['flew', 'swam'], 0], ['🚶', ['walked', 'ate'], 0], ['📚', ['studied', 'flew'], 0], ['👀', ['walked', 'saw'], 1]],
       ['==flew== = voou · ==walked== = caminhou', '==studied== = estudou · ==saw== = viu'], 'vocabulário: verbos no passado'),
     bOuvir_([['Nina flew a plane.', ['✈️', '🚲'], 0], ['Nina studied at school.', ['🏊', '📚'], 1]],
@@ -83,7 +90,7 @@ function casosAno_() {
     ], ['passado: ==walked==, ==flew==', 'yesterday / in 1950 → passado'], 'simple past'),
   ], ['EF07LI15', 'EF07LI04', 'EF07LI15'], ['Yesterday I ', 'contar algo que fez ontem.', 'Yesterday I played soccer.', 'simple past']));
 
-  L.push(aCaso_('7º', 'a7', '2026-10', '#01', 'The Mixed-Up Diary', 2, 'Hi, detective! Our [[time machine|máquina do tempo]] has an [[error|erro]]. Read the clues!', [
+  L.push(aCaso_('7º', 'a7', '2026-10', 'OCT·1', 'The Mixed-Up Diary', 2, 'Hi, detective! Our [[time machine|máquina do tempo]] has an [[error|erro]]. Read the clues!', [
     { id: 'A', aba: 'A · Timeline', blocos: [{ tipo: 'linha', itens: [['1930', 'Nina was [[born|nasceu]] in Joinville.'], ['1948', 'She studied at a [[flight school|escola de aviação]].'], ['1950', 'She flew alone for the first time.']] }] },
     bCaderno_('B', "B · Nina's diary", 'May 5th, 1950', ['Today I flew alone! I walked to the [[airfield|campo de pouso]] at 5 a.m. I was so happy!']),
     bAudio_('pedro', 'Pedro', "Hi! I'm Pedro, Nina's grandson. In 1948, my grandmother studied at a flight school. She flew alone in 1950."),
@@ -103,7 +110,7 @@ function casosAno_() {
   ], ['EF07LI09', 'EF07LI15', 'EF07LI15'], ['In 2020, I ', 'contar algo que fez num ano do passado.', 'In 2020, I visited my grandmother.', 'simple past + in/on/at']));
 
   // ---------- 8º · Message from 2050 (prefixos e sufixos)
-  L.push(aCaso_('8º', 'a8', '2026-10', '#01', 'Message from 2050', 1, 'Hi, scientist! A [[message|mensagem]] from 2050 arrived. Let\'s learn new words!', [], [
+  L.push(aCaso_('8º', 'a8', '2026-10', 'OCT·1', 'Message from 2050', 1, 'Hi, scientist! A [[message|mensagem]] from 2050 arrived. Let\'s learn new words!', [], [
     bFiguras_([['😀', ['happy', 'unhappy'], 0], ['😞', ['happy', 'unhappy'], 1], ['♻️', ['recycle', 'careless'], 0], ['🚗🙅', ['driverless', 'helpful'], 0]],
       ['==unhappy== = un + happy = não feliz', '==recycle== = reciclar · ==driverless== = sem motorista'], 'prefixos e sufixos'),
     bOuvir_([['Cars are driverless.', ['driverless', 'careful'], 0, 'pilulas'], ['Please recycle.', ['unhappy', 'recycle'], 1, 'pilulas']],
@@ -114,7 +121,7 @@ function casosAno_() {
     ], ['==un-== = não · ==re-== = de novo', 'use again → ==reuse=='], 'prefixos un-/re-'),
   ], ['EF08LI13', 'EF08LI03', 'EF08LI13'], ['In 2050, people will ', 'fazer uma previsão para 2050.', 'In 2050, people will recycle everything.', 'will + prefixos/sufixos']));
 
-  L.push(aCaso_('8º', 'a8', '2026-10', '#01', 'Message from 2050', 2, 'Hi, scientist! A [[message|mensagem]] from 2050 arrived, but it is [[broken|quebrada]]. Read the clues!', [
+  L.push(aCaso_('8º', 'a8', '2026-10', 'OCT·1', 'Message from 2050', 2, 'Hi, scientist! A [[message|mensagem]] from 2050 arrived, but it is [[broken|quebrada]]. Read the clues!', [
     bTela_('A', 'A · Message', 'INCOMING · YEAR 2050 · SIGNAL 34%', ['Hello from 2050! Life is wonder####. Cars are driver####. Please ##cycle!']),
     { id: 'B', aba: 'B · Notebook', moldura: 'caderno', blocos: [{ tipo: 'itens', itens: [['🧡', 'care → care==ful== (full of care)'], ['💔', 'care → care==less== (without care)'], ['😞', 'happy → ==un==happy (not happy)'], ['🔁', 'use → ==re==use (use again)']] }] },
     bAudio_('ravi', 'Dr. Ravi', "Hello from 2050! Life is wonderful. Cars are driverless. But the oceans are still in danger. Please recycle!"),
@@ -135,7 +142,7 @@ function casosAno_() {
   ], ['EF08LI05', 'EF08LI13', 'EF08LI13'], ['In 2050, people will ', 'fazer uma previsão para 2050 com uma palavra com prefixo ou sufixo.', 'In 2050, people will be careful with the oceans.', 'will + prefixos/sufixos']));
 
   // ---------- 9º · The Cancelled Concert (fato × opinião, present perfect, since/for)
-  L.push(aCaso_('9º', 'a9', '2026-10', '#01', 'The Cancelled Concert', 1, 'Hi, checker! A post about a [[concert|show]] is [[viral|muito compartilhado]]. Is it true?', [], [
+  L.push(aCaso_('9º', 'a9', '2026-10', 'OCT·1', 'The Cancelled Concert', 1, 'Hi, checker! A post about a [[concert|show]] is [[viral|muito compartilhado]]. Is it true?', [], [
     { titulo: 'Fact or opinion?', tipo: 'Evidence', onomatopeia: 'CLICK!',
       passos: [['👆', 'Click FACT or OPINION.', 'FACT = dá para conferir. OPINION = sentimento ou julgamento.']],
       dicas: ['Opinion words: ==best==, ==boring==, ==amazing==.', 'A day or a job can be checked → FACT.'],
@@ -152,7 +159,7 @@ function casosAno_() {
     ], ['she ==has== · I ==have==', 'have + ==seen== (particípio)'], 'present perfect'),
   ], ['EF09LI06', 'EF09LI07', 'EF09LI21-JO'], ['Lia Storm has ', 'escrever uma frase sobre a Lia no present perfect.', 'Lia Storm has arrived in Brazil.', 'present perfect']));
 
-  L.push(aCaso_('9º', 'a9', '2026-10', '#01', 'The Cancelled Concert', 2, 'Hi, checker! A post about Lia Storm is [[viral|muito compartilhado]]. Check the clues!', [
+  L.push(aCaso_('9º', 'a9', '2026-10', 'OCT·1', 'The Cancelled Concert', 2, 'Hi, checker! A post about Lia Storm is [[viral|muito compartilhado]]. Check the clues!', [
     { id: 'A', aba: 'A · Viral post', moldura: 'celular', blocos: [{ tipo: 'perfil', avatar: { letra: 'B', cor: 'pop' }, nome: '@BreakingNowSC', meta: '2 hours ago' },
       { tipo: 'post', texto: 'BREAKING! Lia Storm has [[cancelled|cancelou]] her show! She has [[never|nunca]] visited Brazil!', selo: '12K SHARES' }] },
     { id: 'B', aba: "B · Lia's profile", moldura: 'celular', blocos: [{ tipo: 'perfil', avatar: { letra: 'L', cor: 'sun' }, nome: '@liastorm ✔', meta: 'official account' },
@@ -175,7 +182,7 @@ function casosAno_() {
   // ======================================================== NOVEMBRO (★, ★★, ★★★)
 
   // ---------- 6º · The Missing Cat (simple present 3ª pessoa: he/she/it + s, does/doesn't)
-  L.push(aCaso_('6º', 'a6', '2026-11', '#02', 'The Missing Cat', 1, 'Hi, agent! A [[cat|gato]] is [[missing|desaparecido]]. Let\'s learn about people\'s routines!', [], [
+  L.push(aCaso_('6º', 'a6', '2026-11', 'NOV·1', 'The Missing Cat', 1, 'Hi, agent! A [[cat|gato]] is [[missing|desaparecido]]. Let\'s learn about people\'s routines!', [], [
     bFiguras_([['🍳', ['cooks', 'sleeps'], 0], ['😴', ['runs', 'sleeps'], 1], ['📺', ['watches TV', 'reads'], 0], ['🚌', ['takes the bus', 'swims'], 0]],
       ['==cooks== = cozinha · ==sleeps== = dorme', '==watches TV== = assiste TV · ==takes the bus== = pega o ônibus'], 'vocabulário: rotina (3ª pessoa)'),
     bOuvir_([['She walks the dog every day.', ['🐕', '🐈'], 0], ['He takes the bus at seven.', ['🚲', '🚌'], 1]],
@@ -191,7 +198,7 @@ function casosAno_() {
     bMsg_('bia', 'Bia', 'My [[neighbour|vizinha]] Ana has a cat. Ana [[feeds|alimenta]] her cat at 6 p.m. every day.'),
     bAudio_('paulo', 'Mr. Paulo', "I see a grey cat every morning. It sleeps in the school garden at eight o'clock."),
   ];
-  L.push(aCaso_('6º', 'a6', '2026-11', '#02', 'The Missing Cat', 2, 'Hi, agent! A [[cat|gato]] is [[missing|desaparecido]]. Read the clues!', gato2, [
+  L.push(aCaso_('6º', 'a6', '2026-11', 'NOV·1', 'The Missing Cat', 2, 'Hi, agent! A [[cat|gato]] is [[missing|desaparecido]]. Read the clues!', gato2, [
     bLerOuvir_([['Who has a cat?', ['Ana', 'Bia', 'Paulo'], 0], ['In the morning, the cat sleeps…', ['in the school garden', 'on the bus', 'in the library'], 0]],
       ['Bia says: "==Ana== has a cat."', 'Paulo says: "It sleeps in the ==school garden=="'], 'localizar informação'),
     bBlocos_('Add -s', 'Complete the sentences.', 'Com he/she/it, o verbo ganha -S.', [
@@ -205,7 +212,7 @@ function casosAno_() {
     ], ["he/she/it → ==does== / ==doesn't==", "The cat ==doesn't== eat pizza."], "does / doesn't"),
   ], ['EF06LI09', 'EF06LI19', 'EF06LI19'], ['My friend ', 'contar o que um amigo faz todo dia.', 'My friend walks to school every day.', 'simple present (3ª pessoa)']));
 
-  L.push(aCaso_('6º', 'a6', '2026-11', '#02', 'The Missing Cat', 3, "Hi, agent! A lost cat is at the agency. Who is the [[owner|dono]]?", [
+  L.push(aCaso_('6º', 'a6', '2026-11', 'NOV·1', 'The Missing Cat', 3, "Hi, agent! A lost cat is at the agency. Who is the [[owner|dono]]?", [
     bCaderno_('A', 'A · Poster', 'LOST CAT: MIMI', ['She eats fish. She sleeps a lot. Her owner walks to school every day.']),
     bFichas_([['ana', 'ANA', ['has a cat', 'takes the bus to school']], ['bia', 'BIA', ['has a cat', 'walks to school']], ['leo', 'LEO', ['has a dog', 'walks to school']]]),
     bAudio_('paulo', 'Mr. Paulo', "Mimi eats fish every evening. Her owner always walks to school with her friend Leo."),
@@ -226,7 +233,7 @@ function casosAno_() {
   ], ['EF06LI09', 'EF06LI04', 'EF06LI19', 'EF06LI19'], ['My best friend ', 'descrever a rotina de um amigo.', "My best friend plays soccer. He doesn't like math.", 'simple present (3ª pessoa)']));
 
   // ---------- 7º · The Old Champion (can/could)
-  L.push(aCaso_('7º', 'a7', '2026-11', '#02', 'The Old Champion', 1, 'Hi, detective! Let\'s travel to 1980 and learn about [[abilities|habilidades]]!', [], [
+  L.push(aCaso_('7º', 'a7', '2026-11', 'NOV·1', 'The Old Champion', 1, 'Hi, detective! Let\'s travel to 1980 and learn about [[abilities|habilidades]]!', [], [
     bFiguras_([['🏊', ['swim', 'fly'], 0], ['🚲', ['sing', 'ride a bike'], 1], ['🎸', ['play the guitar', 'cook'], 0], ['🧗', ['read', 'climb'], 1]],
       ['==swim== = nadar · ==ride a bike== = andar de bicicleta', '==play the guitar== = tocar violão · ==climb== = escalar'], 'vocabulário: habilidades'),
     bOuvir_([['When I was young, I could swim fast.', ['🏊', '🚲'], 0], ['Now I can play the guitar.', ['🧗', '🎸'], 1]],
@@ -237,7 +244,7 @@ function casosAno_() {
     ], ['agora ==can== · passado ==could==', 'In 1980 → ==could=='], 'can / could'),
   ], ['EF07LI20', 'EF07LI04', 'EF07LI20'], ['When I was a kid, I could ', 'contar algo que conseguia fazer quando era criança.', 'When I was a kid, I could climb trees.', 'can/could']));
 
-  L.push(aCaso_('7º', 'a7', '2026-11', '#02', 'The Old Champion', 2, 'Hi, detective! An old [[newspaper|jornal]] talks about a [[champion|campeão]]. Read the clues!', [
+  L.push(aCaso_('7º', 'a7', '2026-11', 'NOV·1', 'The Old Champion', 2, 'Hi, detective! An old [[newspaper|jornal]] talks about a [[champion|campeão]]. Read the clues!', [
     { id: 'A', aba: 'A · Newspaper', blocos: [{ tipo: 'meta', texto: 'Joinville Daily (fictional) · 1980' }, { tipo: 'manchete', texto: 'LOCAL BOY WINS SWIM RACE!' }, { tipo: 'texto', texto: 'Tom Weber, 12, could swim 100 meters in one minute.' }] },
     bMsg_('tom', 'Tom (today)', "I'm 58 now. I can't swim fast now, but I can play the guitar!"),
     bAudio_('pedro', 'Pedro', "My uncle Tom could run fast, but he couldn't ride a bike when he was a kid."),
@@ -259,7 +266,7 @@ function casosAno_() {
       etiquetas: [{ codigo: 'EF07LI20', foco: 'can × could (tempo)' }] },
   ], ['EF07LI09', 'EF07LI20', 'EF07LI20'], ['When I was a kid, I could ', 'comparar o que podia fazer antes e o que pode fazer agora.', "When I was a kid, I couldn't swim. Now I can!", 'can/could']));
 
-  L.push(aCaso_('7º', 'a7', '2026-11', '#02', 'The Old Champion', 3, 'Hi, detective! Who was the [[champion|campeão]] of 1980? Check the clues!', [
+  L.push(aCaso_('7º', 'a7', '2026-11', 'NOV·1', 'The Old Champion', 3, 'Hi, detective! Who was the [[champion|campeão]] of 1980? Check the clues!', [
     bCaderno_('A', 'A · Note', 'Photo from 1980, back side', ["The champion could swim fast and could ride a bike. He couldn't play the guitar."]),
     bFichas_([['tom', 'TOM', ['could: swim', "couldn't: ride a bike", 'now can: play the guitar']], ['paulo', 'PAULO', ['could: swim, ride a bike', "couldn't: play the guitar"]], ['clock', 'CAPTAIN CLOCK', ['could: ride a bike, play the guitar', "couldn't: swim"]]]),
     bAudio_('nina', 'Nina', "In 1980, my neighbour Paulo could swim very fast. He couldn't play the guitar, but now he can!"),
@@ -280,7 +287,7 @@ function casosAno_() {
   ], ['EF07LI09', 'EF07LI04', 'EF07LI20', 'EF07LI20'], ['When I was a kid, I ', 'contar algo que conseguia ou não conseguia fazer quando era criança.', "When I was a kid, I couldn't ride a bike.", 'can/could']));
 
   // ---------- 8º · Robots at the Lab (pronomes relativos who/which/that/whose)
-  L.push(aCaso_('8º', 'a8', '2026-11', '#02', 'Robots at the Lab', 1, 'Hi, scientist! Our lab has new [[robots|robôs]]. Let\'s meet them!', [], [
+  L.push(aCaso_('8º', 'a8', '2026-11', 'NOV·1', 'Robots at the Lab', 1, 'Hi, scientist! Our lab has new [[robots|robôs]]. Let\'s meet them!', [], [
     bFiguras_([['👩‍🔬', ['who', 'which'], 0], ['🤖', ['who', 'which'], 1], ['🧑‍🚀', ['who', 'which'], 0], ['🚗', ['who', 'which'], 1]],
       ['==who== = para pessoas 👩‍🔬', '==which== = para coisas e animais 🤖'], 'pronomes relativos who/which'),
     bOuvir_([['She is the scientist who works in the lab.', ['👩‍🔬', '🤖'], 0], ['This is the robot which cleans the lab.', ['🧑', '🤖'], 1]],
@@ -291,7 +298,7 @@ function casosAno_() {
     ], ['pessoa → ==who== · coisa → ==which==', 'robot → ==which=='], 'who / which'),
   ], ['EF08LI17', 'EF08LI03', 'EF08LI17'], ['I have a friend who ', 'descrever um amigo usando who.', 'I have a friend who plays the guitar.', 'pronomes relativos']));
 
-  L.push(aCaso_('8º', 'a8', '2026-11', '#02', 'Robots at the Lab', 2, 'Hi, scientist! Who does what in the lab? Read the clues!', [
+  L.push(aCaso_('8º', 'a8', '2026-11', 'NOV·1', 'Robots at the Lab', 2, 'Hi, scientist! Who does what in the lab? Read the clues!', [
     { id: 'A', aba: 'A · Lab list', blocos: [{ tipo: 'itens', itens: [['👩‍🔬', 'Dr. Lu — scientist, works in the lab'], ['🤖', 'R-2 — robot, cleans the floor'], ['🤖', 'Z-9 — robot, cooks lunch'], ['🧑‍🚀', 'Ravi — astronaut, lives in 2050']] }] },
     bMsg_('lu', 'Dr. Lu', 'The robot which cooks lunch is Z-9. The person who lives in 2050 is Ravi.'),
     bAudio_('ravi', 'Dr. Ravi', "Hello! I'm the astronaut who sends messages from the future. My friend whose robot is R-2 is Dr. Lu."),
@@ -313,7 +320,7 @@ function casosAno_() {
       etiquetas: [{ codigo: 'EF08LI17', foco: 'who × which' }] },
   ], ['EF08LI03', 'EF08LI17', 'EF08LI17'], ['I have a friend who ', 'descrever uma pessoa e um objeto usando who e which.', 'I have a phone which takes great photos.', 'pronomes relativos']));
 
-  L.push(aCaso_('8º', 'a8', '2026-11', '#02', 'Robots at the Lab', 3, "Hi, scientist! Someone took Dr. Lu's [[notebook|caderno]]. Which robot was it?", [
+  L.push(aCaso_('8º', 'a8', '2026-11', 'NOV·1', 'Robots at the Lab', 3, "Hi, scientist! Someone took Dr. Lu's [[notebook|caderno]]. Which robot was it?", [
     bTela_('A', 'A · Security note', 'LAB SECURITY · NIGHT REPORT', ['The robot which took the notebook has blue arms. It is not the robot that cooks.']),
     { id: 'B', aba: 'B · Robots', blocos: [{ tipo: 'itens', itens: [['🤖', 'R-2: blue arms, cleans the floor'], ['🤖', 'Z-9: blue arms, cooks lunch'], ['🤖', 'M-5: red arms, cleans the windows']] }] },
     bAudio_('lu', 'Dr. Lu', "The robot which cleans the floor came to my office at night. I think the thief is the robot whose name starts with R."),
@@ -334,7 +341,7 @@ function casosAno_() {
   ], ['EF08LI05', 'EF08LI03', 'EF08LI17', 'EF08LI17'], ['The robot which ', 'descrever um robô ou objeto usando which/that.', 'The robot which cleans my room is very fast.', 'pronomes relativos']));
 
   // ---------- 9º · The Record Breaker (present perfect: ever/never/already/yet, since/for)
-  L.push(aCaso_('9º', 'a9', '2026-11', '#02', 'The Record Breaker', 1, "Hi, checker! A post says a student broke a [[world record|recorde mundial]]. Let's check!", [], [
+  L.push(aCaso_('9º', 'a9', '2026-11', 'NOV·1', 'The Record Breaker', 1, "Hi, checker! A post says a student broke a [[world record|recorde mundial]]. Let's check!", [], [
     bFiguras_([['👀', ['seen', 'see'], 0], ['🍽️', ['eat', 'eaten'], 1], ['✍️', ['written', 'write'], 0], ['🎤', ['sing', 'sung'], 1]],
       ['particípio: see → ==seen== · eat → ==eaten==', 'write → ==written== · sing → ==sung=='], 'present perfect (particípios)'),
     bOuvir_([['I have never seen snow.', ['❄️', '☀️'], 0], ['She has already eaten lunch.', ['🛌', '🍽️'], 1]],
@@ -351,7 +358,7 @@ function casosAno_() {
     bCaderno_('B', 'B · Library page', 'Joinville School Library', ['Mia has read 50 books since January. She has visited the library every week for two years.']),
     bAudio_('rosa', 'Rosa · librarian', "Mia hasn't read 500 books. She has read fifty. That is still amazing!"),
   ];
-  L.push(aCaso_('9º', 'a9', '2026-11', '#02', 'The Record Breaker', 2, 'Hi, checker! A post says a student broke a [[world record|recorde mundial]]. Is it true?', rec2, [
+  L.push(aCaso_('9º', 'a9', '2026-11', 'NOV·1', 'The Record Breaker', 2, 'Hi, checker! A post says a student broke a [[world record|recorde mundial]]. Is it true?', rec2, [
     bLerOuvir_([['How many books has Mia read?', ['50', '500', '5'], 0], ['Is the post true?', ["No, it isn't.", 'Yes, it is.', 'Yes, she has.'], 0]],
       ['The library says: "Mia has read ==50== books."', 'Rosa says: "Mia ==hasn\'t== read 500 books."'], 'fato × opinião / evidências'),
     bBlocos_('Present perfect', 'Complete the sentences.', 'has/hasn\'t + particípio (read, visited).', [
@@ -365,7 +372,7 @@ function casosAno_() {
     ], ['==since== + quando começou · ==for== + quanto tempo', 'two years → ==for=='], 'since × for'),
   ], ['EF09LI06', 'EF09LI21-JO', 'EF09LI020-JO'], ['I have read ', 'contar quantos livros (ou filmes) você já leu/viu este ano.', 'I have read three books this year.', 'present perfect']));
 
-  L.push(aCaso_('9º', 'a9', '2026-11', '#02', 'The Record Breaker', 3, 'Hi, checker! Someone started a [[rumour|boato]] about Mia. Who was it?', [
+  L.push(aCaso_('9º', 'a9', '2026-11', 'NOV·1', 'The Record Breaker', 3, 'Hi, checker! Someone started a [[rumour|boato]] about Mia. Who was it?', [
     rec2[0],
     bFichas_([['sam', 'SAM', ['I have never posted about Mia.']], ['ben', 'BEN', ['I have already shared the post.']], ['lucy', 'LUCY', ['I have posted on @SuperNews2 since May.']]]),
     bAudio_('rosa', 'Rosa · librarian', "The account SuperNews2 has posted fake news for months. Its owner has written about Mia before."),

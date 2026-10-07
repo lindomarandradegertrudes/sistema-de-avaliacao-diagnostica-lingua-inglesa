@@ -285,6 +285,9 @@ function ehTrilha_(c) { return c.serie === SERIE_TODAS && c.dados.trilha === 'ba
 /** Treino "Meu reforço" (montado para um aluno; não aparece nas listas de casos). */
 function ehReforco_(c) { return !!(c.dados && c.dados.reforco); }
 
+/** Banco de exercícios avulsos (só alimenta o "Meu reforço"; não aparece nas listas). */
+function ehAvulso_(c) { return !!(c.dados && c.dados.avulso); }
+
 /** Chave da missão: as versões (degraus) de um mesmo caso compartilham a chave. Casos antigos sem "missao" ficam sozinhos. */
 function missaoDe_(c) { return c.dados.missao || c.id; }
 
@@ -322,7 +325,7 @@ function degrauDoAluno_(email, nivel, casos, jogadas) {
 function agruparMissoes_(casos) {
   const m = {};
   casos.forEach(function (c) {
-    if (ehReforco_(c)) return;
+    if (ehReforco_(c) || ehAvulso_(c)) return;
     const k = missaoDe_(c);
     if (!m[k]) m[k] = { missao: k, ordem: Number(c.dados.ordem) || 0, tema: c.dados.tema || '', titulo: c.titulo, serie: c.serie, mes: c.mes, versoes: [] };
     m[k].versoes.push(c);
@@ -612,7 +615,7 @@ function feedbackFinal_(caso, texto) {
 function profListarCasos() {
   exigirProfessor_();
   const jogadas = lerJogadas_().filter(function (j) { return j.turma !== 'PROF'; });
-  return lerCasos_().filter(function (c) { return !ehReforco_(c); }).map(function (c) {
+  return lerCasos_().filter(function (c) { return !ehReforco_(c) && !ehAvulso_(c); }).map(function (c) {
     const js = jogadas.filter(function (j) { return j.caso_id === c.id && j.numero === 1; });
     return {
       id: c.id, serie: c.serie, mes: c.mes, titulo: c.titulo, status: c.status, numero: c.dados.numero || '',

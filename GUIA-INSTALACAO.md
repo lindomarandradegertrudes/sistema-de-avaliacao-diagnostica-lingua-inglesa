@@ -4,6 +4,70 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# Etapa 4 · Banco do ano (9º ano)
+
+**Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `CasosAno9` | **arquivo novo:** **+ > Script**, nome `CasosAno9`, cole **CasosAno9.gs** |
+| `Habilidades` | apague tudo e cole a nova versão (.gs) |
+
+Depois: **Salvar** → **Nova versão** → **F5** → aba **Jogos** → **Carregar casos do ano**.
+
+Entram 10 casos do 9º (saga *Fact Checkers HQ*: março, abril, junho, agosto, outubro e novembro, 2 por período), cada um em ★ ★★ ★★★, como **Rascunho**, e exercícios avulsos de leitura e gramática para o **Meu reforço**.
+
+---
+
+# Etapa 4 · Banco do ano (8º ano)
+
+**Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `CasosAno8` | **arquivo novo:** **+ > Script**, nome `CasosAno8`, cole **CasosAno8.gs** |
+| `Habilidades` | apague tudo e cole a nova versão (.gs) |
+
+Depois: **Salvar** → **Nova versão** → **F5** → aba **Jogos** → **Carregar casos do ano**.
+
+Entram 10 casos do 8º (saga *Future Lab 2050*: março, abril, junho, agosto, outubro e novembro, 2 por período), cada um em ★ ★★ ★★★, como **Rascunho**, e exercícios avulsos de leitura e gramática para o **Meu reforço**.
+
+---
+
+# Etapa 4 · Banco do ano (7º ano)
+
+**Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `CasosAno7` | **arquivo novo:** **+ > Script**, nome `CasosAno7`, cole **CasosAno7.gs** |
+| `Habilidades` | apague tudo e cole a nova versão (.gs) |
+
+Depois: **Salvar** → **Nova versão** → **F5** → aba **Jogos** → **Carregar casos do ano**.
+
+Entram 10 casos do 7º (março, abril, junho, agosto, outubro e novembro, 2 por período), cada um em ★ ★★ ★★★, como **Rascunho**, e exercícios avulsos de leitura e gramática para o **Meu reforço**.
+
+---
+
+# Etapa 4 · Banco do ano (6º ano)
+
+## A. Atualizar o código
+**Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `CasosAno6` | **arquivo novo:** **+ > Script**, nome `CasosAno6`, cole **CasosAno6.gs** |
+| `CasosAno`, `CasosBase`, `CasosPadrao`, `Casos` | apague tudo e cole as novas versões (.gs) |
+
+Depois: **Salvar** → **Nova versão** → **F5** → aba **Jogos** → **Carregar casos do ano** e **Carregar Trilha Base** (a situação Aberto/Rascunho de cada caso é mantida).
+
+## B. O que entra
+- 6º ano: 2 casos por período do Mapa (março, abril, maio, agosto, outubro, novembro), cada um em ★ ★★ ★★★. Os casos novos chegam como **Rascunho**: use-os em ciclos ou abra como treino livre.
+- Exercícios avulsos de leitura e gramática, que não aparecem nas listas e só alimentam o **Meu reforço**.
+- As opções e os blocos de todos os casos agora aparecem em ordem embaralhada (fixa): a resposta certa não fica sempre em primeiro.
+
+---
+
 # Etapa 3 · Habilidades, dificuldades e reforço individual
 
 ## A. Atualizar o código

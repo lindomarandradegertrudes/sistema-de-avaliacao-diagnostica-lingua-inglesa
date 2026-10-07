@@ -7,7 +7,7 @@
 const CASOS_PADRAO = [
   // ---------------------------------------------------------------- 6º ano
   {
-    id: 'c6-2026-10-mochila', missao: 'a6-2026-10', degrau: 3, ordem: 10, serie: '6º', mes: '2026-10', numero: '#01', titulo: 'The Lost Backpack',
+    id: 'c6-2026-10-mochila', missao: 'a6-2026-10', degrau: 3, ordem: 10, serie: '6º', mes: '2026-10', numero: 'OCT·1', titulo: 'The Lost Backpack',
     abertura: { personagem: 'kai', nome: 'CHIEF KAI', texto: 'Hi, agent! We have a [[backpack|mochila]]. Who is the [[owner|dono]]? Open 3 locks!' },
     evidencias: [
       { id: 'A', aba: 'A · The backpack', blocos: [
@@ -66,7 +66,7 @@ const CASOS_PADRAO = [
 
   // ---------------------------------------------------------------- 7º ano
   {
-    id: 'c7-2026-10-diario', missao: 'a7-2026-10', degrau: 3, ordem: 10, serie: '7º', mes: '2026-10', numero: '#01', titulo: 'The Mixed-Up Diary',
+    id: 'c7-2026-10-diario', missao: 'a7-2026-10', degrau: 3, ordem: 10, serie: '7º', mes: '2026-10', numero: 'OCT·1', titulo: 'The Mixed-Up Diary',
     abertura: { personagem: 'clock', nome: 'CAPTAIN CLOCK', texto: 'Hi, detective! Our [[time machine|máquina do tempo]] has an [[error|erro]]. Find it and open 4 locks!' },
     evidencias: [
       { id: 'A', aba: 'A · Time machine', moldura: 'tela', blocos: [
@@ -137,7 +137,7 @@ const CASOS_PADRAO = [
 
   // ---------------------------------------------------------------- 8º ano
   {
-    id: 'c8-2026-10-mensagem', missao: 'a8-2026-10', degrau: 3, ordem: 10, serie: '8º', mes: '2026-10', numero: '#01', titulo: 'Message from 2050',
+    id: 'c8-2026-10-mensagem', missao: 'a8-2026-10', degrau: 3, ordem: 10, serie: '8º', mes: '2026-10', numero: 'OCT·1', titulo: 'Message from 2050',
     abertura: { personagem: 'lu', nome: 'DR. LU', texto: 'Hi, scientist! A [[message|mensagem]] from 2050 arrived, but it is [[broken|quebrada]]. Fix it and open 4 locks!' },
     evidencias: [
       { id: 'A', aba: 'A · Message', moldura: 'tela', blocos: [
@@ -201,7 +201,7 @@ const CASOS_PADRAO = [
 
   // ---------------------------------------------------------------- 9º ano
   {
-    id: 'c9-2026-10-show', missao: 'a9-2026-10', degrau: 3, ordem: 10, serie: '9º', mes: '2026-10', numero: '#01', titulo: 'The Cancelled Concert',
+    id: 'c9-2026-10-show', missao: 'a9-2026-10', degrau: 3, ordem: 10, serie: '9º', mes: '2026-10', numero: 'OCT·1', titulo: 'The Cancelled Concert',
     abertura: { personagem: 'nadia', nome: 'EDITOR NADIA', texto: 'Hi, checker! This post is [[viral|viral (muito compartilhado)]]. Is it true? Check the [[evidence|evidências, provas]]. Open 5 locks!' },
     evidencias: [
       { id: 'A', aba: 'A · Viral post', moldura: 'celular', blocos: [
