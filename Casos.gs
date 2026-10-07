@@ -15,15 +15,24 @@ const PARTES_SEM_RESPOSTA = ['exemplos', 'audio', 'pista'];
 const SERIE_TODAS = 'todas';
 
 /** Cria a aba na primeira vez que for usada (não precisa reinstalar a planilha). */
+const ABAS_CONFERIDAS_ = {};
+
+/** Cria a aba na primeira vez que for usada e acrescenta colunas novas ao cabeçalho (não precisa reinstalar). */
 function garantirAba_(nome) {
   const ss = planilha_();
   let aba = ss.getSheetByName(nome);
+  const cab = CABECALHOS[nome];
   if (!aba) {
     aba = ss.insertSheet(nome);
-    const cab = CABECALHOS[nome];
     aba.getRange(1, 1, 1, cab.length).setValues([cab]).setFontWeight('bold').setBackground('#dbe4ff');
     aba.setFrozenRows(1);
+  } else if (!ABAS_CONFERIDAS_[nome]) {
+    const atual = aba.getRange(1, 1, 1, cab.length).getValues()[0];
+    if (cab.some(function (c, i) { return atual[i] !== c; })) {
+      aba.getRange(1, 1, 1, cab.length).setValues([cab]).setFontWeight('bold').setBackground('#dbe4ff');
+    }
   }
+  ABAS_CONFERIDAS_[nome] = true;
   return aba;
 }
 
@@ -273,6 +282,9 @@ const SEGUIDAS_PARA_SUBIR = 2;
 
 function ehTrilha_(c) { return c.serie === SERIE_TODAS && c.dados.trilha === 'base'; }
 
+/** Treino "Meu reforço" (montado para um aluno; não aparece nas listas de casos). */
+function ehReforco_(c) { return !!(c.dados && c.dados.reforco); }
+
 /** Chave da missão: as versões (degraus) de um mesmo caso compartilham a chave. Casos antigos sem "missao" ficam sozinhos. */
 function missaoDe_(c) { return c.dados.missao || c.id; }
 
@@ -310,6 +322,7 @@ function degrauDoAluno_(email, nivel, casos, jogadas) {
 function agruparMissoes_(casos) {
   const m = {};
   casos.forEach(function (c) {
+    if (ehReforco_(c)) return;
     const k = missaoDe_(c);
     if (!m[k]) m[k] = { missao: k, ordem: Number(c.dados.ordem) || 0, tema: c.dados.tema || '', titulo: c.titulo, serie: c.serie, mes: c.mes, versoes: [] };
     m[k].versoes.push(c);
@@ -369,16 +382,24 @@ function degrauAtualDoAluno_(email, casos, jogadas) {
 /** Painel do aluno: ciclos (valem nota), casos livres do ano e Trilha Base. */
 function alunoMissoes_(email, turma) {
   const serie = serieDaTurma_(turma);
-  const jogadas = lerJogadas_();
-  const casos = lerCasos_();
+  const ctx = contextoDificuldades_();
+  const jogadas = ctx.jogadas;
+  const casos = Object.keys(ctx.casos).map(function (k) { return ctx.casos[k]; });
   const degrau = degrauAtualDoAluno_(email, casos, jogadas);
   const grupos = agruparMissoes_(casos.filter(function (c) { return !ehTrilha_(c) && c.serie === serie; }));
+  let perfil = null;
 
   const ciclos = lerCiclos_().filter(function (ci) { return ci.turma === turma && ci.status === 'aberto'; }).map(function (ci) {
+    if (ci.reforco > 0 && !ci.reforcos[email]) {
+      perfil = perfil || perfilDoAluno_(email, serie, ctx);
+      atribuirReforcos_(ci, email, grupos, perfil, jogadas);
+    }
     const prazo = prazoDoAluno_(ci, email);
-    const itens = ci.missoes.filter(function (k) { return grupos[k]; }).map(function (k) {
+    const reforcos = ci.reforcos[email] || [];
+    const itens = missoesDoAluno_(ci, email).filter(function (k) { return grupos[k]; }).map(function (k) {
       const item = itemMissao_(grupos[k], versaoPara_(grupos[k].versoes, email, jogadas, degrau));
       item.noPrazo = item.situacao === 'concluida' && dentroDoPrazo_(item.concluido_em, prazo);
+      item.reforco = reforcos.indexOf(k) !== -1;
       return item;
     });
     const nota = notaDoCiclo_(itens);
@@ -400,6 +421,7 @@ function alunoMissoes_(email, turma) {
   return {
     degrau: degrau, ciclos: ciclos, casos: livres, patente: patente_(serie, concluidos), saga: serie,
     trilha: trilhaDoAluno_(email, casos, jogadas, degrau),
+    reforco: meuReforco_(email, serie, ctx),
   };
 }
 
@@ -414,7 +436,10 @@ function alunoAbrirCaso(id) {
     painel = alunoMissoes_(eu.email, eu.turma);
     const k = missaoDe_(caso);
     let item = null;
-    if (ehTrilha_(caso)) {
+    if (ehReforco_(caso)) {
+      if (caso.dados.reforco.email !== eu.email) throw new Error('Este treino é de outro aluno.');
+      item = { id: caso.id };
+    } else if (ehTrilha_(caso)) {
       item = painel.trilha && painel.trilha.missoes.filter(function (m) { return m.missao === k; })[0];
       if (item && item.situacao === 'bloqueada') throw new Error('Termine a missão anterior primeiro.');
       trilha = painel.trilha;
@@ -587,7 +612,7 @@ function feedbackFinal_(caso, texto) {
 function profListarCasos() {
   exigirProfessor_();
   const jogadas = lerJogadas_().filter(function (j) { return j.turma !== 'PROF'; });
-  return lerCasos_().map(function (c) {
+  return lerCasos_().filter(function (c) { return !ehReforco_(c); }).map(function (c) {
     const js = jogadas.filter(function (j) { return j.caso_id === c.id && j.numero === 1; });
     return {
       id: c.id, serie: c.serie, mes: c.mes, titulo: c.titulo, status: c.status, numero: c.dados.numero || '',
@@ -811,7 +836,7 @@ function profZerarMissao(missao, email, turma) {
       .sort(function (a, b) { return b._linha - a._linha; })
       .forEach(function (j) { aba.deleteRow(j._linha); });
   });
-  lerCiclos_().filter(function (c) { return c.turma === turma && c.missoes.indexOf(missao) !== -1; })
+  lerCiclos_().filter(function (c) { return c.turma === turma && missoesDoAluno_(c, email).indexOf(missao) !== -1; })
     .forEach(function (c) { gravarNotasCiclo_(c, [email]); });
   return profResultadosMissao(missao, turma);
 }

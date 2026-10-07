@@ -20,7 +20,7 @@ const CABECALHOS = {
   Aulas: ['id', 'turma', 'data', 'descricao', 'criado_em'],
   EntregasDiarias: ['aula_id', 'email', 'status', 'atualizado_em'],
   Casos: ['id', 'serie', 'mes', 'titulo', 'status', 'dados_json', 'criado_em'],
-  Ciclos: ['id', 'turma', 'serie', 'mes', 'titulo', 'missoes_json', 'prazo', 'status', 'extensoes_json', 'criado_em', 'fechado_em'],
+  Ciclos: ['id', 'turma', 'serie', 'mes', 'titulo', 'missoes_json', 'prazo', 'status', 'extensoes_json', 'criado_em', 'fechado_em', 'reforco', 'reforcos_json'],
   Jogadas: ['id', 'caso_id', 'email', 'turma', 'numero', 'status', 'pontos', 'total', 'estado_json', 'final_texto', 'final_feedback', 'iniciado_em', 'atualizado_em', 'concluido_em'],
 };
 

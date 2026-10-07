@@ -330,7 +330,7 @@
           <strong>📅 ${esc(ci.titulo)}</strong>
           <span class="pequeno ${ci.vencido ? 'vencido' : ''}">${ci.vencido ? 'prazo encerrado em ' : 'até '}${dataBr(ci.prazo)} · vale nota</span>
         </div>` +
-        ci.missoes.map((c) => linhaCaso(c, c.situacao === 'concluida' && !c.noPrazo ? ' · ⏰ depois do prazo' : '')).join('') +
+        ci.missoes.map((c) => linhaCaso(c, (c.reforco ? ' · 💪 reforço para você' : '') + (c.situacao === 'concluida' && !c.noPrazo ? ' · ⏰ depois do prazo' : ''))).join('') +
         `<p class="pequeno" style="margin:6px 0 0">Média do ciclo: <strong>${ci.nota != null ? ci.nota + ' pontos' : '—'}</strong>
           <span class="suave">· ${ci.missoes.every((c) => c.noPrazo) ? 'ciclo concluído!' : 'parcial: conclua todos os casos até o prazo (os que faltarem valem 0)'}</span></p>`).join('<hr class="sep-ciclo">') : '';
 
@@ -356,7 +356,29 @@
           <span class="suave"> · treino, não vale nota</span></p>` +
         m.casos.map((c) => linhaCaso(c)).join('') : '';
 
-      $('missoes').innerHTML = ciclos + trilha + livres;
+      const r = m.reforco;
+      const reforco = r && (r.disponivel || r.atual) ? `
+        <div class="trilha-topo" style="margin-top:18px"><strong>💪 Meu reforço</strong>
+          <span class="suave pequeno">treino rápido de 4 cadeados · não vale nota${r.feitos ? ' · ' + r.feitos + ' feito(s)' : ''}</span></div>
+        <div class="missao">
+          <div style="flex:1" class="pequeno">Vamos treinar: ${r.alvos.map((a) => `<span class="patente">${esc(a.nome.replace(/^Base: /, ''))}</span>`).join(' ')}</div>
+          <button class="btn-jogo" type="button" id="btn-reforco">${r.atual ? 'CONTINUE' : 'TRAIN'} ›</button>
+        </div>` : '';
+
+      $('missoes').innerHTML = ciclos + reforco + trilha + livres;
+      const b = $('btn-reforco');
+      if (b) b.addEventListener('click', async () => {
+        b.disabled = true;
+        b.textContent = 'Montando…';
+        try {
+          const x = await chamar('alunoNovoReforco');
+          window.open(`${app}?caso=${encodeURIComponent(x.id)}`, '_top');
+        } catch (e) {
+          alert(e.message);
+          b.disabled = false;
+          b.textContent = 'TRAIN ›';
+        }
+      });
     }
 
     // ---------- Tarefas diárias (bônus) ----------

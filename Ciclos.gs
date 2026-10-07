@@ -25,13 +25,15 @@ function dataIso_(v) {
 function lerCiclos_() {
   garantirAba_('Ciclos');
   return lerTabela_('Ciclos').map(function (c) {
-    let missoes = [], ext = {};
+    let missoes = [], ext = {}, refs = {};
     try { missoes = JSON.parse(c.missoes_json || '[]'); } catch (e) { /* ignora */ }
     try { ext = JSON.parse(c.extensoes_json || '{}'); } catch (e) { /* ignora */ }
+    try { refs = JSON.parse(c.reforcos_json || '{}'); } catch (e) { /* ignora */ }
     return {
       _linha: c._linha, id: String(c.id), turma: String(c.turma), serie: String(c.serie), mes: dataIso_(c.mes + '-01').slice(0, 7) || String(c.mes),
       titulo: String(c.titulo), missoes: missoes, prazo: dataIso_(c.prazo), status: String(c.status || 'aberto'),
       extensoes: ext, criado_em: String(c.criado_em), fechado_em: String(c.fechado_em || ''),
+      reforco: Math.min(Math.max(Number(c.reforco) || 0, 0), 2), reforcos: refs,
     };
   });
 }
@@ -46,6 +48,7 @@ function gravarCiclo_(c) {
   const linha = linhaDe_('Ciclos', {
     id: c.id, turma: c.turma, serie: c.serie, mes: "'" + c.mes, titulo: c.titulo, missoes_json: JSON.stringify(c.missoes),
     prazo: "'" + c.prazo, status: c.status, extensoes_json: JSON.stringify(c.extensoes || {}), criado_em: c.criado_em || new Date(), fechado_em: c.fechado_em || '',
+    reforco: c.reforco || 0, reforcos_json: JSON.stringify(c.reforcos || {}),
   });
   const aba = garantirAba_('Ciclos');
   if (c._linha) aba.getRange(c._linha, 1, 1, linha.length).setValues([linha]);
@@ -53,6 +56,47 @@ function gravarCiclo_(c) {
 }
 
 function prazoDoAluno_(ciclo, email) { return ciclo.extensoes[email] || ciclo.prazo; }
+
+/** Casos do aluno no ciclo: os comuns + os de reforço escolhidos para ele. */
+function missoesDoAluno_(ciclo, email) { return ciclo.missoes.concat(ciclo.reforcos[email] || []); }
+
+/**
+ * Escolhe os casos de reforço de um aluno (uma vez por ciclo) no banco da série: casos que não estão no ciclo,
+ * de meses até o do ciclo, cujos cadeados treinam as habilidades em que ele tem menor acerto.
+ * Sem dados de dificuldade, escolhe os casos mais recentes. A escolha fica gravada no ciclo.
+ */
+function atribuirReforcos_(ciclo, email, grupos, perfil, jogadas) {
+  const pct = {};
+  perfil.forEach(function (p) { pct[p.id] = p; });
+  const candidatos = Object.keys(grupos).map(function (k) { return grupos[k]; }).filter(function (m) {
+    return m.serie === ciclo.serie && ciclo.missoes.indexOf(m.missao) === -1 && m.mes <= ciclo.mes;
+  }).map(function (m) {
+    const habs = {};
+    m.versoes.forEach(function (c) {
+      (c.dados.travas || []).forEach(function (t) {
+        (t.etiquetas || []).forEach(function (e) { const h = habilidadeDe_(ciclo.serie, e.foco, e.codigo); if (h) habs[h.id] = true; });
+      });
+    });
+    let pontos = 0;
+    Object.keys(habs).forEach(function (h) {
+      const p = pct[h];
+      if (p) pontos += Math.max(0, LIMIAR_DIFICULDADE + 20 - p.pct) + (p.dificuldade ? 40 : 0);
+    });
+    const ids = {};
+    m.versoes.forEach(function (c) { ids[c.id] = true; });
+    const feito = jogadas.some(function (j) { return j.email === email && j.numero === 1 && j.status === 'concluido' && ids[j.caso_id]; });
+    return { missao: m.missao, mes: m.mes, pontos: pontos, feito: feito };
+  }).sort(function (a, b) { return (a.feito - b.feito) || (b.pontos - a.pontos) || b.mes.localeCompare(a.mes); });
+  const escolhidos = candidatos.slice(0, ciclo.reforco).map(function (c) { return c.missao; });
+  comTrava_(function () {
+    const atual = buscarCiclo_(ciclo.id);
+    if (atual.reforcos[email]) { ciclo.reforcos[email] = atual.reforcos[email]; return; }
+    atual.reforcos[email] = escolhidos;
+    gravarCiclo_(atual);
+    ciclo.reforcos[email] = escolhidos;
+  });
+  return ciclo.reforcos[email];
+}
 
 /** concluido_em ("dd/MM/yyyy HH:mm" ou Date) até o fim do dia do prazo ("yyyy-MM-dd"). */
 function dentroDoPrazo_(concluido, prazo) {
@@ -71,13 +115,14 @@ function notaDoCiclo_(itens) {
 /** Situação de um aluno num ciclo: a 1ª jogada de qualquer versão de cada caso do ciclo. */
 function resultadoNoCiclo_(ciclo, email, grupos, jogadas) {
   const prazo = prazoDoAluno_(ciclo, email);
-  const itens = ciclo.missoes.filter(function (k) { return grupos[k]; }).map(function (k) {
+  const reforcos = ciclo.reforcos[email] || [];
+  const itens = missoesDoAluno_(ciclo, email).filter(function (k) { return grupos[k]; }).map(function (k) {
     const ids = {};
     grupos[k].versoes.forEach(function (c) { ids[c.id] = c; });
     const j = jogadas.filter(function (x) { return x.email === email && x.numero === 1 && ids[x.caso_id]; })[0];
     const feita = !!(j && j.status === 'concluido');
     return {
-      missao: k, titulo: grupos[k].titulo, degrau: j ? Number(ids[j.caso_id].dados.degrau) || 0 : null,
+      missao: k, titulo: grupos[k].titulo, reforco: reforcos.indexOf(k) !== -1, degrau: j ? Number(ids[j.caso_id].dados.degrau) || 0 : null,
       situacao: !j ? 'nao' : j.status, pontos: feita ? j.pontos : (j ? somaPontos_(j.estado) : null),
       noPrazo: feita && dentroDoPrazo_(j.concluido_em, prazo), concluido_em: feita ? j.concluido_em : '',
     };
@@ -102,7 +147,8 @@ function gravarNotasCiclo_(ciclo, emails, fechando) {
     emails.forEach(function (email) {
       const r = resultadoNoCiclo_(ciclo, email, grupos, jogadas);
       const existente = respostas.filter(function (x) { return x.email === email; })[0];
-      const completo = r.itens.length > 0 && r.itens.every(function (i) { return i.noPrazo; });
+      const semReforco = ciclo.reforco > 0 && !ciclo.reforcos[email];
+      const completo = !semReforco && r.itens.length > 0 && r.itens.every(function (i) { return i.noPrazo; });
       if (r.nota === null || (!fechando && !completo)) { if (existente) apagar.push(existente._linha); return; }
       const total = 100 * r.itens.length;
       gravarResposta_(q, email, ciclo.turma, {
@@ -119,7 +165,7 @@ function atualizarNotasDoAluno_(email, turma, casoId) {
   const caso = buscarCaso_(casoId);
   if (ehTrilha_(caso)) return;
   const k = missaoDe_(caso);
-  lerCiclos_().filter(function (c) { return c.turma === turma && c.status === 'aberto' && c.missoes.indexOf(k) !== -1; })
+  lerCiclos_().filter(function (c) { return c.turma === turma && c.status === 'aberto' && missoesDoAluno_(c, email).indexOf(k) !== -1; })
     .forEach(function (c) { gravarNotasCiclo_(c, [email]); });
 }
 
@@ -149,7 +195,7 @@ function profListarCiclos() {
     return {
       id: c.id, turma: c.turma, serie: c.serie, mes: c.mes, titulo: c.titulo, prazo: c.prazo, status: c.status,
       missoes: c.missoes.map(function (k) { return { missao: k, titulo: grupos[k] ? grupos[k].titulo : '(caso excluído)' }; }),
-      alunos: alunosPorTurma[c.turma] || 0, comNota: notas.length,
+      alunos: alunosPorTurma[c.turma] || 0, comNota: notas.length, reforco: c.reforco,
       media: notas.length ? Math.round((notas.reduce(function (s, r) { return s + r.percentual; }, 0) / notas.length) * 10) / 10 : null,
       extensoes: Object.keys(c.extensoes).length,
     };
@@ -166,6 +212,7 @@ function profSalvarCiclo(dados) {
   const prazo = dataIso_(dados.prazo);
   const mes = String(dados.mes || '').trim();
   const missoes = (dados.missoes || []).map(String);
+  const reforco = Math.min(Math.max(Number(dados.reforco) || 0, 0), 2);
   if (!titulo) throw new Error('Dê um título ao ciclo (ex.: "Jogos de novembro").');
   if (!/^\d{4}-\d{2}$/.test(mes)) throw new Error('Escolha o mês do ciclo.');
   if (!prazo) throw new Error('Escolha a data do prazo.');
@@ -182,6 +229,8 @@ function profSalvarCiclo(dados) {
       const c = buscarCiclo_(dados.id);
       if (c.serie !== serie) throw new Error('Os casos precisam ser do ' + c.serie + ' ano, a série da turma ' + c.turma + '.');
       c.titulo = titulo; c.mes = mes; c.prazo = prazo; c.missoes = missoes;
+      if (reforco !== c.reforco) c.reforcos = {};
+      c.reforco = reforco;
       gravarCiclo_(c);
     });
     gravarNotasCiclo_(buscarCiclo_(dados.id), emailsDaTurma_(buscarCiclo_(dados.id).turma));
@@ -199,7 +248,7 @@ function profSalvarCiclo(dados) {
   const novos = [];
   comTrava_(function () {
     turmas.forEach(function (t) {
-      const c = { id: 'ciclo-' + Utilities.getUuid().slice(0, 8), turma: t, serie: serie, mes: mes, titulo: titulo, missoes: missoes, prazo: prazo, status: 'aberto', extensoes: {} };
+      const c = { id: 'ciclo-' + Utilities.getUuid().slice(0, 8), turma: t, serie: serie, mes: mes, titulo: titulo, missoes: missoes, prazo: prazo, status: 'aberto', extensoes: {}, reforco: reforco, reforcos: {} };
       gravarCiclo_(c);
       novos.push(c.id);
     });
@@ -265,7 +314,7 @@ function profResultadosCiclo(id) {
   const alunos = lerTabela_('Alunos').filter(function (a) { return String(a.turma) === c.turma; })
     .sort(function (a, b) { return String(a.nome).localeCompare(String(b.nome)); });
   return {
-    ciclo: { id: c.id, titulo: c.titulo, turma: c.turma, prazo: c.prazo, status: c.status, mes: c.mes },
+    ciclo: { id: c.id, titulo: c.titulo, turma: c.turma, prazo: c.prazo, status: c.status, mes: c.mes, reforco: c.reforco },
     missoes: c.missoes.map(function (k) { return { missao: k, titulo: grupos[k] ? grupos[k].titulo : '(caso excluído)' }; }),
     linhas: alunos.map(function (a) {
       const email = String(a.email).toLowerCase();

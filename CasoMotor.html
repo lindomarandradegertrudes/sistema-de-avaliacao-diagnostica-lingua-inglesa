@@ -554,12 +554,15 @@
       }
       html += '</div>';
     }
+    var treino = !!C.dados.reforco;
     html += '<div class="actions"><a class="btn alt" href="' + esc(APP) + '">← MISSIONS</a>' +
-      '<button class="btn blue" id="de-novo" type="button">PLAY AGAIN' + (PROF ? '' : ' (PRACTICE)') + '</button></div>';
+      (treino && !PROF ? '<button class="btn blue" id="novo-treino" type="button">NEW TRAINING ›</button>'
+        : '<button class="btn blue" id="de-novo" type="button">PLAY AGAIN' + (PROF ? '' : ' (PRACTICE)') + '</button>') + '</div>';
     $('desk').innerHTML = html;
     var env = $('enviar-final');
     if (env) env.onclick = enviarFinal;
-    $('de-novo').onclick = jogarDeNovo;
+    if ($('de-novo')) $('de-novo').onclick = jogarDeNovo;
+    if ($('novo-treino')) $('novo-treino').onclick = novoTreino;
   }
 
   function enviarFinal() {
@@ -574,6 +577,15 @@
       b.textContent = 'SEND';
       falar('bad', esc(e.message));
     });
+  }
+
+  function novoTreino() {
+    var b = $('novo-treino');
+    b.disabled = true;
+    b.textContent = 'LOADING…';
+    chamar('alunoNovoReforco').then(function (r) {
+      window.open(APP + '?caso=' + encodeURIComponent(r.id), '_top');
+    }).catch(function (e) { b.disabled = false; b.textContent = 'NEW TRAINING ›'; alert(e.message); });
   }
 
   function jogarDeNovo() {

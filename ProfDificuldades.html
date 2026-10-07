@@ -1,0 +1,112 @@
+<!-- Habilidades: mapa da turma (aluno × habilidade), ficha do aluno e grupos de reforço sugeridos. Incluída em Professor.html -->
+<style>
+  .hab-mapa { border-collapse: separate; border-spacing: 0; font-size: .85rem; }
+  .hab-mapa th, .hab-mapa td { border-bottom: 1px solid var(--borda); padding: 5px 6px; text-align: center; white-space: nowrap; }
+  .hab-mapa th.nome, .hab-mapa td.nome { position: sticky; left: 0; background: var(--cartao); text-align: left; z-index: 1; min-width: 170px; }
+  .hab-mapa th.hab { vertical-align: bottom; max-width: 92px; white-space: normal; font-size: .75rem; line-height: 1.2; }
+  .hab-mapa th.hab .cod { display: block; color: var(--suave); font-weight: 400; font-size: .68rem; }
+  .hab-mapa th.base { background: #fff4e6; }
+  .hab-cel { font-weight: 700; border-radius: 6px; min-width: 44px; }
+  .hab-cel.verde { background: #d3f9d8; color: #2b8a3e; }
+  .hab-cel.amarelo { background: #fff3bf; color: #a05a00; }
+  .hab-cel.vermelho { background: #ffe3e3; color: #c92a2a; }
+  .hab-cel.pouco { background: #f8f9fa; color: #adb5bd; font-weight: 400; }
+  .hab-media td { font-weight: 700; background: var(--fundo); }
+  .hab-aluno { cursor: pointer; color: var(--primaria); text-decoration: underline; text-decoration-style: dotted; }
+  .hab-grupo { border: 1px solid var(--borda); border-radius: 10px; padding: 10px 12px; }
+  .hab-grupo h3 { margin: 0 0 6px; }
+  .hab-grupo .g { display: inline-block; background: var(--fundo); border-radius: 8px; padding: 4px 10px; margin: 4px 6px 0 0; font-size: .85rem; }
+  .hab-barra { height: 10px; border-radius: 99px; background: var(--fundo); overflow: hidden; }
+  .hab-barra i { display: block; height: 100%; }
+</style>
+
+<section id="aba-habilidades" class="pilha" hidden>
+  <div class="linha">
+    <select id="hab-turma" style="width:auto"></select>
+    <span class="espaco"></span>
+    <span class="suave pequeno" id="hab-info"></span>
+  </div>
+  <p class="suave pequeno" style="margin:0">
+    Cada célula = acerto do aluno naquela habilidade, juntando questões do diagnóstico e dos mensais, rubricas das TDAs, cadeados dos casos, da Trilha Base e do "Meu reforço"
+    (o que é mais recente pesa mais). <strong>Vermelho</strong> = dificuldade (abaixo de 60% com pelo menos 3 itens) · amarelo = 60–79% · verde = 80%+ ·
+    cinza = menos de 3 itens. Colunas em laranja são da Trilha Base. Clique no nome do aluno para ver a ficha.
+  </p>
+  <div class="cartao tabela-rolagem"><table class="hab-mapa" id="hab-mapa"></table></div>
+  <div class="cartao pilha">
+    <h2 style="margin:0">Grupos de reforço sugeridos</h2>
+    <p class="suave pequeno" style="margin:0">Alunos com a mesma dificuldade, em grupos de até 5 (do menor acerto para o maior). Útil para uma atividade de reforço em sala.</p>
+    <div id="hab-grupos" class="pilha"></div>
+  </div>
+</section>
+
+<dialog id="modal-hab-ficha" style="width:min(640px, calc(100vw - 32px))">
+  <div class="linha" style="margin-bottom:8px"><h2 style="margin:0" id="hab-ficha-titulo"></h2><span class="espaco"></span>
+    <button class="btn" type="button" data-fechar>Fechar</button></div>
+  <div id="hab-ficha"></div>
+</dialog>
+
+<script>
+  const hab = { dados: null };
+  const FONTES = { questionario: 'questões', tda: 'TDA', jogos: 'casos', trilha: 'trilha', reforco: 'Meu reforço' };
+
+  function corHab(c, minimo) {
+    if (!c) return '';
+    if (c.n < minimo) return 'pouco';
+    return c.pct >= 80 ? 'verde' : (c.pct >= 60 ? 'amarelo' : 'vermelho');
+  }
+
+  async function carregarHabilidades() {
+    const turma = $('hab-turma').value;
+    if (!turma) return;
+    $('hab-mapa').innerHTML = '<tr><td class="vazio">Carregando…</td></tr>';
+    const d = hab.dados = await chamar('profMapaTurma', turma);
+    $('hab-info').textContent = `${d.linhas.length} alunos · ${d.habilidades.length} habilidades com dados`;
+    if (!d.habilidades.length) {
+      $('hab-mapa').innerHTML = '<tr><td class="vazio">Ainda não há dados desta turma. Eles aparecem quando os alunos respondem questionários online (ou lançados com letras) e jogam.</td></tr>';
+      $('hab-grupos').innerHTML = '';
+      return;
+    }
+    $('hab-mapa').innerHTML = `<thead><tr><th class="nome">Aluno</th>${d.habilidades.map((h) => `<th class="hab ${h.base ? 'base' : ''}" title="${esc(h.nome)}">${esc(h.nome)}<span class="cod">${esc(h.codigo)}</span></th>`).join('')}</tr></thead>
+      <tbody>
+        <tr class="hab-media"><td class="nome">Média da turma</td>${d.habilidades.map((h) => `<td>${h.media == null ? '' : Math.round(h.media) + '%'}</td>`).join('')}</tr>
+        ${d.linhas.map((l) => `<tr><td class="nome"><span class="hab-aluno" data-hab-aluno="${esc(l.email)}">${esc(l.nome)}</span></td>${d.habilidades.map((h) => {
+          const c = l.celulas[h.id];
+          return `<td>${c ? `<span class="hab-cel ${corHab(c, d.minimo)}" title="${c.n} item(ns)">${Math.round(c.pct)}%</span>` : ''}</td>`;
+        }).join('')}</tr>`).join('')}
+      </tbody>`;
+    $('hab-grupos').innerHTML = d.grupos.length ? d.grupos.map((g) => `
+      <div class="hab-grupo">
+        <h3>${esc(g.habilidade)} <span class="suave pequeno">${esc(g.codigo)} · ${g.total} alunos</span></h3>
+        ${g.grupos.map((grupo, i) => `<div class="g"><strong>Grupo ${i + 1}:</strong> ${grupo.map((a) => `${esc(a.nome)} <span class="suave">(${Math.round(a.pct)}%)</span>`).join(', ')}</div>`).join('')}
+      </div>`).join('')
+      : '<p class="vazio" style="padding:8px 0">Nenhuma dificuldade em comum (2 ou mais alunos) nesta turma.</p>';
+  }
+
+  async function abrirFichaHabilidades(email) {
+    const f = await chamar('profFichaHabilidades', email);
+    const minimo = hab.dados ? hab.dados.minimo : 3;
+    $('hab-ficha-titulo').textContent = `${f.nome} · ${f.turma}`;
+    const fracas = f.perfil.filter((p) => p.dificuldade).slice(0, 3);
+    $('hab-ficha').innerHTML = (fracas.length
+      ? `<p><strong>Maiores dificuldades:</strong> ${fracas.map((p) => `${esc(p.nome)} (${Math.round(p.pct)}%)`).join(' · ')}</p>`
+      : '<p class="suave">Nenhuma dificuldade com dados suficientes (abaixo de 60% com pelo menos 3 itens).</p>') +
+      (f.perfil.length ? `<div class="tabela-rolagem"><table><thead><tr><th>Habilidade</th><th>Acerto</th><th>Itens</th><th>De onde vieram</th></tr></thead><tbody>${f.perfil.map((p) => {
+        const cor = corHab(p, minimo);
+        const cores = { verde: '#2f9e44', amarelo: '#f08c00', vermelho: '#e03131', pouco: '#ced4da' };
+        return `<tr><td>${esc(p.nome)} <span class="suave pequeno">${esc(p.codigo)}</span></td>
+          <td style="min-width:120px"><strong>${Math.round(p.pct)}%</strong><div class="hab-barra"><i style="width:${Math.max(p.pct, 3)}%;background:${cores[cor]}"></i></div></td>
+          <td>${p.n}</td><td class="pequeno">${Object.keys(p.fontes).map((k) => `${FONTES[k] || k}: ${p.fontes[k]}`).join(' · ')}</td></tr>`;
+      }).join('')}</tbody></table></div>` : '<p class="vazio">Sem dados ainda.</p>');
+    $('modal-hab-ficha').showModal();
+  }
+
+  function configurarDificuldades() {
+    $('hab-turma').innerHTML = opcoesTurma(false);
+    document.querySelector('.abas button[data-aba="habilidades"]').addEventListener('click', () => carregarHabilidades());
+    $('hab-turma').addEventListener('change', carregarHabilidades);
+    $('hab-mapa').addEventListener('click', (ev) => {
+      const a = ev.target.closest('[data-hab-aluno]');
+      if (a) abrirFichaHabilidades(a.dataset.habAluno);
+    });
+  }
+</script>

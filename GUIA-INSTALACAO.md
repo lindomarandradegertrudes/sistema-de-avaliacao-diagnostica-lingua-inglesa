@@ -4,6 +4,30 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# Etapa 3 · Habilidades, dificuldades e reforço individual
+
+## A. Atualizar o código
+**Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `Habilidades` | **arquivo novo:** **+ > Script**, nome `Habilidades`, cole **Habilidades.gs** |
+| `Dificuldades` | **arquivo novo:** **+ > Script**, nome `Dificuldades`, cole **Dificuldades.gs** |
+| `ProfDificuldades` | **arquivo novo:** **+ > HTML**, nome `ProfDificuldades`, cole **ProfDificuldades.html** |
+| `Casos`, `Ciclos`, `Codigo` | apague tudo e cole as novas versões (.gs) |
+| `Professor`, `ProfJogos`, `Aluno`, `CasoMotor` | apague tudo e cole as novas versões (.html) |
+
+Depois: **Salvar** → **Nova versão** → **F5**. Não precisa rodar `instalar` (a aba Ciclos ganha as colunas novas sozinha).
+
+## B. Usar
+1. **Aba Habilidades:** escolha a turma. A tabela mostra o acerto de cada aluno em cada habilidade do Mapa (vermelho = dificuldade: abaixo de 60% com pelo menos 3 itens). Clique no nome do aluno para ver a ficha. Embaixo, os **grupos de reforço** sugeridos.
+2. **Ciclo misto:** ao criar ou editar um ciclo, escolha **Reforço individual: 0, 1 ou 2 casos**. Na primeira vez que o aluno abre o painel, o sistema escolhe para ele casos da série (de meses anteriores ou do mês) que treinam as habilidades em que ele mais erra. Esses casos também valem nota.
+3. **Meu reforço:** o aluno vê em Missions o cartão **💪 Meu reforço** com as habilidades a treinar e o botão **TRAIN**: sessões de 4 cadeados curtos, sem nota, que podem ser repetidas.
+
+**De onde vêm os dados:** questões do diagnóstico e dos mensais (respondidas online ou lançadas com letras), rubricas das TDAs, cadeados dos casos, da Trilha Base e do Meu reforço. O mais recente pesa mais. As questões são ligadas às habilidades automaticamente pelo tópico; questões novas já entram etiquetadas.
+
+---
+
 # Ajuste da Etapa 2 · nota só entra no nível ao concluir o ciclo
 
 Substitua **Ciclos** (.gs), **Aluno** e **ProfJogos** (.html) → Salvar → Nova versão → F5.

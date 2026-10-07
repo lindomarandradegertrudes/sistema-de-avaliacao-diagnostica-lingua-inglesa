@@ -107,7 +107,10 @@
     <div class="campo" id="jc-turmas-campo"><label>Turmas (um ciclo para cada turma marcada)</label><div class="jog-checks" id="jc-turmas"></div></div>
     <div class="campo"><label for="jc-titulo">Título</label><input id="jc-titulo" placeholder="ex.: Jogos de novembro" required></div>
     <div class="campo"><label for="jc-prazo">Prazo (até o fim do dia)</label><input id="jc-prazo" type="date" required></div>
-    <div class="campo"><label>Casos (1 a 3)</label><div class="jog-checks" id="jc-casos"></div></div>
+    <div class="campo"><label>Casos comuns (1 a 3, iguais para toda a turma)</label><div class="jog-checks" id="jc-casos"></div></div>
+    <div class="campo"><label for="jc-reforco">Reforço individual</label>
+      <select id="jc-reforco"><option value="0">Sem reforço</option><option value="1">+ 1 caso de reforço por aluno</option><option value="2">+ 2 casos de reforço por aluno</option></select>
+      <span class="suave pequeno">O sistema escolhe, para cada aluno, casos da série (de meses anteriores ou do mês) que treinam as habilidades em que ele mais erra. Também valem nota.</span></div>
     <div class="rodape-modal">
       <button class="btn" type="button" data-fechar>Cancelar</button>
       <button class="btn primario" type="submit" id="jc-salvar">Salvar</button>
@@ -172,7 +175,7 @@
       <tr>
         <td><strong>${esc(c.turma)}</strong></td>
         <td><strong>${esc(c.titulo)}</strong><div class="suave pequeno">${esc(c.mes)}</div></td>
-        <td>${c.missoes.map((m) => `<span class="jog-chip">${esc(m.titulo)}</span>`).join('')}</td>
+        <td>${c.missoes.map((m) => `<span class="jog-chip">${esc(m.titulo)}</span>`).join('')}${c.reforco ? `<div class="suave pequeno">+ ${c.reforco} de reforço por aluno</div>` : ''}</td>
         <td>${dataBrJ(c.prazo)}${c.prazo < hojeJ() ? '<div class="suave pequeno">vencido</div>' : ''}${c.extensoes ? `<div class="suave pequeno">${c.extensoes} prorrogado(s)</div>` : ''}</td>
         <td><select data-jog-ciclo-status="${esc(c.id)}" style="width:auto">
           <option value="aberto" ${c.status === 'aberto' ? 'selected' : ''}>Aberto</option>
@@ -290,18 +293,22 @@
     $('jog-res-legenda').innerHTML = `Prazo da turma: <strong>${dataBrJ(r.ciclo.prazo)}</strong> · ${r.ciclo.status === 'fechado' ? 'ciclo <strong>fechado</strong> (notas congeladas)' : 'ciclo aberto'}. ` +
       'Em cada caso: degrau jogado e pontos. ✔ = concluído no prazo · ⏰ = concluído depois do prazo (não vale). ' +
       '<strong>Nota no nível</strong> = média dos casos; entra quando o aluno conclui todos no prazo ou quando você fecha o ciclo (os que faltarem valem 0). Vazio = ainda sem nota no nível.';
-    $('jog-res-tabela').innerHTML = `<thead><tr><th>Aluno</th><th>Degrau atual</th>${r.missoes.map((m) => `<th>${esc(m.titulo)}</th>`).join('')}<th>Nota</th><th>Prazo</th><th></th></tr></thead><tbody>` +
+    const celulaItem = (i) => (i.situacao === 'nao' ? '<span class="jog-sit nao">Não jogou</span>'
+      : `<span class="jog-estrelas">${estrelas(i.degrau)}</span> <strong>${i.pontos == null ? '—' : i.pontos}</strong>
+         ${i.situacao === 'andamento' ? '<span class="jog-sit andamento">jogando</span>' : (i.noPrazo ? ' ✔' : ' <span class="jog-sit fora">⏰ fora do prazo</span>')}`);
+    const comuns = (l) => r.missoes.map((m) => l.itens.find((i) => i.missao === m.missao && !i.reforco) || { situacao: 'nao' });
+    const reforcos = (l) => l.itens.filter((i) => i.reforco);
+    $('jog-res-tabela').innerHTML = `<thead><tr><th>Aluno</th><th>Degrau atual</th>${r.missoes.map((m) => `<th>${esc(m.titulo)}</th>`).join('')}${r.ciclo.reforco ? '<th>Reforço</th>' : ''}<th>Nota</th><th>Prazo</th><th></th></tr></thead><tbody>` +
       (r.linhas.length ? r.linhas.map((l) => `
         <tr>
           <td>${esc(l.nome)}</td>
           <td class="jog-estrelas">${estrelas(l.degrauAtual)}</td>
-          ${l.itens.map((i) => `<td>${i.situacao === 'nao' ? '<span class="jog-sit nao">Não jogou</span>'
-            : `<span class="jog-estrelas">${estrelas(i.degrau)}</span> <strong>${i.pontos == null ? '—' : i.pontos}</strong>
-               ${i.situacao === 'andamento' ? '<span class="jog-sit andamento">jogando</span>' : (i.noPrazo ? ' ✔' : ' <span class="jog-sit fora">⏰ fora do prazo</span>')}`}</td>`).join('')}
+          ${comuns(l).map((i) => `<td>${celulaItem(i)}</td>`).join('')}
+          ${r.ciclo.reforco ? `<td class="pequeno">${reforcos(l).length ? reforcos(l).map((i) => `<div>${esc(i.titulo)}: ${celulaItem(i)}</div>`).join('') : '<span class="suave">ainda não escolhido (o aluno não abriu o ciclo)</span>'}</td>` : ''}
           <td class="jog-nota">${l.nota == null ? '—' : l.nota}</td>
           <td>${dataBrJ(l.prazo)}${l.prorrogado ? '<div class="suave pequeno">prorrogado</div>' : ''}</td>
           <td><button class="btn mini" data-jog-prazo="${esc(l.email)}" data-nome="${esc(l.nome)}" data-prazo="${esc(l.prazo)}">Prazo</button></td>
-        </tr>`).join('') : `<tr><td colspan="${r.missoes.length + 5}" class="vazio">Nenhum aluno nesta turma.</td></tr>`) + '</tbody>';
+        </tr>`).join('') : `<tr><td colspan="${r.missoes.length + 6}" class="vazio">Nenhum aluno nesta turma.</td></tr>`) + '</tbody>';
   }
 
   // ---------- Novo / editar ciclo ----------
@@ -327,6 +334,7 @@
     $('jc-mes').value = c ? c.mes : hoje.slice(0, 7);
     $('jc-titulo').value = c ? c.titulo : '';
     $('jc-prazo').value = c ? c.prazo : '';
+    $('jc-reforco').value = String(c ? c.reforco || 0 : 0);
     turmasDaSerie($('jc-serie').value);
     casosDaSerie($('jc-serie').value, c ? c.missoes.map((m) => m.missao) : []);
     $('modal-jog-ciclo').showModal();
@@ -347,7 +355,10 @@
         turmas: [...document.querySelectorAll('#jc-turmas input:checked')].map((i) => i.value),
         titulo: $('jc-titulo').value, mes: $('jc-mes').value, prazo: $('jc-prazo').value,
         missoes: [...document.querySelectorAll('#jc-casos input:checked')].map((i) => i.value),
+        reforco: Number($('jc-reforco').value),
       };
+      const editado = dados.id && jog.ciclos.find((c) => c.id === dados.id);
+      if (editado && editado.reforco !== dados.reforco && !confirm('Mudar o número de casos de reforço refaz a escolha do reforço de cada aluno. Continuar?')) return;
       comBotao($('jc-salvar'), async () => {
         jog.ciclos = await chamar('profSalvarCiclo', dados);
         $('modal-jog-ciclo').close();
