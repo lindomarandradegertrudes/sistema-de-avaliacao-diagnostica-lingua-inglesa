@@ -140,6 +140,10 @@
             <div class="campo so-questionario"><label for="ed-qtd">Quantidade de questões (para a IA)</label><input id="ed-qtd" type="number" min="3" max="25" value="10"></div>
             <div class="campo so-tda" hidden><label for="ed-tda-modo">Como a TDA será feita</label>
               <select id="ed-tda-modo"><option value="individual">Individual</option><option value="grupo">Em grupo (grupos do mês)</option></select></div>
+            <div class="campo so-tda" hidden><label style="display:flex;gap:8px;align-items:flex-start;font-weight:400">
+              <input type="checkbox" id="ed-tda-canva" style="width:auto;margin-top:4px">
+              <span><strong>Permitir Canva e anexos</strong><br><span class="suave pequeno">Mostra o botão "Abrir o Canva", o campo de link e os anexos nesta TDA. Desmarcado, o aluno só escreve no editor.</span></span>
+            </label></div>
           </div>
           <div class="campo" style="margin-top:14px">
             <label for="ed-conteudo">Conteúdo do mês</label>
@@ -232,6 +236,11 @@
         <div class="campo">
           <label for="cfg-cadastro">Cadastro de novos alunos</label>
           <select id="cfg-cadastro"><option value="SIM">Aberto</option><option value="NÃO">Fechado</option></select>
+        </div>
+        <div class="campo">
+          <label for="cfg-canva">Canva, link e anexos nas TDAs</label>
+          <select id="cfg-canva"><option value="SIM">Liberado (cada TDA pode bloquear)</option><option value="NÃO">Bloqueado em todas as TDAs</option></select>
+          <span class="suave pequeno">Bloqueado, o aluno não vê o botão do Canva, o campo de link nem os anexos (só o editor de texto).</span>
         </div>
         <div class="campo">
           <label>Faixas de nível (média % mínima)</label>
@@ -886,6 +895,7 @@
       $('cfg-dominio').value = c.dominio;
       $('cfg-professores').value = c.professores;
       $('cfg-cadastro').value = c.cadastro_aberto === 'NÃO' ? 'NÃO' : 'SIM';
+      $('cfg-canva').value = c.canva_tda === 'NÃO' ? 'NÃO' : 'SIM';
       $('cfg-b').value = c.faixa_basico;
       $('cfg-i').value = c.faixa_intermediario;
       $('cfg-a').value = c.faixa_avancado;
@@ -902,6 +912,7 @@
           dominio: $('cfg-dominio').value,
           professores: $('cfg-professores').value,
           cadastro_aberto: $('cfg-cadastro').value,
+          canva_tda: $('cfg-canva').value,
           faixa_basico: $('cfg-b').value,
           faixa_intermediario: $('cfg-i').value,
           faixa_avancado: $('cfg-a').value,

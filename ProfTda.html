@@ -8,6 +8,10 @@
   .tda-membro .nome { flex: 1; }
   .tda-entrega { background: var(--fundo); border-radius: 8px; padding: 8px 10px; margin: 8px 0; font-size: .88rem; }
   .tda-entrega .trecho { white-space: pre-wrap; max-height: 5.5em; overflow: hidden; }
+  .texto-tda-prof { background: var(--fundo); border-radius: 8px; padding: 10px 14px; line-height: 1.55; }
+  .texto-tda-prof h2 { font-size: 1.3rem; margin: .5em 0 .25em; }
+  .texto-tda-prof h3 { font-size: 1.08rem; margin: .45em 0 .2em; }
+  .texto-tda-prof p { margin: 0 0 .45em; }
   .rub-grade { width: 100%; border-collapse: collapse; }
   .rub-grade th, .rub-grade td { border: 1px solid var(--borda); padding: 6px; font-size: .82rem; vertical-align: top; }
   .rub-grade td.opcao { cursor: pointer; }
@@ -57,6 +61,44 @@
 </dialog>
 
 <script>
+  // ---------- Texto formatado das TDAs: mesmo filtro do servidor (só negrito, títulos, listas, alinhamento e cor) ----------
+  const TAGS_TDA_PROF = { p: 1, br: 1, b: 1, strong: 1, i: 1, em: 1, u: 1, h2: 1, h3: 1, ul: 1, ol: 1, li: 1, div: 1, span: 1, font: 1 };
+  function limparHtmlTdaProf(html) {
+    const s = String(html || '').replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<(script|style|iframe|object|embed|svg|math|template|textarea|select)\b[\s\S]*?<\/\1\s*>/gi, '');
+    return s.split(/(<[^<>]*>)/).map((parte) => {
+      const m = parte.match(/^<(\/?)([a-zA-Z][a-zA-Z0-9]*)(\s[^>]*|\/)?>$/);
+      if (!m) return parte.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      let nome = m[2].toLowerCase();
+      if (!TAGS_TDA_PROF[nome]) return '';
+      if (nome === 'font') nome = 'span';
+      if (m[1]) return '</' + nome + '>';
+      if (nome === 'br') return '<br>';
+      const attrs = m[3] || '';
+      const estilo = [];
+      const st = attrs.match(/style\s*=\s*("([^"]*)"|'([^']*)')/i);
+      const css = st ? (st[2] || st[3] || '') : '';
+      let cor = (css.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i) || [])[1] || (attrs.match(/\bcolor\s*=\s*["']?([#\w(),\s]+?)["'\s>]/i) || [])[1] || '';
+      cor = cor.trim();
+      if (/^#[0-9a-f]{3,8}$/i.test(cor) || /^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/i.test(cor)) estilo.push('color:' + cor);
+      const al = ((css.match(/text-align\s*:\s*([a-z]+)/i) || [])[1] || (attrs.match(/\balign\s*=\s*["']?([a-z]+)/i) || [])[1] || '').toLowerCase();
+      if (['left', 'center', 'right', 'justify'].indexOf(al) !== -1) estilo.push('text-align:' + al);
+      if (/font-weight\s*:\s*(bold|[6-9]00)/i.test(css)) estilo.push('font-weight:bold');
+      if (/font-style\s*:\s*italic/i.test(css)) estilo.push('font-style:italic');
+      if (/text-decoration(-line)?\s*:[^;]*underline/i.test(css)) estilo.push('text-decoration:underline');
+      return '<' + nome + (estilo.length ? ' style="' + estilo.join(';') + '"' : '') + '>';
+    }).join('');
+  }
+  function textoPuroTdaProf(html) {
+    return String(html || '').replace(/<(br|\/p|\/div|\/h2|\/h3|\/li)\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
+  }
+  /** Conteúdo da entrega para mostrar: texto formatado (filtrado) ou texto simples das entregas antigas. */
+  function conteudoEntregaTdaProf(e) {
+    return e.formato === 'html' ? limparHtmlTdaProf(e.texto) : esc(e.texto).replace(/\n/g, '<br>');
+  }
+  function palavrasTdaProf(texto) { const t = String(texto || '').trim(); return t ? t.split(/\s+/).length : 0; }
+
   const tdaEstado = { dados: null, turma: '', unidade: null, niveis: [] };
   const NIVEL_ROTULO = { 4: '4 – Excelente', 3: '3 – Satisfatório', 2: '2 – Em desenvolvimento', 1: '1 – Insuficiente' };
 
@@ -69,6 +111,7 @@
   function preencherTdaEditor(t) {
     const tda = Object.assign(tdaVazia(), t || {});
     $('ed-tda-modo').value = tda.modo === 'grupo' ? 'grupo' : 'individual';
+    $('ed-tda-canva').checked = tda.canva !== false;
     $('ed-tda-situacao').value = tda.situacao || '';
     $('ed-tda-produto').value = tda.produto || '';
     $('ed-tda-tarefas').value = (tda.tarefas || []).join('\n');
@@ -97,6 +140,7 @@
     const linhas = (id) => $(id).value.split('\n').map((s) => s.trim()).filter(Boolean);
     return {
       modo: $('ed-tda-modo').value,
+      canva: $('ed-tda-canva').checked,
       situacao: $('ed-tda-situacao').value,
       produto: $('ed-tda-produto').value,
       tarefas: linhas('ed-tda-tarefas'),
@@ -199,7 +243,8 @@
         <h3>${esc(u.titulo)} <span class="espaco"></span>${selo}</h3>
         ${e ? `<div class="tda-entrega">
             <div class="suave pequeno">Enviado por ${esc(e.enviadoPor)} · ${esc(e.atualizado_em)}</div>
-            ${e.texto ? `<div class="trecho">${esc(e.texto)}</div>` : ''}
+            ${e.titulo ? `<div><strong>${esc(e.titulo)}</strong></div>` : ''}
+            ${e.texto ? `<div class="trecho">${esc(e.formato === 'html' ? textoPuroTdaProf(e.texto) : e.texto)}</div>` : ''}
             ${e.link ? `<div>🔗 <a href="${esc(e.link)}" target="_blank" rel="noopener">abrir link</a></div>` : ''}
             ${e.anexos.length ? `<div>📎 ${e.anexos.length} anexo(s)</div>` : ''}
           </div>` : ''}
@@ -226,7 +271,9 @@
     const e = unidade.entrega;
     $('mt-entrega').innerHTML = e ? `<div class="cartao">
         <h3>Entrega <span class="suave pequeno">· enviada por ${esc(e.enviadoPor)} em ${esc(e.atualizado_em)}</span></h3>
-        ${e.texto ? `<div style="white-space:pre-wrap;background:var(--fundo);border-radius:8px;padding:10px 12px">${esc(e.texto)}</div>` : '<p class="suave pequeno">Sem texto.</p>'}
+        ${e.titulo ? `<h2 style="margin:6px 0">${esc(e.titulo)}</h2>` : ''}
+        ${e.texto ? `<div class="texto-tda-prof">${conteudoEntregaTdaProf(e)}</div>
+          <p class="suave pequeno" style="margin:4px 0 0">${palavrasTdaProf(e.formato === 'html' ? textoPuroTdaProf(e.texto) : e.texto)} palavras</p>` : '<p class="suave pequeno">Sem texto.</p>'}
         ${e.link ? `<p>🔗 <a href="${esc(e.link)}" target="_blank" rel="noopener">${esc(e.link)}</a></p>` : ''}
         ${e.anexos.map((a) => `<p>📎 <a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.nome)}</a></p>`).join('')}
         ${Object.keys(e.saidas || {}).filter((m) => e.saidas[m].vezes).map((m) => {

@@ -104,17 +104,18 @@ function testeResponder(id, marcadas) {
 function testeAbrirTda(id) {
   const q = questionarioTeste_(id, true);
   return {
-    id: q.id, titulo: q.titulo, aberta: true, modo: q.tda.modo, monitorar: false, teste: true,
+    id: q.id, titulo: q.titulo, aberta: true, modo: q.tda.modo, monitorar: false, teste: true, canva: canvaLiberado_(q),
     situacao: q.tda.situacao, produto: q.tda.produto, tarefas: q.tda.tarefas, criterios: q.tda.criterios,
     rubrica: q.tda.rubrica, correcao: null, entrega: null, grupo: null,
   };
 }
 
 function testeEnviarTda(id, dados) {
-  questionarioTeste_(id, true);
-  const texto = String((dados && dados.texto) || '').trim();
-  const link = String((dados && dados.link) || '').trim();
-  const arquivos = Array.isArray(dados && dados.arquivos) ? dados.arquivos : [];
+  const q = questionarioTeste_(id, true);
+  const liberado = canvaLiberado_(q);
+  const texto = dados && dados.formato === 'html' ? textoPuroTda_(limparHtmlTda_(dados.texto)) : String((dados && dados.texto) || '').trim();
+  const link = liberado ? String((dados && dados.link) || '').trim() : '';
+  const arquivos = liberado && Array.isArray(dados && dados.arquivos) ? dados.arquivos : [];
   if (link && !/^https?:\/\/\S+$/i.test(link)) throw new Error('O link precisa começar com http:// ou https://');
   if (arquivos.length > MAX_ANEXOS) throw new Error('Envie no máximo ' + MAX_ANEXOS + ' anexos.');
   if (!texto && !link && !arquivos.length) throw new Error('Escreva sua resposta, cole um link ou anexe um arquivo.');

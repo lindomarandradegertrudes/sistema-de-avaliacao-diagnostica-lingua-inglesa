@@ -57,6 +57,19 @@
     .ciclo-topo .vencido { color: #c92a2a; font-weight: 700; }
     .sep-ciclo { border: 0; border-top: 1px dashed var(--borda); margin: 14px 0; }
     .patente { display: inline-block; font-weight: 800; background: #ffd23f; border: 2px solid #121212; border-radius: 99px; padding: 2px 12px; }
+    .editor-tda { border: 1px solid var(--borda); border-radius: 10px; background: #fff; overflow: hidden; }
+    .editor-barra { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 6px 8px; background: var(--fundo); border-bottom: 1px solid var(--borda); }
+    .editor-barra button { border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 4px 8px; font: inherit; font-size: .88rem; cursor: pointer; min-width: 32px; color: inherit; }
+    .editor-barra button:hover { background: #fff; border-color: var(--borda); }
+    .editor-barra .sep { width: 1px; height: 22px; background: var(--borda); margin: 0 4px; }
+    .editor-barra .cor { width: 22px; height: 22px; min-width: 22px; padding: 0; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--borda); }
+    .editor-area { min-height: 280px; max-height: 60vh; overflow-y: auto; padding: 18px 22px; outline: none; line-height: 1.6; font-size: 1rem; }
+    .editor-area:empty::before { content: attr(data-placeholder); color: #adb5bd; }
+    .editor-area h2, .texto-tda h2 { font-size: 1.35rem; margin: .6em 0 .3em; }
+    .editor-area h3, .texto-tda h3 { font-size: 1.1rem; margin: .5em 0 .25em; }
+    .editor-area p, .texto-tda p { margin: 0 0 .5em; }
+    .texto-tda { white-space: normal !important; }
+    #tda-titulo-trab { font-size: 1.1rem; font-weight: 700; }
     #aviso-saida {
       position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 20; max-width: calc(100vw - 32px);
       background: #c92a2a; color: #fff; padding: 12px 18px; border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.25); font-weight: 600;
@@ -149,11 +162,45 @@
       <form id="tda-form" class="cartao" hidden>
         <h2 id="tda-form-titulo">Minha entrega</h2>
         <p class="suave pequeno" id="tda-form-ajuda"></p>
-        <div class="campo"><label for="tda-texto">Texto</label>
-          <textarea id="tda-texto" rows="8" placeholder="Write your text here…" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false"></textarea></div>
-        <div class="campo"><label for="tda-link">Link (Canva, Padlet, Google Docs…)</label>
-          <input id="tda-link" type="url" placeholder="https://…" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off"></div>
-        <div class="campo"><label for="tda-arquivos">Anexos (foto, PDF, Word, PowerPoint – até 3, máx. 10 MB cada)</label>
+        <div class="campo"><label for="tda-titulo-trab">Título do trabalho</label>
+          <input id="tda-titulo-trab" maxlength="200" placeholder="Title of your work" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false"></div>
+        <div class="campo"><label>Texto</label>
+          <div class="editor-tda">
+            <div class="editor-barra" id="tda-barra" role="toolbar" aria-label="Formatação do texto">
+              <button type="button" data-cmd="bold" title="Negrito"><b>B</b></button>
+              <button type="button" data-cmd="italic" title="Itálico"><i>I</i></button>
+              <button type="button" data-cmd="underline" title="Sublinhado"><u>U</u></button>
+              <span class="sep"></span>
+              <button type="button" data-bloco="h2" title="Título"><strong>Título</strong></button>
+              <button type="button" data-bloco="h3" title="Subtítulo">Subtítulo</button>
+              <button type="button" data-bloco="p" title="Texto normal">Normal</button>
+              <span class="sep"></span>
+              <button type="button" data-cmd="insertUnorderedList" title="Lista com marcadores">• Lista</button>
+              <button type="button" data-cmd="insertOrderedList" title="Lista numerada">1. Lista</button>
+              <span class="sep"></span>
+              <button type="button" data-cmd="justifyLeft" title="Alinhar à esquerda">⇤</button>
+              <button type="button" data-cmd="justifyCenter" title="Centralizar">↔</button>
+              <button type="button" data-cmd="justifyRight" title="Alinhar à direita">⇥</button>
+              <span class="sep"></span>
+              <button type="button" class="cor" data-cor="#212529" title="Preto" style="background:#212529"></button>
+              <button type="button" class="cor" data-cor="#1c7ed6" title="Azul" style="background:#1c7ed6"></button>
+              <button type="button" class="cor" data-cor="#e03131" title="Vermelho" style="background:#e03131"></button>
+              <button type="button" class="cor" data-cor="#2f9e44" title="Verde" style="background:#2f9e44"></button>
+              <button type="button" class="cor" data-cor="#7048e8" title="Roxo" style="background:#7048e8"></button>
+              <button type="button" class="cor" data-cor="#f76707" title="Laranja" style="background:#f76707"></button>
+            </div>
+            <div id="tda-editor" class="editor-area" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Texto do trabalho"
+              data-placeholder="Write your text here…" spellcheck="false" autocorrect="off" autocapitalize="off" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false"></div>
+          </div>
+          <div class="linha pequeno suave" style="margin-top:4px"><span id="tda-contagem">0 palavras</span><span class="espaco"></span><span id="tda-rascunho"></span></div>
+        </div>
+        <div class="campo" id="tda-link-campo"><label for="tda-link">Link do Canva</label>
+          <input id="tda-link" type="url" placeholder="https://…" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off">
+          <div class="linha" style="gap:8px;margin-top:6px;flex-wrap:wrap">
+            <button class="btn mini primario" type="button" id="tda-abrir-canva">🎨 Abrir o Canva</button>
+            <span class="suave pequeno" id="tda-link-status" style="flex:1">Use este botão para ir ao Canva e copiar o link do seu trabalho.</span>
+          </div></div>
+        <div class="campo" id="tda-anexos-campo"><label for="tda-arquivos">Anexos (foto, PDF, Word, PowerPoint – até 3, máx. 10 MB cada)</label>
           <div id="tda-anexos-atuais"></div>
           <input id="tda-arquivos" type="file" multiple accept="image/*,.pdf,.doc,.docx,.ppt,.pptx"></div>
         <div class="rodape-modal"><span class="suave pequeno" id="tda-status" style="flex:1"></span>
@@ -184,6 +231,45 @@
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const LETRAS = ['A', 'B', 'C', 'D', 'E'];
+
+    // ---------- Texto formatado das TDAs: mesmo filtro do servidor (só negrito, títulos, listas, alinhamento e cor) ----------
+    const TAGS_TDA = { p: 1, br: 1, b: 1, strong: 1, i: 1, em: 1, u: 1, h2: 1, h3: 1, ul: 1, ol: 1, li: 1, div: 1, span: 1, font: 1 };
+    function limparHtmlTda(html) {
+      const s = String(html || '').replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/<(script|style|iframe|object|embed|svg|math|template|textarea|select)\b[\s\S]*?<\/\1\s*>/gi, '');
+      return s.split(/(<[^<>]*>)/).map((parte) => {
+        const m = parte.match(/^<(\/?)([a-zA-Z][a-zA-Z0-9]*)(\s[^>]*|\/)?>$/);
+        if (!m) return parte.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        let nome = m[2].toLowerCase();
+        if (!TAGS_TDA[nome]) return '';
+        if (nome === 'font') nome = 'span';
+        if (m[1]) return '</' + nome + '>';
+        if (nome === 'br') return '<br>';
+        const attrs = m[3] || '';
+        const estilo = [];
+        const st = attrs.match(/style\s*=\s*("([^"]*)"|'([^']*)')/i);
+        const css = st ? (st[2] || st[3] || '') : '';
+        let cor = (css.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i) || [])[1] || (attrs.match(/\bcolor\s*=\s*["']?([#\w(),\s]+?)["'\s>]/i) || [])[1] || '';
+        cor = cor.trim();
+        if (/^#[0-9a-f]{3,8}$/i.test(cor) || /^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/i.test(cor)) estilo.push('color:' + cor);
+        const al = ((css.match(/text-align\s*:\s*([a-z]+)/i) || [])[1] || (attrs.match(/\balign\s*=\s*["']?([a-z]+)/i) || [])[1] || '').toLowerCase();
+        if (['left', 'center', 'right', 'justify'].indexOf(al) !== -1) estilo.push('text-align:' + al);
+        if (/font-weight\s*:\s*(bold|[6-9]00)/i.test(css)) estilo.push('font-weight:bold');
+        if (/font-style\s*:\s*italic/i.test(css)) estilo.push('font-style:italic');
+        if (/text-decoration(-line)?\s*:[^;]*underline/i.test(css)) estilo.push('text-decoration:underline');
+        return '<' + nome + (estilo.length ? ' style="' + estilo.join(';') + '"' : '') + '>';
+      }).join('');
+    }
+    function textoPuroTda(html) {
+      return String(html || '').replace(/<(br|\/p|\/div|\/h2|\/h3|\/li)\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '')
+        .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
+    }
+    /** Conteúdo da entrega para mostrar: texto formatado (filtrado) ou texto simples das entregas antigas. */
+    function conteudoEntregaTda(e) {
+      return e.formato === 'html' ? limparHtmlTda(e.texto) : esc(e.texto).replace(/\n/g, '<br>');
+    }
+    function palavrasTda(texto) { const t = String(texto || '').trim(); return t ? t.split(/\s+/).length : 0; }
+
     let estadoAtual = null;
     let quizAtual = null;
 
@@ -215,7 +301,12 @@
     // ---------- Monitoramento de saídas da tela (questionários e TDAs) ----------
     // Um site não consegue bloquear outras abas; aqui só percebemos a saída, avisamos o aluno e registramos para o professor.
     // A contagem fica guardada no navegador para não zerar se o aluno recarregar a página.
-    const monitor = { chave: null, dados: null, ausente: false, inicio: 0, porVisibilidade: false, seletorArquivo: false };
+    // Saídas curtas (até 5 s) não contam: o aluno pode alternar a tela rapidamente sem ser registrado.
+    const TOLERANCIA_SAIDA_MS = 5000;
+    // TDA: depois de clicar em "Abrir o Canva", a saída seguinte (até 3 min) também não conta.
+    const TEMPO_BUSCAR_LINK_MS = 3 * 60 * 1000;
+    const PRAZO_PARA_SAIR_MS = 60 * 1000;
+    const monitor = { chave: null, dados: null, ausente: false, inicio: 0, porVisibilidade: false, seletorArquivo: false, liberarLink: 0, saidaLink: false };
     let temporizadorAviso;
 
     function lerMonitor(chave) {
@@ -250,6 +341,8 @@
       if (!monitor.chave || monitor.seletorArquivo) return;
       if (monitor.ausente) { monitor.porVisibilidade = monitor.porVisibilidade || porVisibilidade; return; }
       monitor.ausente = true;
+      monitor.saidaLink = !!monitor.liberarLink && Date.now() - monitor.liberarLink <= PRAZO_PARA_SAIR_MS;
+      monitor.liberarLink = 0;
       monitor.porVisibilidade = porVisibilidade;
       monitor.inicio = Date.now();
       monitor.dados.desde = monitor.inicio;
@@ -259,13 +352,23 @@
       if (monitor.seletorArquivo) { monitor.seletorArquivo = false; return; }
       if (!monitor.chave || !monitor.ausente) return;
       monitor.ausente = false;
-      registrarVolta(monitor.inicio, monitor.porVisibilidade);
+      registrarVolta(monitor.inicio, false);
     }
     function registrarVolta(desde, contaSempre) {
       const duracao = Date.now() - desde;
       monitor.dados.desde = 0;
-      // Trocar de aba sempre conta; perder o foco da janela só conta a partir de 1,5 s (evita cliques acidentais).
-      if (contaSempre || duracao >= 1500) {
+      const peloLink = monitor.saidaLink && !contaSempre;
+      monitor.saidaLink = false;
+      if (peloLink) {
+        // O limite de 3 minutos não é mostrado ao aluno; passando dele, a saída conta como qualquer outra.
+        if (duracao <= TEMPO_BUSCAR_LINK_MS) {
+          $('tda-link-status').textContent = '✅ Agora cole o link do Canva no campo acima.';
+          gravarMonitor();
+          return;
+        }
+      }
+      // Trocar de aba ou de janela só conta a partir de 5 s; recarregar ou fechar a página no meio da atividade sempre conta.
+      if (contaSempre || duracao >= TOLERANCIA_SAIDA_MS) {
         monitor.dados.vezes += 1;
         monitor.dados.ms += duracao;
         const aviso = $('aviso-saida');
@@ -482,7 +585,7 @@
     function renderQuiz() {
       $('quiz-titulo').textContent = quizAtual.titulo;
       $('quiz-questoes').innerHTML = (quizAtual.monitorar !== false
-        ? '<p class="suave pequeno" style="margin:0">⚠️ Fique nesta tela até terminar: sair para outras abas ou janelas fica registrado para o professor.</p>'
+        ? '<p class="suave pequeno" style="margin:0">⚠️ Fique nesta tela até terminar: sair para outras abas ou janelas por mais de 5 segundos fica registrado para o professor.</p>'
         : '') + quizAtual.questoes.map((q, i) => `
         <div class="cartao questao">
           <span class="num">Questão ${i + 1}</span>
@@ -602,7 +705,8 @@
       $('tda-entrega-atual').innerHTML = e && !podeEditar ? `
         <div class="cartao"><h2>${t.modo === 'grupo' && e.grupo != null ? 'Entrega do grupo' : 'Minha entrega'}</h2>
           <p class="suave pequeno">Enviada por ${esc(e.enviadoPor)} · ${esc(e.atualizado_em)}</p>
-          ${e.texto ? `<div class="apoio" style="font-style:normal">${esc(e.texto)}</div>` : ''}
+          ${e.titulo ? `<h3 style="margin:8px 0 0">${esc(e.titulo)}</h3>` : ''}
+          ${e.texto ? `<div class="apoio texto-tda" style="font-style:normal">${conteudoEntregaTda(e)}</div>` : ''}
           ${e.link ? `<p>🔗 <a href="${esc(e.link)}" target="_blank" rel="noopener">${esc(e.link)}</a></p>` : ''}
           ${e.anexos.map((a) => `<p>📎 ${esc(a.nome)}</p>`).join('')}
         </div>` : (!e && !podeEditar && !c ? '<div class="cartao suave">Esta TDA não está mais recebendo entregas.</div>' : '');
@@ -612,11 +716,10 @@
         $('tda-form-titulo').textContent = e ? 'Atualizar entrega' : 'Minha entrega';
         $('tda-form-ajuda').textContent = (t.modo === 'grupo' && (e ? e.grupo != null : t.grupo)
           ? 'A entrega vale para todo o grupo. Qualquer integrante pode enviar ou atualizar. '
-          : '') + 'Você pode escrever o texto, colar um link e/ou anexar arquivos. Dá para atualizar até o professor corrigir.' +
-          (t.monitorar !== false ? ' ⚠️ Nesta TDA, sair desta tela (outras abas ou sites) fica registrado para o professor.' : '') +
+          : '') + (t.canva ? 'Você pode escrever o texto, colar um link e/ou anexar arquivos.' : 'Escreva o seu trabalho no editor abaixo.') + ' Dá para atualizar até o professor corrigir.' +
+          (t.monitorar !== false ? ' ⚠️ Nesta TDA, sair desta tela (outras abas ou sites) por mais de 5 segundos fica registrado para o professor.' : '') +
           (e ? ` Última atualização: ${e.atualizado_em}, por ${e.enviadoPor}.` : '');
-        $('tda-texto').value = e ? e.texto : '';
-        $('tda-link').value = e ? e.link : '';
+        preencherEditorTda(t, e);
         $('tda-arquivos').value = '';
         $('tda-anexos-atuais').innerHTML = e && e.anexos.length ? e.anexos.map((a) => `
           <label class="anexo-atual"><input type="checkbox" data-manter="${esc(a.id)}" checked> manter 📎 ${esc(a.nome)}</label>`).join('') : '';
@@ -629,7 +732,81 @@
 
     // Abrir o seletor de arquivos tira o foco da página, mas não é saída da atividade.
     $('tda-arquivos').addEventListener('click', () => (monitor.seletorArquivo = true));
+    function liberarSaidaParaLink(texto) {
+      monitor.liberarLink = Date.now();
+      $('tda-link-status').textContent = texto;
+    }
+    $('tda-abrir-canva').addEventListener('click', () => {
+      liberarSaidaParaLink('🎨 O Canva abriu em outra aba. Copie o link (Compartilhar › Copiar link) e volte para colar acima.');
+      window.open(['https:', '', 'www.canva.com', ''].join('/'), '_blank', 'noopener');
+    });
     $('tda-arquivos').addEventListener('change', () => (monitor.seletorArquivo = false));
+
+    // ---------- Editor de texto da TDA (parecido com o Word, sem corretor) ----------
+    const editorTda = $('tda-editor');
+    function comandoEditor(cmd, valor) {
+      editorTda.focus();
+      // Sem CSS: negrito, itálico e sublinhado viram <b>, <i> e <u>; a cor vira <font color>.
+      try { document.execCommand('styleWithCSS', false, false); } catch (e) { /* navegador antigo */ }
+      document.execCommand(cmd, false, valor || null);
+      atualizarContagemTda();
+      salvarRascunhoTda();
+    }
+    // Os botões não tiram o cursor do texto.
+    $('tda-barra').addEventListener('mousedown', (ev) => { if (ev.target.closest('button')) ev.preventDefault(); });
+    $('tda-barra').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      if (b.dataset.cmd) comandoEditor(b.dataset.cmd);
+      else if (b.dataset.bloco) comandoEditor('formatBlock', '<' + b.dataset.bloco + '>');
+      else if (b.dataset.cor) comandoEditor('foreColor', b.dataset.cor);
+    });
+    editorTda.addEventListener('focus', () => { try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) { /* ignora */ } });
+
+    // Colar texto de fora não é permitido (no título e no texto). O link do Canva pode ser colado.
+    function avisoColarTda(ev) {
+      ev.preventDefault();
+      $('tda-rascunho').textContent = '🚫 Aqui não dá para colar texto: escreva com as suas palavras.';
+    }
+    [editorTda, $('tda-titulo-trab')].forEach((el) => { el.addEventListener('paste', avisoColarTda); el.addEventListener('drop', avisoColarTda); });
+    editorTda.addEventListener('beforeinput', (ev) => { if (/^insertFrom(Paste|Drop|YankNoPaste|PasteAsQuotation)/.test(ev.inputType)) avisoColarTda(ev); });
+
+    function atualizarContagemTda() {
+      const n = palavrasTda(editorTda.innerText);
+      $('tda-contagem').textContent = n + (n === 1 ? ' palavra' : ' palavras');
+    }
+
+    // Rascunho automático: fica guardado neste navegador até a entrega ser enviada.
+    let temporizadorRascunho;
+    const chaveRascunhoTda = (id) => 'rascunhoTda:' + id;
+    function lerRascunhoTda(id) { try { return JSON.parse(localStorage.getItem(chaveRascunhoTda(id))) || null; } catch (e) { return null; } }
+    function apagarRascunhoTda(id) { try { localStorage.removeItem(chaveRascunhoTda(id)); } catch (e) { /* ignora */ } }
+    function salvarRascunhoTda() {
+      clearTimeout(temporizadorRascunho);
+      temporizadorRascunho = setTimeout(() => {
+        if (!tdaAtual || $('tda-form').hidden) return;
+        try {
+          localStorage.setItem(chaveRascunhoTda(tdaAtual.id), JSON.stringify({ titulo: $('tda-titulo-trab').value, html: editorTda.innerHTML, link: $('tda-link').value }));
+          $('tda-rascunho').textContent = '💾 Rascunho salvo neste computador.';
+        } catch (e) { /* sem armazenamento: segue sem rascunho */ }
+      }, 700);
+    }
+    editorTda.addEventListener('input', () => { atualizarContagemTda(); salvarRascunhoTda(); });
+    $('tda-titulo-trab').addEventListener('input', salvarRascunhoTda);
+    $('tda-link').addEventListener('input', salvarRascunhoTda);
+
+    /** Preenche o formulário com o rascunho (se houver) ou com a entrega já enviada. */
+    function preencherEditorTda(t, e) {
+      const r = lerRascunhoTda(t.id);
+      $('tda-titulo-trab').value = r ? (r.titulo || '') : (e ? e.titulo || '' : '');
+      editorTda.innerHTML = r ? limparHtmlTda(r.html) : (e && e.texto ? conteudoEntregaTda(e) : '');
+      $('tda-link').value = t.canva ? (r ? (r.link || '') : (e ? e.link : '')) : '';
+      $('tda-link-campo').hidden = !t.canva;
+      $('tda-anexos-campo').hidden = !t.canva;
+      $('tda-rascunho').textContent = r ? '📝 Rascunho recuperado deste computador (ainda não enviado).' : '';
+      atualizarContagemTda();
+    }
+
 
     /** Lê o arquivo em base64. Fotos grandes são reduzidas (máx. 1600 px) para envio mais rápido. */
     function lerArquivo(arquivo) {
@@ -661,12 +838,12 @@
 
     $('tda-form').addEventListener('submit', async (ev) => {
       ev.preventDefault();
-      const arquivos = [...$('tda-arquivos').files];
+      const arquivos = tdaAtual.canva ? [...$('tda-arquivos').files] : [];
       const manter = [...document.querySelectorAll('#tda-anexos-atuais [data-manter]')].filter((c) => c.checked).map((c) => c.dataset.manter);
       if (manter.length + arquivos.length > 3) { alert('Envie no máximo 3 anexos no total.'); return; }
       const grande = arquivos.find((a) => a.size > 10 * 1024 * 1024 && !/^image\//.test(a.type));
       if (grande) { alert(`O arquivo "${grande.name}" passa de 10 MB.`); return; }
-      if (!$('tda-texto').value.trim() && !$('tda-link').value.trim() && !manter.length && !arquivos.length) {
+      if (!editorTda.innerText.trim() && !$('tda-link').value.trim() && !manter.length && !arquivos.length) {
         alert('Escreva sua resposta, cole um link ou anexe um arquivo.');
         return;
       }
@@ -676,9 +853,11 @@
       try {
         const lidos = await Promise.all(arquivos.map(lerArquivo));
         const t = await chamar('alunoEnviarTda', tdaAtual.id, {
-          texto: $('tda-texto').value, link: $('tda-link').value.trim(), manterAnexos: manter, arquivos: lidos, saidas: saidasAtuais(),
+          titulo: $('tda-titulo-trab').value, texto: editorTda.innerText.trim() ? editorTda.innerHTML : '', formato: 'html',
+          link: tdaAtual.canva ? $('tda-link').value.trim() : '', manterAnexos: manter, arquivos: lidos, saidas: saidasAtuais(),
         });
         zerarSaidas(); // o servidor soma as saídas de cada envio
+        apagarRascunhoTda(t.id);
         renderTda(t);
         alert(t.simulado ? 'Modo teste: a entrega foi conferida, mas não foi gravada.' : 'Entrega enviada! ✅');
       } catch (e) {

@@ -15,7 +15,7 @@ const CABECALHOS = {
   Questionarios: ['id', 'tipo', 'serie', 'mes', 'titulo', 'conteudo', 'questoes_json', 'status', 'form_id', 'criado_em', 'monitorar'],
   Respostas: ['questionario_id', 'email', 'turma', 'pontuacao', 'total', 'percentual', 'acertos_json', 'origem', 'respondido_em'],
   Grupos: ['mes', 'turma', 'grupo', 'email', 'nome', 'nivel', 'media', 'aplicado_em'],
-  Entregas: ['questionario_id', 'turma', 'grupo', 'membros', 'email', 'texto', 'link', 'anexos_json', 'enviado_em', 'atualizado_em', 'saidas_json'],
+  Entregas: ['questionario_id', 'turma', 'grupo', 'membros', 'email', 'texto', 'link', 'anexos_json', 'enviado_em', 'atualizado_em', 'saidas_json', 'titulo', 'formato'],
   Periodos: ['id', 'nome', 'inicio', 'fim', 'status', 'fechado_em', 'planilha_url'],
   Aulas: ['id', 'turma', 'data', 'descricao', 'criado_em'],
   EntregasDiarias: ['aula_id', 'email', 'status', 'atualizado_em'],
@@ -35,6 +35,7 @@ const CONFIG_PADRAO = [
   ['diaria_verde', 100, 'Entregas diárias: % mínimo para o verde (bônus 1,0).'],
   ['diaria_amarelo', 80, 'Entregas diárias: % mínimo para o amarelo (bônus 0,5).'],
   ['diaria_laranja', 50, 'Entregas diárias: % mínimo para o laranja (bônus 0,2). Abaixo: vermelho (0).'],
+  ['canva_tda', 'SIM', 'SIM = o botão "Abrir o Canva", o campo de link e os anexos aparecem nas TDAs (se a TDA também permitir); NÃO = bloqueados em todas.'],
   ['aluno_teste', 'SIM', 'SIM = qualquer conta da escola pode usar o link ?modo=teste (Aluno teste); NÃO = desligado.'],
 ];
 
@@ -316,6 +317,7 @@ function profResumo() {
       dominio: String(cfg.dominio || ''),
       professores: String(cfg.professores || ''),
       cadastro_aberto: String(cfg.cadastro_aberto || 'SIM'),
+      canva_tda: String(cfg.canva_tda || 'SIM'),
       faixa_basico: Number(cfg.faixa_basico),
       faixa_intermediario: Number(cfg.faixa_intermediario),
       faixa_avancado: Number(cfg.faixa_avancado),
@@ -413,14 +415,21 @@ function profSalvarConfig(novos) {
     dominio: String(novos.dominio || '').replace(/^@/, '').toLowerCase().trim(),
     professores: professores,
     cadastro_aberto: novos.cadastro_aberto === 'NÃO' ? 'NÃO' : 'SIM',
+    canva_tda: novos.canva_tda === 'NÃO' ? 'NÃO' : 'SIM',
     faixa_basico: b,
     faixa_intermediario: i,
     faixa_avancado: a,
   };
   comTrava_(function () {
     const aba = aba_('Config');
+    const existentes = {};
     lerTabela_('Config').forEach(function (l) {
+      existentes[l.chave] = true;
       if (valores.hasOwnProperty(l.chave)) aba.getRange(l._linha, 2).setValue(valores[l.chave]);
+    });
+    // Chaves novas (de versões mais recentes) que ainda não existem na planilha.
+    CONFIG_PADRAO.forEach(function (item) {
+      if (!existentes[item[0]] && valores.hasOwnProperty(item[0])) aba.appendRow([item[0], valores[item[0]], item[2]]);
     });
   });
   return profResumo();

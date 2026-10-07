@@ -20,6 +20,7 @@ function validarTda_(t) {
     produto: texto(t.produto),
     tarefas: lista(t.tarefas),
     criterios: lista(t.criterios),
+    canva: t.canva !== false,
     rubrica: (Array.isArray(t.rubrica) ? t.rubrica : []).map(function (r) {
       return { criterio: texto(r.criterio), n4: texto(r.n4), n3: texto(r.n3), n2: texto(r.n2), n1: texto(r.n1) };
     }).filter(function (r) { return r.criterio; }),
@@ -33,6 +34,12 @@ function validarTda_(t) {
   return tda;
 }
 
+/** O botão do Canva, o campo de link e os anexos aparecem se a chave geral e a opção da TDA permitirem. */
+function canvaLiberado_(q, cfg) {
+  const geral = String((cfg || lerConfig_()).canva_tda || 'SIM').toUpperCase();
+  return geral !== 'NÃO' && geral !== 'NAO' && !(q.tda && q.tda.canva === false);
+}
+
 function buscarTda_(id) {
   const q = buscarQuestionario_(id);
   if (q.tipo !== 'tda' || !q.tda) throw new Error('Esta atividade não é uma TDA.');
@@ -40,6 +47,7 @@ function buscarTda_(id) {
 }
 
 function lerEntregas_() {
+  garantirAba_('Entregas');
   return lerTabela_('Entregas').map(function (e) {
     let anexos = [];
     let saidas = {};
@@ -51,7 +59,7 @@ function lerEntregas_() {
       membros: String(e.membros || '').split(',').map(function (m) { return m.trim().toLowerCase(); }).filter(String),
       email: String(e.email).toLowerCase(), texto: String(e.texto || ''), link: String(e.link || ''),
       anexos: anexos, enviado_em: String(e.enviado_em), atualizado_em: String(e.atualizado_em),
-      saidas: saidas,
+      saidas: saidas, titulo: String(e.titulo || ''), formato: String(e.formato || ''),
     };
   });
 }
@@ -104,7 +112,8 @@ function entregaPublica_(e, nomes, incluirSaidas) {
   if (!e) return null;
   const pub = {
     turma: e.turma, grupo: e.grupo, membros: e.membros.map(function (m) { return { email: m, nome: nomes[m] || m }; }),
-    enviadoPor: nomes[e.email] || e.email, texto: e.texto, link: e.link,
+    enviadoPor: nomes[e.email] || e.email, titulo: e.titulo, formato: e.formato,
+    texto: e.formato === 'html' ? limparHtmlTda_(e.texto) : e.texto, link: e.link,
     anexos: e.anexos.map(function (a) { return { id: a.id, nome: a.nome, url: a.url }; }),
     enviado_em: e.enviado_em, atualizado_em: e.atualizado_em,
   };
@@ -176,7 +185,7 @@ function alunoAbrirTda(id) {
   const correcao = correcaoDe_(lerRespostas_().filter(function (r) { return r.questionario_id === id && r.email === aluno.email; })[0]);
   const grupo = q.tda.modo === 'grupo' ? grupoAtualDoAluno_(aluno.email, aluno.turma) : null;
   return {
-    id: q.id, titulo: q.titulo, aberta: q.status === 'aberto', modo: q.tda.modo, monitorar: q.monitorar,
+    id: q.id, titulo: q.titulo, aberta: q.status === 'aberto', modo: q.tda.modo, monitorar: q.monitorar, canva: canvaLiberado_(q),
     situacao: q.tda.situacao, produto: q.tda.produto, tarefas: q.tda.tarefas, criterios: q.tda.criterios,
     // A rubrica só é mostrada ao aluno depois da correção, junto com os níveis que ele recebeu.
     rubrica: correcao ? q.tda.rubrica : null,
@@ -196,10 +205,16 @@ function alunoEnviarTda(id, dados) {
   if (q.serie !== serieDaTurma_(aluno.turma)) throw new Error('Esta TDA não é da sua série.');
   if (q.status !== 'aberto') throw new Error('Esta TDA não está mais recebendo entregas.');
 
-  const texto = String(dados.texto || '').trim().slice(0, 20000);
-  const link = String(dados.link || '').trim();
+  const html = dados.formato === 'html';
+  const texto = html ? limparHtmlTda_(dados.texto) : String(dados.texto || '').trim().slice(0, 20000);
+  if (texto.length > MAX_HTML_TDA) throw new Error('O texto ficou muito longo. Divida em partes ou anexe um arquivo.');
+  const titulo = String(dados.titulo || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  const temTexto = !!(html ? textoPuroTda_(texto) : texto);
+  // Com o Canva bloqueado nesta TDA, não aparecem o campo de link nem os anexos: nenhum link ou arquivo novo é aceito.
+  const liberado = canvaLiberado_(q);
+  const link = liberado ? String(dados.link || '').trim() : '';
   if (link && !/^https?:\/\/\S+$/i.test(link)) throw new Error('O link precisa começar com http:// ou https://');
-  const novos = Array.isArray(dados.arquivos) ? dados.arquivos : [];
+  const novos = liberado && Array.isArray(dados.arquivos) ? dados.arquivos : [];
   const manter = Array.isArray(dados.manterAnexos) ? dados.manterAnexos.map(String) : [];
 
   const nomes = nomesPorEmail_();
@@ -219,9 +234,10 @@ function alunoEnviarTda(id, dados) {
       if (g) { grupo = g.numero; membros = g.membros; }
     }
 
-    const anexosMantidos = atual ? atual.anexos.filter(function (a) { return manter.indexOf(a.id) !== -1; }) : [];
+    // Bloqueado: os anexos já enviados antes ficam guardados.
+    const anexosMantidos = atual ? atual.anexos.filter(function (a) { return !liberado || manter.indexOf(a.id) !== -1; }) : [];
     if (anexosMantidos.length + novos.length > MAX_ANEXOS) throw new Error('Envie no máximo ' + MAX_ANEXOS + ' anexos.');
-    if (!texto && !link && !anexosMantidos.length && !novos.length) throw new Error('Escreva sua resposta, cole um link ou anexe um arquivo.');
+    if (!temTexto && !link && !anexosMantidos.length && !novos.length) throw new Error('Escreva sua resposta, cole um link ou anexe um arquivo.');
 
     const prefixo = aluno.turma + (grupo ? ' – Grupo ' + grupo : ' – ' + (nomes[aluno.email] || aluno.email));
     const anexos = anexosMantidos.concat(salvarAnexos_(q, novos, prefixo));
@@ -233,11 +249,11 @@ function alunoEnviarTda(id, dados) {
     const agora = new Date();
     const linha = linhaDe_('Entregas', {
       questionario_id: id, turma: aluno.turma, grupo: grupo === null ? '' : grupo, membros: membros.join(','),
-      email: aluno.email, texto: texto, link: link, anexos_json: JSON.stringify(anexos),
+      email: aluno.email, texto: temTexto ? texto : '', link: link, anexos_json: JSON.stringify(anexos), titulo: titulo, formato: html ? 'html' : '',
       enviado_em: atual ? aba_('Entregas').getRange(atual._linha, 9).getValue() : agora, atualizado_em: agora,
       saidas_json: JSON.stringify(saidas),
     });
-    const aba = aba_('Entregas');
+    const aba = garantirAba_('Entregas');
     if (atual) aba.getRange(atual._linha, 1, 1, linha.length).setValues([linha]);
     else aba.appendRow(linha);
   });
@@ -312,4 +328,48 @@ function profApagarCorrecaoTda(id, emails) {
       .forEach(function (l) { aba.deleteRow(l); });
   });
   return profTdaResultados(id);
+}
+
+// ============================================================
+// Texto formatado das TDAs (editor do aluno)
+// ============================================================
+
+const TAGS_TDA = { p: 1, br: 1, b: 1, strong: 1, i: 1, em: 1, u: 1, h2: 1, h3: 1, ul: 1, ol: 1, li: 1, div: 1, span: 1, font: 1 };
+const MAX_HTML_TDA = 60000;
+
+/**
+ * Deixa passar só a formatação do editor: negrito, itálico, sublinhado, títulos, listas, alinhamento e cor.
+ * Qualquer outra marcação (scripts, links, imagens, eventos) é removida; "<" solto vira texto.
+ */
+function limparHtmlTda_(html) {
+  const s = String(html || '').replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(script|style|iframe|object|embed|svg|math|template|textarea|select)\b[\s\S]*?<\/\1\s*>/gi, '');
+  return s.split(/(<[^<>]*>)/).map(function (parte) {
+    const m = parte.match(/^<(\/?)([a-zA-Z][a-zA-Z0-9]*)(\s[^>]*|\/)?>$/);
+    if (!m) return parte.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    let nome = m[2].toLowerCase();
+    if (!TAGS_TDA[nome]) return '';
+    if (nome === 'font') nome = 'span';
+    if (m[1]) return '</' + nome + '>';
+    if (nome === 'br') return '<br>';
+    const attrs = m[3] || '';
+    const estilo = [];
+    const st = attrs.match(/style\s*=\s*("([^"]*)"|'([^']*)')/i);
+    const css = st ? (st[2] || st[3] || '') : '';
+    let cor = (css.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i) || [])[1] || (attrs.match(/\bcolor\s*=\s*["']?([#\w(),\s]+?)["'\s>]/i) || [])[1] || '';
+    cor = cor.trim();
+    if (/^#[0-9a-f]{3,8}$/i.test(cor) || /^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/i.test(cor)) estilo.push('color:' + cor);
+    const al = ((css.match(/text-align\s*:\s*([a-z]+)/i) || [])[1] || (attrs.match(/\balign\s*=\s*["']?([a-z]+)/i) || [])[1] || '').toLowerCase();
+    if (['left', 'center', 'right', 'justify'].indexOf(al) !== -1) estilo.push('text-align:' + al);
+    if (/font-weight\s*:\s*(bold|[6-9]00)/i.test(css)) estilo.push('font-weight:bold');
+    if (/font-style\s*:\s*italic/i.test(css)) estilo.push('font-style:italic');
+    if (/text-decoration(-line)?\s*:[^;]*underline/i.test(css)) estilo.push('text-decoration:underline');
+    return '<' + nome + (estilo.length ? ' style="' + estilo.join(';') + '"' : '') + '>';
+  }).join('');
+}
+
+/** Só o texto (sem marcação), para conferir se o aluno escreveu algo e para o resumo do professor. */
+function textoPuroTda_(html) {
+  return String(html || '').replace(/<(br|\/p|\/div|\/h2|\/h3|\/li)\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/[ \t]+\n/g, '\n').trim();
 }
