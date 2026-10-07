@@ -186,7 +186,7 @@ function cadeadosParaTreino_(serie, casos) {
 
 function treinosDoAluno_(email, casos) {
   return Object.keys(casos).map(function (k) { return casos[k]; })
-    .filter(function (c) { return c.dados.reforco && c.dados.reforco.email === email; })
+    .filter(function (c) { return c.dados.reforco && c.dados.reforco.email === email && !c.dados.reforco.teste; })
     .sort(function (a, b) { return (a.dados.reforco.numero || 0) - (b.dados.reforco.numero || 0); });
 }
 
@@ -210,7 +210,7 @@ function meuReforco_(email, serie, ctx) {
 /** Devolve o treino em andamento ou monta um novo (4 cadeados das habilidades mais fracas). */
 function alunoNovoReforco() {
   const eu = jogador_();
-  if (eu.professor) throw new Error('O "Meu reforço" é montado para cada aluno.');
+  if (eu.professor || eu.teste) throw new Error('O "Meu reforço" é montado para cada aluno.');
   const serie = serieDaTurma_(eu.turma);
   const ctx = contextoDificuldades_();
   const treinos = treinosDoAluno_(eu.email, ctx.casos);

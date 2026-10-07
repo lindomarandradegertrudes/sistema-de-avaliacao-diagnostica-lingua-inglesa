@@ -63,7 +63,7 @@
     }
   </style>
 </head>
-<body>
+<body data-teste="<?= modoTeste ?>">
   <header class="topo">
     <div class="marca">English Learning App</div>
     <div class="suave pequeno"><?= email ?></div>
@@ -89,7 +89,17 @@
 
     <!-- Painel do aluno -->
     <div id="painel" class="pilha" hidden>
-      <div class="cartao">
+      <div class="cartao" id="teste-card" hidden>
+        <h1 class="ola">🧪 Aluno teste</h1>
+        <p class="suave" style="margin:0">Modo de demonstração: experimente tudo o que o aluno vê. Nada vale nota nem aparece nos relatórios.</p>
+        <div class="linha" style="margin-top:10px;gap:8px;flex-wrap:wrap">
+          <label for="teste-serie" class="pequeno" style="margin:0">Série</label>
+          <select id="teste-serie" style="width:auto"></select>
+          <span class="espaco"></span>
+          <button class="btn" id="teste-recomecar" type="button">Recomeçar do zero</button>
+        </div>
+      </div>
+      <div class="cartao" id="ola-card">
         <h1 class="ola">Hello, <span id="primeiro-nome"></span>! 👋</h1>
         <p class="suave" style="margin:0"><span id="nome-completo"></span> · Turma <strong id="minha-turma"></strong></p>
       </div>
@@ -109,11 +119,11 @@
         <h2>Tarefas (TDA)</h2>
         <div id="tdas"></div>
       </div>
-      <div class="cartao">
+      <div class="cartao" id="grupo-card">
         <h2>Meu grupo</h2>
         <div id="meu-grupo"></div>
       </div>
-      <p class="suave pequeno" style="text-align:center">Algum dado errado? Avise o professor para corrigir.</p>
+      <p class="suave pequeno" style="text-align:center" id="rodape-aluno">Algum dado errado? Avise o professor para corrigir.</p>
     </div>
 
     <!-- Respondendo -->
@@ -153,7 +163,7 @@
 
     <div id="enviado" class="cartao" hidden style="text-align:center">
       <h1 class="ola">Great job! ✅</h1>
-      <p>Suas respostas foram enviadas.</p>
+      <p id="enviado-msg">Suas respostas foram enviadas.</p>
       <button class="btn primario" id="voltar-inicio">Voltar ao início</button>
     </div>
   </main>
@@ -177,7 +187,18 @@
     let estadoAtual = null;
     let quizAtual = null;
 
+    // Modo Aluno teste: as mesmas telas, chamando as versões de teste no servidor (nada vale nota).
+    const TESTE = document.body.dataset.teste === '1';
+    let serieTeste = '6º';
+    try { serieTeste = localStorage.getItem('serieTeste') || '6º'; } catch (e) { /* sem armazenamento: usa o 6º */ }
+    const MAPA_TESTE = { alunoObterEstado: 'testeObterEstado', alunoAbrirQuestionario: 'testeAbrirQuestionario', alunoResponder: 'testeResponder',
+      alunoAbrirTda: 'testeAbrirTda', alunoEnviarTda: 'testeEnviarTda', alunoNovoReforco: 'testeNovoReforco' };
+
     function chamar(fn, ...args) {
+      if (TESTE && MAPA_TESTE[fn]) {
+        if (fn === 'alunoObterEstado' || fn === 'alunoNovoReforco') args = [serieTeste];
+        fn = MAPA_TESTE[fn];
+      }
       return new Promise((ok, falha) => google.script.run.withSuccessHandler(ok).withFailureHandler(falha)[fn](...args));
     }
 
@@ -262,6 +283,7 @@
     function render(estado) {
       estadoAtual = estado;
       pararMonitor(false);
+      if (estado.teste) { renderTeste(estado); return; }
       if (!estado.aluno) {
         const series = [...new Set(estado.turmas.map((t) => t.serie))];
         $('turma').innerHTML = '<option value="">Selecione…</option>' + series.map((s) =>
@@ -502,9 +524,16 @@
       if (!confirm('Enviar as respostas? Depois de enviar não será possível alterar.')) return;
       $('enviar').disabled = true;
       try {
-        estadoAtual = await chamar('alunoResponder', quizAtual.id, m, saidasAtuais());
+        const resp = await chamar('alunoResponder', quizAtual.id, m, saidasAtuais());
         pararMonitor(true);
         quizAtual = null;
+        if (resp && resp.teste) {
+          $('enviado-msg').innerHTML = `Você acertou <strong>${resp.pontuacao} de ${resp.total}</strong> (${resp.percentual}%).<br>
+            <span class="suave pequeno">${resp.acertos.map((a, i) => 'Q' + (i + 1) + (a ? ' ✔' : ' ✘')).join(' · ')}<br>Modo teste: nada foi gravado.</span>`;
+        } else {
+          estadoAtual = resp;
+          $('enviado-msg').textContent = 'Suas respostas foram enviadas.';
+        }
         mostrar('enviado');
       } catch (e) {
         alert(e.message);
@@ -537,7 +566,8 @@
       $('tda-titulo').textContent = t.titulo;
       const lista = (itens, tag) => `<${tag}>${itens.map((i) => `<li>${esc(i)}</li>`).join('')}</${tag}>`;
       $('tda-conteudo').innerHTML = `
-        ${t.modo === 'grupo' ? `<p class="suave pequeno">👥 Atividade em grupo${t.grupo ? ' — Grupo ' + esc(t.grupo.numero) + ': ' + t.grupo.nomes.map(esc).join(', ') : ' (seu grupo ainda não foi formado: sua entrega será individual)'}</p>` : ''}
+        ${t.teste ? '<p class="suave pequeno">🧪 Modo teste: a entrega é conferida, mas não é gravada nem enviada ao professor.</p>' : ''}
+        ${t.modo === 'grupo' && !t.teste ? `<p class="suave pequeno">👥 Atividade em grupo${t.grupo ? ' — Grupo ' + esc(t.grupo.numero) + ': ' + t.grupo.nomes.map(esc).join(', ') : ' (seu grupo ainda não foi formado: sua entrega será individual)'}</p>` : ''}
         <h3>🌍 Situação-problema</h3><p>${esc(t.situacao)}</p>
         <h3>🎯 Produto final</h3><p>${esc(t.produto)}</p>
         ${t.tarefas.length ? `<h3>📝 Tarefas de apoio</h3>${lista(t.tarefas, 'ol')}` : ''}
@@ -557,7 +587,15 @@
               `<td class="${c.niveis[i] === n ? 'minha' : ''}">${esc(r['n' + n])}</td>`).join('')}</tr>`).join('')}
           </table></div>
           <p class="suave pequeno">O quadro destacado mostra o nível que você alcançou em cada critério.</p>
-        </div>` : '';
+        </div>` : (t.teste && t.rubrica ? `
+        <div class="cartao">
+          <h2>Rubrica de avaliação</h2>
+          <p class="suave pequeno">O aluno só vê a rubrica depois da correção. No modo teste ela aparece para você conhecer os critérios.</p>
+          <div class="tabela-rolagem"><table class="rub">
+            <tr><th>Critério</th><th>4 – Excelente</th><th>3 – Satisfatório</th><th>2 – Em desenvolvimento</th><th>1 – Insuficiente</th></tr>
+            ${t.rubrica.map((r) => `<tr><td><strong>${esc(r.criterio)}</strong></td>${[4, 3, 2, 1].map((n) => `<td>${esc(r['n' + n])}</td>`).join('')}</tr>`).join('')}
+          </table></div>
+        </div>` : '');
 
       const e = t.entrega;
       const podeEditar = t.aberta && !c;
@@ -642,12 +680,95 @@
         });
         zerarSaidas(); // o servidor soma as saídas de cada envio
         renderTda(t);
-        alert('Entrega enviada! ✅');
+        alert(t.simulado ? 'Modo teste: a entrega foi conferida, mas não foi gravada.' : 'Entrega enviada! ✅');
       } catch (e) {
         $('tda-status').textContent = '';
         alert(e.message);
       } finally { $('tda-enviar').disabled = false; }
     });
+
+
+    // ---------- Modo Aluno teste (?modo=teste): demonstração para qualquer conta da escola ----------
+    function renderTeste(estado) {
+      serieTeste = estado.serie;
+      $('teste-card').hidden = false;
+      ['ola-card', 'diarias-card', 'grupo-card', 'rodape-aluno'].forEach((id) => ($(id).hidden = true));
+      $('teste-serie').innerHTML = estado.series.map((s) => `<option value="${esc(s)}" ${s === estado.serie ? 'selected' : ''}>${esc(s)} ano</option>`).join('');
+      $('pendentes').innerHTML = estado.questionarios.length
+        ? estado.questionarios.map((q) => `
+            <div class="pendente">
+              <div style="flex:1"><strong>${esc(q.titulo)}</strong><div class="suave pequeno">${q.total} questões · corrigido na hora, nada é gravado</div></div>
+              <button class="btn primario" data-abrir="${esc(q.id)}">Responder</button>
+            </div>`).join('')
+        : `<p class="vazio" style="padding:8px 0">Nenhum questionário aberto para o ${esc(estado.serie)} ano.</p>`;
+      $('tdas').innerHTML = estado.tdas.length
+        ? estado.tdas.map((t) => `
+            <div class="pendente">
+              <div style="flex:1"><strong>${esc(t.titulo)}</strong><div class="suave pequeno">${t.modo === 'grupo' ? 'Em grupo' : 'Individual'} · a entrega não é gravada</div></div>
+              <button class="btn primario" data-tda="${esc(t.id)}">Fazer</button>
+            </div>`).join('')
+        : `<p class="vazio" style="padding:8px 0">Nenhuma TDA aberta para o ${esc(estado.serie)} ano.</p>`;
+      renderMissoesTeste(estado);
+      mostrar('painel');
+    }
+
+    function renderMissoesTeste(e) {
+      const link = (id) => `${esc(e.appUrl)}?caso=${encodeURIComponent(id)}&modo=teste`;
+      const SIT = { nova: '', andamento: ' · em andamento', concluida: '' };
+      const botoes = (vs) => vs.map((v) => `<a class="btn-jogo ${v.situacao === 'concluida' ? 'alt' : ''}" style="margin:2px" href="${link(v.id)}"
+          title="${v.degrau ? 'Degrau ' + v.degrau : ''}">${v.degrau ? '★'.repeat(v.degrau) : 'PLAY'}${v.situacao === 'concluida' ? ' ✔ ' + v.pontos : (v.situacao === 'andamento' ? ' …' : '')}</a>`).join('');
+      const linha = (rotulo, titulo, sub, vs) => `
+          <div class="missao" style="flex-wrap:wrap">
+            <div style="flex:1;min-width:180px"><span class="num-caso">${esc(rotulo)}</span> <strong>${esc(titulo)}</strong>
+              <div class="suave pequeno">${sub}</div></div>
+            <div>${botoes(vs)}</div>
+          </div>`;
+      const reforco = e.reforco.disponivel ? `
+        <div class="trilha-topo"><strong>💪 Meu reforço</strong>
+          <span class="suave pequeno">treino rápido de 4 cadeados da série${e.reforco.feitos ? ' · ' + e.reforco.feitos + ' montado(s)' : ''}</span></div>
+        <div class="missao">
+          <div style="flex:1" class="pequeno">No app de verdade, o treino usa as habilidades mais fracas de cada aluno. Aqui ele sorteia habilidades do ${esc(e.serie)} ano.</div>
+          <button class="btn-jogo" type="button" id="btn-reforco">TRAIN ›</button>
+        </div>` : '';
+      const casos = e.casos.length ? `
+        <h3 style="margin:18px 0 4px">🕵️ Casos do ano · ${esc(e.serie)} ano</h3>
+        <p class="pequeno suave" style="margin:0 0 4px">Escolha o degrau: ★ mais simples · ★★★ mais desafiador.</p>` +
+        e.casos.map((c) => linha('CASE ' + c.numero, c.titulo, esc(c.mes) + (c.gerado ? ' · 🤖 criado com IA' : ''), c.versoes)).join('')
+        : `<p class="vazio">Ainda não há casos do ${esc(e.serie)} ano.</p>`;
+      const trilha = e.trilha.length ? `
+        <h3 style="margin:18px 0 4px">🎓 Detective Academy (Trilha Base)</h3>
+        <p class="pequeno suave" style="margin:0 0 4px">Igual para o 6º ao 9º ano. No modo teste, todas as missões estão liberadas.</p>` +
+        e.trilha.map((m) => linha(m.missao === 'tutorial' ? 'MISSION 0' : 'MISSION ' + m.ordem, m.titulo, esc(m.tema), m.versoes)).join('') : '';
+      $('missoes-card').hidden = false;
+      $('missoes').innerHTML = reforco + casos + trilha;
+      const b = $('btn-reforco');
+      if (b) b.addEventListener('click', async () => {
+        b.disabled = true;
+        b.textContent = 'Montando…';
+        try {
+          const x = await chamar('alunoNovoReforco');
+          window.open(link(x.id).replace(/&amp;/g, '&'), '_top');
+        } catch (err) {
+          alert(err.message);
+          b.disabled = false;
+          b.textContent = 'TRAIN ›';
+        }
+      });
+    }
+
+    if (TESTE) {
+      $('teste-serie').addEventListener('change', async () => {
+        serieTeste = $('teste-serie').value;
+        try { localStorage.setItem('serieTeste', serieTeste); } catch (e) { /* sem armazenamento: tudo bem */ }
+        mostrar('carregando');
+        try { render(await chamar('alunoObterEstado')); } catch (e) { mostrarErro(e.message); }
+      });
+      $('teste-recomecar').addEventListener('click', async () => {
+        if (!confirm('Apagar todas as suas jogadas de teste e começar do zero?')) return;
+        mostrar('carregando');
+        try { render(await chamar('testeRecomecar', serieTeste)); } catch (e) { mostrarErro(e.message); }
+      });
+    }
 
     chamar('alunoObterEstado').then(render).catch((e) => mostrarErro(e.message));
   </script>

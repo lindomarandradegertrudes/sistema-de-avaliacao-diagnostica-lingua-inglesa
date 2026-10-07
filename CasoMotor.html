@@ -67,7 +67,7 @@
   };
   var CORES = { pop: '#FF4F6D', sun: '#FFD23F', go: '#22B573', blue: '#2F5BFF', orange: '#FF8A3D' };
 
-  var C = null, J = null, PROF = false, PAT = null, TRI = null, CIC = null, S = { tab: null, texto: {}, textoParte: {}, ajuda: false, resp: [], ocupado: false, concluidoAoAbrir: false };
+  var C = null, J = null, PROF = false, TESTE = false, PAT = null, TRI = null, CIC = null, S = { tab: null, texto: {}, textoParte: {}, ajuda: false, resp: [], ocupado: false, concluidoAoAbrir: false };
   var $ = function (id) { return document.getElementById(id); };
 
   function chamar(fn) {
@@ -199,7 +199,7 @@
     var valeNota = !PROF && CIC && J.numero === 1;
     m.hidden = !(PROF || J.numero > 1 || valeNota);
     m.className = 'modo' + (PROF || valeNota ? ' prof' : '');
-    if (PROF) m.textContent = 'Teste do professor · nada vale nota';
+    if (PROF) m.textContent = TESTE ? 'Aluno teste · nada vale nota' : 'Teste do professor · nada vale nota';
     else if (valeNota) {
       var p = String(CIC.prazo || '').split('-');
       m.textContent = '📅 ' + CIC.titulo + ' · vale nota até ' + (p.length === 3 ? p[2] + '/' + p[1] : '');
@@ -537,7 +537,7 @@
     var F = C.dados.final || {};
     var treino = J.numero > 1 || PROF;
     var html = '<span class="kind">CASE CLOSED</span><div><span class="big-stamp' + (treino ? ' treino' : '') + '">' + (treino ? 'PRACTICE DONE!' : 'CASE CLOSED!') + '</span></div>' +
-      '<h2>' + total + ' / 100 POINTS</h2>' + (treino ? '<p class="pt">' + (PROF ? 'Teste do professor: não entra em nenhum relatório.' : 'Treino: só a primeira jogada vale nota.') + '</p>' : '') +
+      '<h2>' + total + ' / 100 POINTS</h2>' + (treino ? '<p class="pt">' + (PROF ? (TESTE ? 'Aluno teste: não entra em nenhuma nota nem relatório.' : 'Teste do professor: não entra em nenhum relatório.') : 'Treino: só a primeira jogada vale nota.') + '</p>' : '') +
       '<div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Lock</th><th class="n">Hints</th><th class="n">Wrong</th><th class="n">Points</th></tr></thead><tbody>' +
       J.travas.map(function (t, i) {
         return '<tr><td>' + (i + 1) + '. ' + esc(C.dados.travas[i].titulo) + '</td><td class="n">' + t.dicas.length + '</td><td class="n">' + t.erros + '</td><td class="n">' + t.pontos + ' / ' + t.valor + '</td></tr>';
@@ -715,7 +715,7 @@
 
   if (!CASO_ID) { erro('Caso não informado.'); return; }
   chamar('alunoAbrirCaso', CASO_ID).then(function (r) {
-    C = r.caso; J = r.jogada; PROF = !!r.professor; PAT = r.patente; TRI = r.trilha || null; CIC = r.ciclo || null;
+    C = r.caso; J = r.jogada; PROF = !!r.professor || !!r.teste; TESTE = !!r.teste; PAT = r.patente; TRI = r.trilha || null; CIC = r.ciclo || null;
     if (r.appUrl) APP = r.appUrl;
     S.concluidoAoAbrir = J.status === 'concluido';
     $('carregando').hidden = true;

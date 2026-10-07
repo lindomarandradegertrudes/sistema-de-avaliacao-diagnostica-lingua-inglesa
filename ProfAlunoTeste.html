@@ -1,0 +1,75 @@
+<!-- Aba "Aluno teste": link de demonstração para colegas e direção (incluída em Professor.html) -->
+<section id="aba-alunoteste" class="pilha" hidden>
+  <div class="cartao pilha">
+    <div class="linha">
+      <h2 style="margin:0">🧪 Aluno teste</h2>
+      <span class="espaco"></span>
+      <span id="at-status" class="pequeno"></span>
+      <button class="btn" id="at-alternar" type="button"></button>
+    </div>
+    <p class="suave pequeno" style="margin:0">
+      Link de demonstração para professores de outras áreas, direção e coordenação. Qualquer conta da escola abre, sem cadastro,
+      escolhe a série (6º ao 9º) e experimenta tudo o que o aluno vê: <strong>casos do ano</strong> em qualquer degrau (inclusive rascunhos e os criados com IA),
+      <strong>Trilha Base</strong> com todas as missões liberadas, <strong>Meu reforço</strong>, <strong>questionários</strong> e <strong>TDAs</strong> abertos.
+      Nada vale nota nem aparece em notas, níveis, relatórios ou listas de alunos. Questionários e TDAs são conferidos na hora, mas não são gravados.
+    </p>
+    <div class="link-box"><code id="at-link"></code><button class="btn mini" id="at-copiar" type="button">Copiar</button>
+      <a class="btn mini primario" id="at-abrir" target="_blank" rel="noopener">Abrir como Aluno teste ↗</a></div>
+    <p class="pequeno" style="margin:0;color:var(--perigo)">
+      ⚠️ Alunos cadastrados não conseguem usar o link (no teste, o 3º erro revela a resposta). Se um aluno ainda <strong>não cadastrado</strong> receber o link,
+      ele poderia ver respostas antes de jogar valendo: compartilhe só com adultos e desligue o modo quando não estiver usando.
+    </p>
+  </div>
+
+  <div class="cartao pilha">
+    <div class="linha">
+      <h2 style="margin:0">Quem usou</h2>
+      <span class="espaco"></span>
+      <button class="btn perigo" id="at-limpar" type="button">Apagar todos os dados de teste</button>
+    </div>
+    <div class="tabela-rolagem">
+      <table>
+        <thead><tr><th>Conta</th><th>Jogadas</th><th>Concluídas</th><th>Último uso</th></tr></thead>
+        <tbody id="at-visitantes"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<script>
+  const at = { dados: null };
+
+  function renderAlunoTeste() {
+    const d = at.dados;
+    $('at-status').innerHTML = d.ligado ? '<span class="jog-sit aberto">Ligado</span>' : '<span class="jog-sit nao">Desligado</span>';
+    $('at-alternar').textContent = d.ligado ? 'Desligar' : 'Ligar';
+    $('at-alternar').className = 'btn' + (d.ligado ? '' : ' primario');
+    $('at-link').textContent = d.link;
+    $('at-abrir').href = d.link;
+    $('at-visitantes').innerHTML = d.visitantes.length ? d.visitantes.map((v) => `
+      <tr><td>${esc(v.email)}</td><td>${v.jogadas}</td><td>${v.concluidas}</td><td class="pequeno">${esc(v.ultimo)}</td></tr>`).join('')
+      : '<tr><td colspan="4" class="vazio">Ninguém usou o modo teste ainda.</td></tr>';
+  }
+
+  async function carregarAlunoTeste() {
+    at.dados = await chamar('profAlunoTeste');
+    renderAlunoTeste();
+  }
+
+  function configurarAlunoTeste() {
+    document.querySelector('.abas button[data-aba="alunoteste"]').addEventListener('click', carregarAlunoTeste);
+    $('at-alternar').addEventListener('click', (ev) => comBotao(ev.target, async () => {
+      at.dados = await chamar('profSalvarAlunoTeste', !at.dados.ligado);
+      renderAlunoTeste();
+      avisar(at.dados.ligado ? 'Modo Aluno teste ligado.' : 'Modo Aluno teste desligado.');
+    }));
+    $('at-copiar').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(at.dados.link); avisar('Link copiado.'); }
+      catch (e) { avisar('Selecione o link e copie com Ctrl+C.'); }
+    });
+    $('at-limpar').addEventListener('click', (ev) => {
+      if (!confirm('Apagar todas as jogadas e treinos feitos no modo Aluno teste? Os dados dos alunos não são afetados.')) return;
+      comBotao(ev.target, async () => { at.dados = await chamar('profLimparTeste'); renderAlunoTeste(); avisar('Dados de teste apagados.'); });
+    });
+  }
+</script>

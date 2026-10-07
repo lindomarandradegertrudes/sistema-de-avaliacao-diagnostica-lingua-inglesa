@@ -59,9 +59,10 @@ function buscarCaso_(id) {
   return c;
 }
 
-function lerJogadas_() {
+/** Jogadas da planilha. As do modo Aluno teste (turma TESTE) só vêm quando incluirTeste = true. */
+function lerJogadas_(incluirTeste) {
   garantirAba_('Jogadas');
-  return lerTabela_('Jogadas').map(function (j) {
+  return lerTabela_('Jogadas').filter(function (j) { return incluirTeste || String(j.turma) !== TURMA_TESTE; }).map(function (j) {
     let estado = null;
     try { estado = JSON.parse(j.estado_json || 'null'); } catch (e) { /* ignora */ }
     return {
@@ -250,15 +251,16 @@ function visaoJogada_(caso, j) {
 // Área do aluno
 // ============================================================
 
-/** Quem está jogando: aluno cadastrado ou o professor testando (turma PROF). */
+/** Quem está jogando: aluno cadastrado, o professor testando (turma PROF) ou um visitante do modo Aluno teste (turma TESTE). */
 function jogador_() {
   const email = usuarioAtual_();
   const cfg = lerConfig_();
   if (ehProfessor_(email, cfg)) return { email: email, turma: 'PROF', professor: true };
   validarAluno_(email, cfg);
   const aluno = lerTabela_('Alunos').filter(function (a) { return String(a.email).toLowerCase() === email; })[0];
-  if (!aluno) throw new Error('Cadastro não encontrado. Abra o English Learning App e faça seu cadastro.');
-  return { email: email, turma: String(aluno.turma), professor: false };
+  if (aluno) return { email: email, turma: String(aluno.turma), professor: false };
+  if (testeLigado_(cfg)) return { email: email, turma: TURMA_TESTE, professor: false, teste: true };
+  throw new Error('Cadastro não encontrado. Abra o English Learning App e faça seu cadastro.');
 }
 
 function patente_(serie, concluidos) {
@@ -432,9 +434,9 @@ function alunoMissoes_(email, turma) {
 function alunoAbrirCaso(id) {
   const eu = jogador_();
   const caso = buscarCaso_(id);
-  const jogadas = lerJogadas_();
+  const jogadas = lerJogadas_(eu.teste);
   let trilha = null, ciclo = null, painel = null;
-  if (!eu.professor) {
+  if (!eu.professor && !eu.teste) {
     if (caso.serie !== SERIE_TODAS && caso.serie !== serieDaTurma_(eu.turma)) throw new Error('Este caso é de outra série.');
     painel = alunoMissoes_(eu.email, eu.turma);
     const k = missaoDe_(caso);
@@ -455,16 +457,17 @@ function alunoAbrirCaso(id) {
     if (!item) throw new Error('Este caso não está disponível agora.');
     if (item.id !== caso.id) throw new Error('Esta versão é de outro degrau. Abra o caso pelo painel "Missions".');
   }
-  const minhas = jogadas.filter(function (j) { return j.email === eu.email && j.caso_id === caso.id; })
+  const minhas = jogadas.filter(function (j) { return j.email === eu.email && j.caso_id === caso.id && (!eu.teste || j.turma === TURMA_TESTE); })
     .sort(function (a, b) { return b.numero - a.numero; });
   let j = minhas[0] ? buscarJogada_(minhas[0].id) : null;
   if (!j) j = criarJogada_(caso, eu, 1);
   return {
-    caso: casoParaAluno_(caso), jogada: visaoJogada_(caso, j), professor: eu.professor,
+    caso: casoParaAluno_(caso), jogada: visaoJogada_(caso, j), professor: eu.professor, teste: !!eu.teste,
     patente: painel ? painel.patente : patente_(caso.serie, 0),
     trilha: trilha ? { degrau: trilha.degrau, feitas: trilha.feitas, total: trilha.total } : null,
     ciclo: ciclo,
-    appUrl: ScriptApp.getService().getUrl(),
+    // O professor volta para a página de onde veio (painel ou Aluno teste); o visitante volta ao Aluno teste.
+    appUrl: eu.professor ? null : ScriptApp.getService().getUrl() + (eu.teste ? '?modo=teste' : ''),
   };
 }
 
@@ -472,8 +475,8 @@ function alunoAbrirCaso(id) {
 function alunoNovaJogada(id) {
   const eu = jogador_();
   const caso = buscarCaso_(id);
-  if (!eu.professor && caso.status !== 'aberto') throw new Error('Este caso não está disponível agora.');
-  const minhas = lerJogadas_().filter(function (j) { return j.email === eu.email && j.caso_id === caso.id; });
+  if (!eu.professor && !eu.teste && caso.status !== 'aberto') throw new Error('Este caso não está disponível agora.');
+  const minhas = lerJogadas_(eu.teste).filter(function (j) { return j.email === eu.email && j.caso_id === caso.id && (!eu.teste || j.turma === TURMA_TESTE); });
   if (!eu.professor && minhas.some(function (j) { return j.status === 'andamento'; })) throw new Error('Termine a jogada atual primeiro.');
   const numero = minhas.reduce(function (m, j) { return Math.max(m, j.numero); }, 0) + 1;
   const j = criarJogada_(caso, eu, numero);
@@ -483,7 +486,7 @@ function alunoNovaJogada(id) {
 function criarJogada_(caso, eu, numero) {
   if (!(caso.dados.travas || []).length) throw new Error('Este caso ainda não tem cadeados.');
   return comTrava_(function () {
-    const existe = lerJogadas_().filter(function (j) { return j.email === eu.email && j.caso_id === caso.id && j.numero === numero; })[0];
+    const existe = lerJogadas_(eu.teste).filter(function (j) { return j.email === eu.email && j.caso_id === caso.id && j.numero === numero && (!eu.teste || j.turma === TURMA_TESTE); })[0];
     if (existe) return buscarJogada_(existe.id);
     const agora = new Date();
     const j = {
@@ -537,7 +540,7 @@ function alunoVerificar(jogadaId, indice, respostas) {
     }
     if (t.aberta) avancar_(j);
     gravarJogada_(j);
-    if (j.status === 'concluido' && j.numero === 1 && !eu.professor) atualizarNotasDoAluno_(j.email, j.turma, j.caso_id);
+    if (j.status === 'concluido' && j.numero === 1 && !eu.professor && !eu.teste) atualizarNotasDoAluno_(j.email, j.turma, j.caso_id);
     return { resultado: resultado, msg: r.msg || '', jogada: visaoJogada_(caso, j) };
   });
 }

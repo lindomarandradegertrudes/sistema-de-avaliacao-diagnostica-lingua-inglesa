@@ -4,6 +4,27 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# Aluno teste (demonstração para colegas e direção)
+
+**Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `Teste` | **arquivo novo:** **+ > Script**, nome `Teste`, cole **Teste.gs** |
+| `ProfAlunoTeste` | **arquivo novo:** **+ > HTML**, nome `ProfAlunoTeste`, cole **ProfAlunoTeste.html** |
+| `Casos`, `Codigo`, `Dificuldades` | apague tudo e cole as novas versões (.gs) |
+| `Aluno`, `CasoMotor`, `Professor` | apague tudo e cole as novas versões (.html) |
+
+Depois: **Salvar** → **Nova versão** → **F5** no painel.
+
+## Como usar
+- Aba **Aluno teste** no painel: copie o link (termina em `?modo=teste`) e envie aos colegas e à direção. O botão **Abrir como Aluno teste** abre para você também.
+- Quem abre escolhe a série (6º ao 9º) e experimenta casos do ano (qualquer degrau, inclusive rascunhos), Trilha Base liberada, Meu reforço, questionários e TDAs abertos.
+- Nada vale nota nem aparece em relatórios. Questionários e TDAs são conferidos na hora, sem gravar. As jogadas ficam marcadas como TESTE; cada visitante pode **Recomeçar do zero**, e você pode **Apagar todos os dados de teste**.
+- Alunos cadastrados não conseguem usar o link. Use **Desligar** quando não estiver demonstrando.
+
+---
+
 # Etapa 5 · Parte A · Criar com IA (sem custo)
 
 **Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**

@@ -35,6 +35,7 @@ const CONFIG_PADRAO = [
   ['diaria_verde', 100, 'Entregas diárias: % mínimo para o verde (bônus 1,0).'],
   ['diaria_amarelo', 80, 'Entregas diárias: % mínimo para o amarelo (bônus 0,5).'],
   ['diaria_laranja', 50, 'Entregas diárias: % mínimo para o laranja (bônus 0,2). Abaixo: vermelho (0).'],
+  ['aluno_teste', 'SIM', 'SIM = qualquer conta da escola pode usar o link ?modo=teste (Aluno teste); NÃO = desligado.'],
 ];
 
 // ============================================================
@@ -188,17 +189,20 @@ function doGet(e) {
   try {
     const email = usuarioAtual_();
     const caso = e && e.parameter ? String(e.parameter.caso || '') : '';
+    const modoTeste = !!(e && e.parameter && e.parameter.modo === 'teste');
     if (caso) {
       // Tela do jogo (caso investigativo), em página própria.
       const tc = HtmlService.createTemplateFromFile('Caso');
       tc.casoId = caso.replace(/[^\w-]/g, '');
-      tc.appUrl = ScriptApp.getService().getUrl();
+      tc.appUrl = ScriptApp.getService().getUrl() + (modoTeste ? '?modo=teste' : '');
       return tc.evaluate().setTitle('English Learning App – Missions')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1');
     }
-    const pagina = ehProfessor_(email) ? 'Professor' : 'Aluno';
+    // ?modo=teste abre a tela do aluno em modo de demonstração (qualquer conta da escola, inclusive professores).
+    const pagina = !modoTeste && ehProfessor_(email) ? 'Professor' : 'Aluno';
     const t = HtmlService.createTemplateFromFile(pagina);
     t.email = email;
+    t.modoTeste = modoTeste ? '1' : '';
     return t.evaluate()
       .setTitle(pagina === 'Professor' ? 'English Learning App – Professor' : 'English Learning App')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
