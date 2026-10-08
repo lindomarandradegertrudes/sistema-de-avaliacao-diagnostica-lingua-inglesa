@@ -50,6 +50,7 @@ Roda **gratuitamente** no Google Workspace da escola: Google Apps Script e Googl
   - evolução do aluno (degrau mês a mês, ciclos e habilidades: começo × agora);
   - resumo para a coordenação por trimestre, com impressão em PDF;
   - exportação de todos os dados dos jogos para uma planilha nova no Drive.
+- **Manual do aluno:** botão "❓ Como funciona" no painel do aluno, que abre o manual dentro do app, e a versão em PDF (`Manual-do-aluno.pdf`) para imprimir ou enviar à turma.
 - **Aluno teste:** link de demonstração (`?modo=teste`) para professores de outras áreas e direção. Qualquer conta da escola escolhe a série e experimenta casos, Trilha Base, Meu reforço, questionários e TDAs, sem cadastro e sem entrar em notas ou relatórios. O professor liga ou desliga na aba "Aluno teste".
 
 ## Estrutura
@@ -76,6 +77,7 @@ Roda **gratuitamente** no Google Workspace da escola: Google Apps Script e Googl
 | `Gerador.gs` | Criar com IA: pedido para o claude.ai, conversão e validação da resposta |
 | `RelatoriosJogos.gs` / `ProfRelJogos.html` | Aba "Relatórios de jogos": turma por caso, evolução, coordenação e exportação |
 | `Teste.gs` / `ProfAlunoTeste.html` | Modo Aluno teste (demonstração) e a aba de controle do professor |
+| `Manual.html` / `Manual-do-aluno.pdf` | Manual do aluno: página do app (com imagens) e versão em PDF |
 | `Caso.html` / `CasoEstilo.html` / `CasoMotor.html` | Tela do jogo (visual de HQ e motor no navegador) |
 | `ProfJogos.html` | Aba "Jogos" do professor: ciclos, casos do ano, Criar com IA, Trilha Base e resultados |
 | `ProfDificuldades.html` | Aba "Habilidades" do professor: mapa da turma, ficha e grupos de reforço |

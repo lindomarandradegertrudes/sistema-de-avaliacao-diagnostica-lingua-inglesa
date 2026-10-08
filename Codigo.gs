@@ -212,6 +212,11 @@ function doGet(e) {
   }
 }
 
+/** Manual do aluno (arquivo Manual.html), carregado só quando o aluno clica em "Como funciona". */
+function alunoManual() {
+  return HtmlService.createHtmlOutputFromFile('Manual').getContent();
+}
+
 function incluir(arquivo) {
   return HtmlService.createHtmlOutputFromFile(arquivo).getContent();
 }

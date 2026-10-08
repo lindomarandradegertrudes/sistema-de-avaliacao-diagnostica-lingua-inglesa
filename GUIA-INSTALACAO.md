@@ -4,6 +4,23 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# Manual do aluno
+
+**Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `Manual` | **arquivo novo:** **+ > HTML**, nome `Manual`, cole **Manual.html** (é um arquivo grande, com as imagens; abra no Bloco de Notas, Ctrl+A, Ctrl+C) |
+| `Aluno` | apague tudo e cole a nova versão (.html) |
+| `Codigo` | apague tudo e cole a nova versão (.gs) |
+
+Depois: **Salvar** → **Nova versão** → **F5**.
+
+- No painel do aluno aparece o botão **❓ Como funciona**, que abre o manual (só carrega quando o aluno clica).
+- O arquivo **Manual-do-aluno.pdf** é a versão para imprimir, projetar ou mandar no grupo da turma.
+
+---
+
 # Aluno teste (demonstração para colegas e direção)
 
 **Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**

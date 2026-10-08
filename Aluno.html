@@ -103,7 +103,10 @@
     <!-- Painel do aluno -->
     <div id="painel" class="pilha" hidden>
       <div class="cartao" id="teste-card" hidden>
-        <h1 class="ola">🧪 Aluno teste</h1>
+        <div class="linha" style="align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <h1 class="ola" style="flex:1;margin:0">🧪 Aluno teste</h1>
+          <button class="btn" type="button" data-manual>❓ Como funciona</button>
+        </div>
         <p class="suave" style="margin:0">Modo de demonstração: experimente tudo o que o aluno vê. Nada vale nota nem aparece nos relatórios.</p>
         <div class="linha" style="margin-top:10px;gap:8px;flex-wrap:wrap">
           <label for="teste-serie" class="pequeno" style="margin:0">Série</label>
@@ -113,7 +116,10 @@
         </div>
       </div>
       <div class="cartao" id="ola-card">
-        <h1 class="ola">Hello, <span id="primeiro-nome"></span>! 👋</h1>
+        <div class="linha" style="align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <h1 class="ola" style="flex:1;margin:0">Hello, <span id="primeiro-nome"></span>! 👋</h1>
+          <button class="btn" type="button" data-manual>❓ Como funciona</button>
+        </div>
         <p class="suave" style="margin:0"><span id="nome-completo"></span> · Turma <strong id="minha-turma"></strong></p>
       </div>
       <div class="cartao" id="missoes-card" hidden>
@@ -208,6 +214,13 @@
       </form>
     </div>
 
+    <!-- Manual do aluno (carregado só quando o aluno abre) -->
+    <div id="manual-view" class="pilha" hidden>
+      <div class="linha"><button class="btn" type="button" id="manual-voltar">← Voltar</button><strong style="flex:1">Manual do aluno</strong></div>
+      <div class="cartao" id="manual-conteudo"><p class="vazio">Carregando…</p></div>
+      <div class="linha"><button class="btn" type="button" id="manual-voltar-fim">← Voltar ao início</button></div>
+    </div>
+
     <div id="enviado" class="cartao" hidden style="text-align:center">
       <h1 class="ola">Great job! ✅</h1>
       <p id="enviado-msg">Suas respostas foram enviadas.</p>
@@ -289,7 +302,7 @@
     }
 
     function mostrar(id) {
-      ['carregando', 'erro', 'cadastro', 'fechado', 'painel', 'quiz', 'enviado', 'tda-view'].forEach((x) => ($(x).hidden = x !== id));
+      ['carregando', 'erro', 'cadastro', 'fechado', 'painel', 'quiz', 'enviado', 'tda-view', 'manual-view'].forEach((x) => ($(x).hidden = x !== id));
       window.scrollTo(0, 0);
     }
 
@@ -585,7 +598,7 @@
     function renderQuiz() {
       $('quiz-titulo').textContent = quizAtual.titulo;
       $('quiz-questoes').innerHTML = (quizAtual.monitorar !== false
-        ? '<p class="suave pequeno" style="margin:0">⚠️ Fique nesta tela até terminar: sair para outras abas ou janelas por mais de 5 segundos fica registrado para o professor.</p>'
+        ? '<p class="suave pequeno" style="margin:0">⚠️ Fique nesta tela até terminar: sair para outras abas ou janelas fica registrado para o professor.</p>'
         : '') + quizAtual.questoes.map((q, i) => `
         <div class="cartao questao">
           <span class="num">Questão ${i + 1}</span>
@@ -717,7 +730,7 @@
         $('tda-form-ajuda').textContent = (t.modo === 'grupo' && (e ? e.grupo != null : t.grupo)
           ? 'A entrega vale para todo o grupo. Qualquer integrante pode enviar ou atualizar. '
           : '') + (t.canva ? 'Você pode escrever o texto, colar um link e/ou anexar arquivos.' : 'Escreva o seu trabalho no editor abaixo.') + ' Dá para atualizar até o professor corrigir.' +
-          (t.monitorar !== false ? ' ⚠️ Nesta TDA, sair desta tela (outras abas ou sites) por mais de 5 segundos fica registrado para o professor.' : '') +
+          (t.monitorar !== false ? ' ⚠️ Nesta TDA, sair desta tela (outras abas ou sites) fica registrado para o professor.' : '') +
           (e ? ` Última atualização: ${e.atualizado_em}, por ${e.enviadoPor}.` : '');
         preencherEditorTda(t, e);
         $('tda-arquivos').value = '';
@@ -948,6 +961,28 @@
         try { render(await chamar('testeRecomecar', serieTeste)); } catch (e) { mostrarErro(e.message); }
       });
     }
+
+    // ---------- Manual do aluno ----------
+    let manualCarregado = false;
+    document.querySelectorAll('[data-manual]').forEach((b) => b.addEventListener('click', async () => {
+      mostrar('manual-view');
+      if (manualCarregado) return;
+      try {
+        $('manual-conteudo').innerHTML = await chamar('alunoManual');
+        manualCarregado = true;
+      } catch (e) {
+        $('manual-conteudo').innerHTML = `<p class="vazio">Não foi possível abrir o manual: ${esc(e.message)}</p>`;
+      }
+    }));
+    // Links do sumário: rolam até a seção (sem sair da página).
+    $('manual-conteudo').addEventListener('click', (ev) => {
+      const a = ev.target.closest('a[href^="#"]');
+      if (!a) return;
+      ev.preventDefault();
+      const alvo = $(a.getAttribute('href').slice(1));
+      if (alvo) alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    ['manual-voltar', 'manual-voltar-fim'].forEach((id) => $(id).addEventListener('click', () => (estadoAtual ? render(estadoAtual) : mostrar('carregando'))));
 
     chamar('alunoObterEstado').then(render).catch((e) => mostrarErro(e.message));
   </script>
