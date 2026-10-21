@@ -60,6 +60,7 @@ Gerado em 08/10/2026 a partir dos históricos das duas sessões. Este arquivo n�
 ## 6. Pendências e ideias em aberto
 - Confirmar a instalação do que foi entregue por último em cada conversa (aluno teste, manual) no Apps Script real.
 - Otimizações de desempenho, caso a lentidão volte com a rede estável: cache de dados que mudam pouco, tela inicial mais leve, tirar a fila de bloqueio na primeira jogada, tentar de novo automático.
-- Manter o **manual do aluno** em dia quando alguma regra mudar (PDF e página no app). Sugestão pendente: explicar o botão **START ›** do Meu reforço.
+- Manter o **manual do aluno** em dia quando alguma regra mudar (PDF e página no app). O botão **START ›** do Meu reforço já foi explicado (seção 9, em 21/10).
+- **Como gerar o PDF do manual de novo:** envolver o `Manual.html` numa página A4 com uma capa ("ENGLISH LEARNING APP" / "Manual do aluno" / "Língua Inglesa · 6º ao 9º ano" / barra azul `#3b5bdb` / "Teacher Lindomar"). Regras de impressão: `@page { size: A4; margin: 14mm 16mm }`, fonte Segoe UI, `.manual { font-size: 14.67px }` (11 pt), esconder `.m-titulo` e `.m-sub`, quebra de página depois do sumário, títulos com `break-after: avoid`, figuras com até 630 px de largura e 149,6 mm de altura, mantendo a proporção. Imprimir com `chrome --headless=new --no-pdf-header-footer --print-to-pdf`. O resultado tem 19 páginas.
 - Ampliar o banco de exercícios avulsos conforme as habilidades mais fracas dos alunos.
 - O app 3º–5º ano é outro projeto (ver `English Kids App`); a conversa dele não foi unificada aqui.
