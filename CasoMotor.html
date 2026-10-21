@@ -584,7 +584,15 @@
     b.disabled = true;
     b.textContent = 'LOADING…';
     chamar('alunoNovoReforco').then(function (r) {
-      window.open(APP + '?caso=' + encodeURIComponent(r.id), '_top');
+      /* Se o servidor demorou, o Chrome bloqueia a abertura automática: o botão vira um link "START ›". */
+      var url = APP + '?caso=' + encodeURIComponent(r.id);
+      var a = document.createElement('a');
+      a.className = b.className;
+      a.href = url;
+      a.target = '_top';
+      a.textContent = 'START ›';
+      b.parentNode.replaceChild(a, b);
+      try { window.open(url, '_top'); } catch (e) { /* bloqueado: o aluno toca no link */ }
     }).catch(function (e) { b.disabled = false; b.textContent = 'NEW TRAINING ›'; alert(e.message); });
   }
 

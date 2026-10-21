@@ -30,6 +30,7 @@ Gerado em 08/10/2026 a partir dos históricos das duas sessões. Este arquivo n�
 9. **Editor de texto da TDA** estilo Word (título, B/I/U, listas, cores, sem corretor, contador, rascunho automático, colar bloqueado, filtro de HTML). **Bloqueio de Canva e anexos** por chave geral e por TDA.
 10. **Manual do aluno**: `Manual-do-aluno.pdf` (19 páginas) e página no app (botão "❓ Como funciona"). Não cita os 5 s nem os 3 min. Commit `8156000`.
 11. Dúvida sobre o aviso do Slack: nenhum projeto usa Slack. Esse tema ficou só nessa conversa.
+12. **Correção do "Meu reforço" (21/10):** o botão TRAIN/CONTINUE ficava em "Montando…" para sempre com a turma. Quando o servidor demorava mais de ~5 s, o Chrome bloqueava sem erro o `window.open(..., '_top')` feito depois da espera. Agora o botão vira o link **START ›** (abre sozinho se der; senão, um toque entra). Vale também para NEW TRAINING (`CasoMotor.html`) e para o modo Aluno teste. Confirmado pelo usuário com os alunos. Ainda sem commit.
 
 ### Conversa "Aplicativo de jogos de inglês" (05/10 a 08/10)
 1. **Entrevista:** jogos dentro do English Learning App, individuais, estilo escape room, análise de evidências e descoberta de regras. Visual de quadrinhos (HQ). Comandos curtos em inglês com ícones, botão "? Ajuda em português", áudio com 🎧 PLAY / 🐢 SLOWER / 📄 TEXT. 6º ano com 3 cadeados e evidência visual.
@@ -53,11 +54,12 @@ Gerado em 08/10/2026 a partir dos históricos das duas sessões. Este arquivo n�
 - `google.script.run` descarta `null` dentro de objetos, entregando `undefined`: testar os dois casos.
 - Gabarito e soluções são removidos antes de enviar o caso ao aluno; a correção é sempre no servidor.
 - Após publicar uma nova versão, recarregar com F5 (a página antiga fica em cache).
+- **Navegação depois de chamar o servidor:** o iframe do Apps Script só pode trocar a página do topo com um clique recente (~5 s). Nunca chamar `window.open(url, '_top')` depois de um `await`/`google.script.run`. Use links `<a target="_top">` ou transforme o botão num link quando a resposta chegar.
 - Testes: harness em Node com `SpreadsheetApp` simulado, rodando as suites e depois conferindo as telas no navegador. O código real do Apps Script e os Chromebooks só são testados pelo usuário.
 
 ## 6. Pendências e ideias em aberto
 - Confirmar a instalação do que foi entregue por último em cada conversa (aluno teste, manual) no Apps Script real.
 - Otimizações de desempenho, caso a lentidão volte com a rede estável: cache de dados que mudam pouco, tela inicial mais leve, tirar a fila de bloqueio na primeira jogada, tentar de novo automático.
-- Manter o **manual do aluno** em dia quando alguma regra mudar (PDF e página no app).
+- Manter o **manual do aluno** em dia quando alguma regra mudar (PDF e página no app). Sugestão pendente: explicar o botão **START ›** do Meu reforço.
 - Ampliar o banco de exercícios avulsos conforme as habilidades mais fracas dos alunos.
 - O app 3º–5º ano é outro projeto (ver `English Kids App`); a conversa dele não foi unificada aqui.

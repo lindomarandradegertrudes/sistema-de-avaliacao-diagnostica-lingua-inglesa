@@ -293,6 +293,22 @@
     const MAPA_TESTE = { alunoObterEstado: 'testeObterEstado', alunoAbrirQuestionario: 'testeAbrirQuestionario', alunoResponder: 'testeResponder',
       alunoAbrirTda: 'testeAbrirTda', alunoEnviarTda: 'testeEnviarTda', alunoNovoReforco: 'testeNovoReforco' };
 
+    /**
+     * Leva ao treino montado. O Chrome só deixa a página abrir outra sozinha até ~5 s depois do clique;
+     * se o servidor demorou mais, a abertura é bloqueada sem erro. Por isso o botão vira um link
+     * "START ›": se a abertura automática falhar, um toque (clique novo) leva ao treino.
+     */
+    function irParaTreino(botao, url) {
+      const a = document.createElement('a');
+      a.className = botao.className;
+      a.href = url;
+      a.target = '_top';
+      a.textContent = 'START ›';
+      a.title = 'Treino pronto! Toque para entrar.';
+      botao.replaceWith(a);
+      try { window.open(url, '_top'); } catch (e) { /* bloqueado: o aluno toca no link */ }
+    }
+
     function chamar(fn, ...args) {
       if (TESTE && MAPA_TESTE[fn]) {
         if (fn === 'alunoObterEstado' || fn === 'alunoNovoReforco') args = [serieTeste];
@@ -510,7 +526,7 @@
         b.textContent = 'Montando…';
         try {
           const x = await chamar('alunoNovoReforco');
-          window.open(`${app}?caso=${encodeURIComponent(x.id)}`, '_top');
+          irParaTreino(b, `${app}?caso=${encodeURIComponent(x.id)}`);
         } catch (e) {
           alert(e.message);
           b.disabled = false;
@@ -939,7 +955,7 @@
         b.textContent = 'Montando…';
         try {
           const x = await chamar('alunoNovoReforco');
-          window.open(link(x.id).replace(/&amp;/g, '&'), '_top');
+          irParaTreino(b, link(x.id).replace(/&amp;/g, '&'));
         } catch (err) {
           alert(err.message);
           b.disabled = false;
