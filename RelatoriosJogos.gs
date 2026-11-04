@@ -13,7 +13,8 @@ const ITENS_TENDENCIA = 4;
 // ============================================================
 
 function contextoRelJogos_() {
-  const casos = lerCasos_();
+  // Os treinos da recuperação têm relatório próprio (painel da TDA).
+  const casos = lerCasos_().filter(function (c) { return !ehRecuperacao_(c); });
   const porId = {};
   casos.forEach(function (c) { porId[c.id] = c; });
   const alunos = lerTabela_('Alunos').map(function (a) { return { email: String(a.email).toLowerCase(), nome: String(a.nome), turma: String(a.turma) }; })

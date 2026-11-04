@@ -42,14 +42,20 @@ function buscarQuestionario_(id) {
   return q;
 }
 
+/** percentual: na TDA com recuperação concluída, vale a maior nota (percentual_tda guarda a da TDA). */
 function lerRespostas_() {
+  const recs = notasRecuperacao_();
   return lerTabela_('Respostas').map(function (r) {
     let det = null;
     try { det = r.acertos_json ? JSON.parse(r.acertos_json) : null; } catch (e) { /* ignora */ }
+    const email = String(r.email).toLowerCase();
+    const pct = Number(r.percentual);
+    const rec = recs[String(r.questionario_id) + '|' + email];
     return {
-      _linha: r._linha, questionario_id: String(r.questionario_id), email: String(r.email).toLowerCase(),
+      _linha: r._linha, questionario_id: String(r.questionario_id), email: email,
       turma: String(r.turma), pontuacao: Number(r.pontuacao), total: Number(r.total),
-      percentual: Number(r.percentual), detalhe: det, origem: String(r.origem), respondido_em: String(r.respondido_em),
+      percentual: rec != null ? Math.max(pct, rec) : pct, percentual_tda: pct, recuperacao: rec != null ? rec : null,
+      detalhe: det, origem: String(r.origem), respondido_em: String(r.respondido_em),
     };
   });
 }
@@ -223,7 +229,7 @@ function profSalvarQuestionario(dados) {
   if (!titulo) throw new Error('Informe um título.');
   const mes = /^\d{4}-\d{2}$/.test(dados.mes) ? dados.mes : mesAtual_();
   const ehTda = dados.tipo === 'tda';
-  const conteudoValidado = ehTda ? validarTda_(dados.tda) : validarQuestoes_(dados.questoes);
+  const conteudoValidado = ehTda ? validarTda_(dados.tda, dados.serie) : validarQuestoes_(dados.questoes);
   const json = JSON.stringify(conteudoValidado);
   if (json.length > 49000) throw new Error('Conteúdo grande demais para a planilha. Reduza os textos ou divida em dois.');
 

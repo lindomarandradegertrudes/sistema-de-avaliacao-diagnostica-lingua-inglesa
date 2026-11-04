@@ -34,6 +34,7 @@
   <div class="chips" id="tda-turmas"></div>
   <p class="suave pequeno" id="tda-info" style="margin:0"></p>
   <div id="tda-lista" class="tda-grade"></div>
+  <div id="tda-rec" class="cartao" style="margin-top:14px"></div>
 </div>
 
 <dialog id="modal-tda" style="width:min(900px, calc(100vw - 32px))">
@@ -117,6 +118,27 @@
     $('ed-tda-tarefas').value = (tda.tarefas || []).join('\n');
     $('ed-tda-criterios').value = (tda.criterios || []).join('\n');
     renderRubricaEditor(tda.rubrica && tda.rubrica.length ? tda.rubrica : tdaVazia().rubrica);
+    renderHabilidadesTda(tda.habilidades || []);
+  }
+
+  // ---------- Habilidades da TDA (base da recuperação) ----------
+  let catalogoHabTda = null;
+  async function renderHabilidadesTda(marcadas) {
+    const caixa = $('ed-tda-habilidades');
+    if (!catalogoHabTda) {
+      caixa.innerHTML = '<span class="suave">Carregando…</span>';
+      try { catalogoHabTda = await chamar('profHabilidadesTda'); } catch (e) { caixa.textContent = e.message; return; }
+    }
+    const lista = catalogoHabTda[$('ed-serie').value] || [];
+    caixa.innerHTML = lista.length ? lista.map((h) => `
+      <label style="display:inline-flex;gap:6px;align-items:center;font-weight:400;margin:2px 14px 2px 0">
+        <input type="checkbox" data-hab-tda="${esc(h.id)}" style="width:auto" ${marcadas.indexOf(h.id) !== -1 ? 'checked' : ''}>
+        ${esc(h.nome)} <span class="suave">${esc(h.codigo || '')}</span></label>`).join('')
+      : '<span class="suave">Escolha a série para ver as habilidades.</span>';
+  }
+
+  function lerHabilidadesTda() {
+    return [...document.querySelectorAll('#ed-tda-habilidades [data-hab-tda]:checked')].map((c) => c.dataset.habTda);
   }
 
   function renderRubricaEditor(rubrica) {
@@ -146,6 +168,7 @@
       tarefas: linhas('ed-tda-tarefas'),
       criterios: linhas('ed-tda-criterios'),
       rubrica: lerRubricaEditor().filter((r) => r.criterio.trim()),
+      habilidades: lerHabilidadesTda(),
     };
   }
 
@@ -256,6 +279,71 @@
       </div>`;
     }).join('') : '<div class="cartao vazio">Nenhum aluno cadastrado nesta turma.</div>';
     tdaEstado.unidades = unidades;
+    renderRecuperacao();
+  }
+
+  // ---------- Recuperação (por ciclo) ----------
+  const nota10 = (pct) => String(Math.round(pct) / 10).replace('.', ',');
+
+  function renderRecuperacao() {
+    const d = tdaEstado.dados;
+    const recs = d.recuperacoes || {};
+    const alunos = d.alunos.filter((a) => a.turma === tdaEstado.turma && a.correcao && a.correcao.percentual < 100)
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    const habs = d.habilidades || [];
+    const treinos = (r) => {
+      const hs = (r.treinos && r.treinos.habilidades) || [];
+      if (!r.iniciada || !hs.length) return '';
+      return '<br><span class="suave">📖 ' + hs.map((h) => esc(h.nome) + ': ' + (h.atingiu ? '✅ ' + h.melhor
+        : h.encerrado ? '<strong style="color:#c92a2a">⚠️ ' + h.melhor + ' (não atingiu 70%)</strong>'
+        : h.feitas ? h.melhor + ' (1ª tentativa)' : h.tentativas ? 'treinando' : '—')).join(' · ') + '</span>';
+    };
+    const atividades = (r) => {
+      const a = r.avaliacao;
+      if (!a) return '';
+      const saidas = a.saidas && a.saidas.vezes ? ` · <span title="Saídas da tela">🚪 ${a.saidas.vezes}× (${a.saidas.segundos} s)</span>` : '';
+      return '<br>📝 ' + (a.concluida ? `<strong>${a.acertos}/${a.total}</strong>${a.motivo === 'tempo' ? ' (tempo acabou; o que faltou valeu zero)' : ''}`
+        : `respondendo: ${a.respondidas}/${a.total}`) + saidas;
+    };
+    const situacao = (r) => !r ? '<span class="suave">—</span>'
+      : (r.nota != null ? '✅ Concluída'
+      : r.liberada ? `<strong style="color:#2b8a3e">🟢 Liberada até ${esc(r.ate)}</strong>`
+      : r.iniciada ? 'Começou (aguardando nova liberação)' : 'Indicado') + treinos(r) + atividades(r);
+    const final = (a, r) => r && r.nota != null ? `<strong>${nota10(Math.max(a.correcao.percentual, r.nota * 10))}</strong>` : '<span class="suave">—</span>';
+    const pac = d.pacoteRec;
+    $('tda-rec').innerHTML = `
+      <h3 style="margin-top:0">🔁 Recuperação · ${esc(tdaEstado.turma)}</h3>
+      <p class="suave pequeno" style="margin:0 0 8px">Para quem tirou menos de 10 nesta TDA. Marque quem vai fazer e, na aula, libere para os presentes: fecha sozinha em 1 hora ou quando você clicar em "Encerrar". Prevalece a maior nota entre a TDA e a recuperação.</p>
+      <p class="pequeno" style="margin:0 0 10px">${habs.length ? '📚 Habilidades: ' + habs.map(esc).join(' · ')
+        : '⚠️ Marque no editor da TDA as habilidades que ela cobra antes de indicar alunos.'}</p>
+      <div class="pequeno" style="margin:0 0 12px;padding:10px 12px;border:1px dashed #adb5bd;border-radius:8px">
+        <strong>📦 Pacote de recuperação</strong> (as 10 atividades que valem nota):
+        ${pac ? `✅ ${pac.questoes} questões · ${esc(pac.criado_em)} · cada aluno recebe 10 sorteadas, com as opções embaralhadas.`
+          : '<span style="color:#c92a2a">ainda não gerado.</span> Sem ele, os alunos fazem os treinos, mas as atividades não abrem.'}
+        <div class="linha" style="gap:8px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn mini" data-rec-acao="pedido" ${habs.length ? '' : 'disabled'}>📋 Copiar pedido para o claude.ai</button>
+          <a class="btn mini" href="https://claude.ai/new" target="_blank" rel="noopener">Abrir claude.ai ↗</a>
+          ${pac ? '<button class="btn mini" data-rec-acao="ver">👁 Ver questões</button><button class="btn mini perigo" data-rec-acao="apagar-pacote">Apagar pacote</button>' : ''}
+        </div>
+        <textarea id="rec-pedido" rows="4" readonly hidden style="margin-top:8px"></textarea>
+        <div style="margin-top:8px"><textarea id="rec-resposta" rows="3" placeholder="Cole aqui a resposta inteira do claude.ai e clique em Importar."></textarea>
+          <button class="btn mini primario" data-rec-acao="importar" style="margin-top:6px">${pac ? 'Importar (substitui o pacote)' : 'Importar'}</button></div>
+        <div id="rec-pacote-lista"></div>
+      </div>
+      ${alunos.length ? `<div class="tabela-rolagem"><table class="pequeno">
+        <thead><tr><th><input type="checkbox" id="rec-todos" style="width:auto" title="Marcar todos"></th><th>Aluno</th><th>Nota da TDA</th><th>Recuperação</th><th>Nota final</th></tr></thead>
+        <tbody>${alunos.map((a) => `<tr>
+          <td><input type="checkbox" data-rec="${esc(a.email)}" style="width:auto"></td>
+          <td>${esc(a.nome)}</td><td>${nota10(a.correcao.percentual)}</td><td>${situacao(recs[a.email])}</td><td>${final(a, recs[a.email])}</td></tr>`).join('')}</tbody>
+      </table></div>
+      <div class="linha" style="gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn mini" data-rec-acao="indicar">Indicar</button>
+        <button class="btn mini primario" data-rec-acao="liberar">▶ Liberar agora (1 h)</button>
+        <button class="btn mini" data-rec-acao="encerrar">■ Encerrar</button>
+        <button class="btn mini perigo" data-rec-acao="tirar">Tirar indicação</button>
+        <span class="espaco"></span>
+        <button class="btn mini" data-rec-acao="atualizar">↻ Atualizar</button>
+      </div>` : '<p class="suave pequeno">Nenhum aluno desta turma com nota abaixo de 10 (só aparecem os já corrigidos).</p>'}`;
   }
 
   // ---------- Correção ----------
@@ -325,6 +413,75 @@
       if (!b) return;
       if (b.dataset.corrigir !== undefined) abrirCorrecao(tdaEstado.unidades[Number(b.dataset.corrigir)]);
       if (b.dataset.ajustar !== undefined) abrirCorrecao(tdaEstado.unidades[Number(b.dataset.ajustar)], b.dataset.email);
+    });
+    $('tda-rec').addEventListener('change', (ev) => {
+      if (ev.target.id === 'rec-todos') document.querySelectorAll('#tda-rec [data-rec]').forEach((c) => (c.checked = ev.target.checked));
+    });
+    $('tda-rec').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button[data-rec-acao]');
+      if (!b) return;
+      const id = tdaEstado.dados.questionario.id;
+      const acao = b.dataset.recAcao;
+      if (['pedido', 'ver', 'importar', 'apagar-pacote'].indexOf(acao) !== -1) { acaoPacoteRec(acao, b, id); return; }
+      const emails = [...document.querySelectorAll('#tda-rec [data-rec]:checked')].map((c) => c.dataset.rec);
+      if (acao !== 'atualizar' && !emails.length) { avisar('Marque pelo menos um aluno.', true); return; }
+      if (acao === 'tirar' && !confirm('Tirar a indicação dos alunos marcados?')) return;
+      comBotao(b, async () => {
+        tdaEstado.dados = acao === 'indicar' ? await chamar('profIndicarRecuperacao', id, emails, true)
+          : acao === 'tirar' ? await chamar('profIndicarRecuperacao', id, emails, false)
+          : acao === 'liberar' ? await chamar('profLiberarRecuperacao', id, emails)
+          : acao === 'encerrar' ? await chamar('profEncerrarRecuperacao', id, emails)
+          : await chamar('profTdaResultados', id);
+        renderTda();
+        if (acao === 'liberar') avisar('Recuperação liberada por 1 hora para ' + emails.length + ' aluno(s).');
+        if (acao === 'encerrar') avisar('Liberação encerrada.');
+      });
+    });
+    async function acaoPacoteRec(acao, b, id) {
+      if (acao === 'pedido') {
+        comBotao(b, async () => {
+          const texto = await chamar('profPedidoRecuperacao', id);
+          const campo = $('rec-pedido');
+          campo.value = texto;
+          let ok = false;
+          try { await navigator.clipboard.writeText(texto); ok = true; } catch (e) { /* sem permissão: usa a seleção */ }
+          if (!ok) { campo.hidden = false; campo.focus(); campo.select(); try { ok = document.execCommand('copy'); } catch (e) { ok = false; } }
+          avisar(ok ? 'Pedido copiado. Cole no claude.ai (Ctrl+V) e depois cole a resposta aqui.' : 'Selecione o texto do pedido e copie com Ctrl+C.');
+        });
+      } else if (acao === 'importar') {
+        const texto = $('rec-resposta').value.trim();
+        if (!texto) { avisar('Cole a resposta do claude.ai no campo.', true); return; }
+        if (tdaEstado.dados.pacoteRec && !confirm('Substituir o pacote atual? Quem já começou as atividades continua com as questões sorteadas antes.')) return;
+        comBotao(b, async () => {
+          tdaEstado.dados = await chamar('profImportarPacoteRec', id, texto);
+          renderTda();
+          avisar('Pacote importado: ' + tdaEstado.dados.pacoteRec.questoes + ' questões.');
+        });
+      } else if (acao === 'apagar-pacote') {
+        if (!confirm('Apagar o pacote de recuperação desta TDA? Quem já começou as atividades continua com as questões sorteadas.')) return;
+        comBotao(b, async () => { tdaEstado.dados = await chamar('profApagarPacoteRec', id); renderTda(); });
+      } else if (acao === 'ver') {
+        const caixa = $('rec-pacote-lista');
+        if (caixa.innerHTML) { caixa.innerHTML = ''; return; }
+        comBotao(b, async () => {
+          const itens = await chamar('profVerPacoteRec', id);
+          caixa.innerHTML = '<ol style="margin:10px 0 0;padding-left:20px">' + itens.map((x) => `<li style="margin-bottom:10px">
+            <span class="suave">${esc(x.nome)} · ${esc(x.tipo)}</span>
+            ${x.contexto ? `<div class="suave" style="white-space:pre-wrap">${esc(x.contexto)}</div>` : ''}
+            <div><strong>${esc(x.enunciado)}</strong></div>
+            <div>${x.opcoes.map((o, k) => k === x.certa ? `<strong style="color:#2b8a3e">✔ ${esc(o)}</strong>` : esc(o)).join(' · ')}</div>
+            ${x.porque ? `<div class="suave">💡 ${esc(x.porque)}</div>` : ''}</li>`).join('') + '</ol>';
+        });
+      }
+    }
+    $('ed-serie').addEventListener('change', () => {
+      if ($('ed-tipo').value === 'tda') renderHabilidadesTda(lerHabilidadesTda());
+    });
+    $('ed-tda-habilidades').addEventListener('change', (ev) => {
+      if (ev.target.matches('[data-hab-tda]') && ev.target.checked && lerHabilidadesTda().length > 3) {
+        ev.target.checked = false;
+        avisar('Marque no máximo 3 habilidades.', true);
+      }
     });
     $('tda-imprimir').addEventListener('click', () => imprimirTda(tdaEstado.dados.questionario, false));
     $('tda-imprimir-rubrica').addEventListener('click', () => imprimirTda(tdaEstado.dados.questionario, true));

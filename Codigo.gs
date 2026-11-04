@@ -22,6 +22,10 @@ const CABECALHOS = {
   Casos: ['id', 'serie', 'mes', 'titulo', 'status', 'dados_json', 'criado_em'],
   Ciclos: ['id', 'turma', 'serie', 'mes', 'titulo', 'missoes_json', 'prazo', 'status', 'extensoes_json', 'criado_em', 'fechado_em', 'reforco', 'reforcos_json'],
   Jogadas: ['id', 'caso_id', 'email', 'turma', 'numero', 'status', 'pontos', 'total', 'estado_json', 'final_texto', 'final_feedback', 'iniciado_em', 'atualizado_em', 'concluido_em'],
+  Fichas: ['hab_id', 'ficha_json', 'atualizado_em'],
+  FichasLidas: ['email', 'hab_id', 'lida_em'],
+  Recuperacoes: ['questionario_id', 'email', 'turma', 'indicado_em', 'liberado_ate', 'dados_json', 'atualizado_em'],
+  PacotesRec: ['questionario_id', 'itens_json', 'criado_em'],
 };
 
 const CONFIG_PADRAO = [

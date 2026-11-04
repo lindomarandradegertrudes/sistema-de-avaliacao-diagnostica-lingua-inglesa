@@ -327,7 +327,7 @@ function degrauDoAluno_(email, nivel, casos, jogadas) {
 function agruparMissoes_(casos) {
   const m = {};
   casos.forEach(function (c) {
-    if (ehReforco_(c) || ehAvulso_(c)) return;
+    if (ehReforco_(c) || ehAvulso_(c) || ehRecuperacao_(c)) return;
     const k = missaoDe_(c);
     if (!m[k]) m[k] = { missao: k, ordem: Number(c.dados.ordem) || 0, tema: c.dados.tema || '', titulo: c.titulo, serie: c.serie, mes: c.mes, versoes: [] };
     m[k].versoes.push(c);
@@ -444,6 +444,10 @@ function alunoAbrirCaso(id) {
     if (ehReforco_(caso)) {
       if (caso.dados.reforco.email !== eu.email) throw new Error('Este treino é de outro aluno.');
       item = { id: caso.id };
+    } else if (ehRecuperacao_(caso)) {
+      if (caso.dados.recuperacao.email !== eu.email) throw new Error('Este treino é de outro aluno.');
+      exigirRecLiberada_(caso.dados.recuperacao.questionario_id, eu.email);
+      item = { id: caso.id };
     } else if (ehTrilha_(caso)) {
       item = painel.trilha && painel.trilha.missoes.filter(function (m) { return m.missao === k; })[0];
       if (item && item.situacao === 'bloqueada') throw new Error('Termine a missão anterior primeiro.');
@@ -466,6 +470,11 @@ function alunoAbrirCaso(id) {
     patente: painel ? painel.patente : patente_(caso.serie, 0),
     trilha: trilha ? { degrau: trilha.degrau, feitas: trilha.feitas, total: trilha.total } : null,
     ciclo: ciclo,
+    // Treinos do "Meu reforço" abrem com a teoria ("📖 Study") das habilidades dos cadeados.
+    // Na recuperação, a 1ª tentativa de cada habilidade sempre exige ler a ficha até o fim.
+    estudo: ehReforco_(caso) || ehRecuperacao_(caso)
+      ? estudoDoTreino_(caso, eu.email, eu.professor, ehRecuperacao_(caso) && caso.dados.recuperacao.tentativa === 1) : null,
+    recuperacao: ehRecuperacao_(caso) ? { questionario_id: caso.dados.recuperacao.questionario_id, minimo: MINIMO_TREINO_REC } : null,
     // O professor volta para a página de onde veio (painel ou Aluno teste); o visitante volta ao Aluno teste.
     appUrl: eu.professor ? null : ScriptApp.getService().getUrl() + (eu.teste ? '?modo=teste' : ''),
   };
@@ -476,6 +485,7 @@ function alunoNovaJogada(id) {
   const eu = jogador_();
   const caso = buscarCaso_(id);
   if (!eu.professor && !eu.teste && caso.status !== 'aberto') throw new Error('Este caso não está disponível agora.');
+  if (ehRecuperacao_(caso) && !eu.professor) throw new Error('Na recuperação, a 2ª tentativa é montada sozinha: toque em "NEXT".');
   const minhas = lerJogadas_(eu.teste).filter(function (j) { return j.email === eu.email && j.caso_id === caso.id && (!eu.teste || j.turma === TURMA_TESTE); });
   if (!eu.professor && minhas.some(function (j) { return j.status === 'andamento'; })) throw new Error('Termine a jogada atual primeiro.');
   const numero = minhas.reduce(function (m, j) { return Math.max(m, j.numero); }, 0) + 1;
@@ -505,7 +515,10 @@ function minhaJogada_(jogadaId) {
   const eu = jogador_();
   const j = buscarJogada_(jogadaId);
   if (j.email !== eu.email) throw new Error('Esta jogada não é sua.');
-  return { eu: eu, j: j, caso: buscarCaso_(j.caso_id) };
+  const caso = buscarCaso_(j.caso_id);
+  // Treino da recuperação: só enquanto o professor deixa liberado (na aula).
+  if (ehRecuperacao_(caso) && !eu.professor) exigirRecLiberada_(caso.dados.recuperacao.questionario_id, eu.email);
+  return { eu: eu, j: j, caso: caso };
 }
 
 function comTravaDoUsuario_(fn) {
@@ -618,7 +631,7 @@ function feedbackFinal_(caso, texto) {
 function profListarCasos() {
   exigirProfessor_();
   const jogadas = lerJogadas_().filter(function (j) { return j.turma !== 'PROF'; });
-  return lerCasos_().filter(function (c) { return !ehReforco_(c) && !ehAvulso_(c); }).map(function (c) {
+  return lerCasos_().filter(function (c) { return !ehReforco_(c) && !ehAvulso_(c) && !ehRecuperacao_(c); }).map(function (c) {
     const js = jogadas.filter(function (j) { return j.caso_id === c.id && j.numero === 1; });
     return {
       id: c.id, serie: c.serie, mes: c.mes, titulo: c.titulo, status: c.status, numero: c.dados.numero || '',

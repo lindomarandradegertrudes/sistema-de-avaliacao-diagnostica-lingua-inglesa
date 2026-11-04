@@ -4,6 +4,7 @@
   <div id="jogo" hidden>
     <header class="top">
       <a class="voltar" id="voltar" href="#">← Missions</a>
+      <button class="voltar" id="btn-estudo" type="button" hidden>📖 STUDY</button>
       <div class="logo" id="logo"></div>
       <div class="issue" id="issue"></div>
       <span class="modo" id="modo" hidden></span>
@@ -12,6 +13,7 @@
         <div class="points"><small>POINTS</small><span id="pts">0</span></div>
       </div>
     </header>
+    <section class="panel est" id="estudo" hidden></section>
     <section class="panel strip" id="abertura"></section>
     <div class="grid" id="grade">
       <section id="sec-ev">
@@ -67,7 +69,7 @@
   };
   var CORES = { pop: '#FF4F6D', sun: '#FFD23F', go: '#22B573', blue: '#2F5BFF', orange: '#FF8A3D' };
 
-  var C = null, J = null, PROF = false, TESTE = false, PAT = null, TRI = null, CIC = null, S = { tab: null, texto: {}, textoParte: {}, ajuda: false, resp: [], ocupado: false, concluidoAoAbrir: false };
+  var C = null, J = null, PROF = false, TESTE = false, PAT = null, TRI = null, CIC = null, REC = null, S = { tab: null, texto: {}, textoParte: {}, ajuda: false, resp: [], ocupado: false, concluidoAoAbrir: false };
   var $ = function (id) { return document.getElementById(id); };
 
   function chamar(fn) {
@@ -541,7 +543,7 @@
       '<div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Lock</th><th class="n">Hints</th><th class="n">Wrong</th><th class="n">Points</th></tr></thead><tbody>' +
       J.travas.map(function (t, i) {
         return '<tr><td>' + (i + 1) + '. ' + esc(C.dados.travas[i].titulo) + '</td><td class="n">' + t.dicas.length + '</td><td class="n">' + t.erros + '</td><td class="n">' + t.pontos + ' / ' + t.valor + '</td></tr>';
-      }).join('') + '</tbody></table></div>' + patente();
+      }).join('') + '</tbody></table></div>' + (REC ? '' : patente());
     if (F.passos) {
       html += '<div class="actions" style="display:block"><span class="kind" style="background:var(--pop)">BONUS · NO POINTS</span>' +
         '<h2 style="font-size:1.7rem;margin-top:8px">' + esc(F.titulo || 'Write!') + '</h2><div id="passos">' + passos(F.passos) + '</div>';
@@ -555,7 +557,13 @@
       html += '</div>';
     }
     var treino = !!C.dados.reforco;
-    html += '<div class="actions"><a class="btn alt" href="' + esc(APP) + '">← MISSIONS</a>' +
+    if (REC && !PROF) {
+      var passou = total >= REC.minimo, tent = (C.dados.recuperacao || {}).tentativa || 1;
+      html += '<div class="say ' + (passou ? 'ok' : 'bad') + '" style="margin-top:12px">' + rosto('max') + '<div class="balloon"><span class="name">RECOVERY TRAINING</span>' +
+        (passou ? '✅ <b>You passed!</b> (' + REC.minimo + '+ points)' : '⚠️ <b>Below ' + REC.minimo + ' points.</b> ' +
+          (tent < 2 ? 'Você terá uma 2ª tentativa com novos cadeados.' : 'Tudo bem: siga em frente. O professor vai ver.')) + '</div></div>' +
+        '<div class="actions"><a class="btn alt" href="' + esc(APP) + '">← BACK</a><button class="btn blue" id="rec-next" type="button">NEXT ›</button></div><div id="rec-fim"></div>';
+    } else html += '<div class="actions"><a class="btn alt" href="' + esc(APP) + '">← MISSIONS</a>' +
       (treino && !PROF ? '<button class="btn blue" id="novo-treino" type="button">NEW TRAINING ›</button>'
         : '<button class="btn blue" id="de-novo" type="button">PLAY AGAIN' + (PROF ? '' : ' (PRACTICE)') + '</button>') + '</div>';
     $('desk').innerHTML = html;
@@ -563,6 +571,28 @@
     if (env) env.onclick = enviarFinal;
     if ($('de-novo')) $('de-novo').onclick = jogarDeNovo;
     if ($('novo-treino')) $('novo-treino').onclick = novoTreino;
+    if ($('rec-next')) $('rec-next').onclick = proximoRec;
+  }
+
+  /* Recuperação: próximo treino (2ª tentativa ou próxima habilidade) ou fim dos treinos. */
+  function proximoRec() {
+    var b = $('rec-next');
+    b.disabled = true;
+    b.textContent = 'LOADING…';
+    chamar('alunoRecuperacaoProximo', REC.questionario_id).then(function (r) {
+      if (r.fim) {
+        b.remove();
+        $('rec-fim').innerHTML = '<div class="say ok">' + rosto('max') + '<div class="balloon"><span class="name">COACH MAX</span>🎉 <b>Treinos concluídos!</b> Volte para a TDA: as 10 atividades da recuperação vêm a seguir.</div></div>';
+        return;
+      }
+      var a = document.createElement('a');
+      a.className = b.className;
+      a.href = r.url;
+      a.target = '_top';
+      a.textContent = 'START ›';
+      b.parentNode.replaceChild(a, b);
+      try { window.open(r.url, '_top'); } catch (e) { /* bloqueado: o aluno toca no link */ }
+    }).catch(function (e) { b.disabled = false; b.textContent = 'NEXT ›'; alert(e.message); });
   }
 
   function enviarFinal() {
@@ -714,6 +744,107 @@
     }
   }, true);
 
+  /* ---------- "📖 Study": teoria das habilidades antes do treino do Meu reforço ----------
+     Na 1ª vez em cada habilidade, o START só libera depois de rolar até o fim da teoria (aí a ficha conta como lida).
+     Nas próximas vezes a teoria aparece, mas pode ser pulada. O botão 📖 STUDY reabre durante o treino. */
+  var EST = { dados: null, liberado: false, marcou: false, obs: null };
+
+  function fmtEst(s) { return fmt(s).replace(/\*([^*]+?)\*/g, '<i>$1</i>'); }
+
+  function fichaEstudoHtml(f, i) {
+    var x = f.ficha, h = '<article class="est-ficha"><h2 class="est-nome">' + esc(f.nome) + '</h2>';
+    h += '<p class="est-regra">' + fmtEst(x.regra) + '</p>';
+    if ((x.atencao || []).length) {
+      h += '<div class="est-bloco est-atencao"><b>⚠️ Atenção</b><ul>' + x.atencao.map(function (a) { return '<li>' + fmtEst(a) + '</li>'; }).join('') + '</ul></div>';
+    }
+    if ((x.exemplos || []).length) {
+      h += '<div class="est-bloco"><b>💬 Exemplos</b><ul class="est-ex">' + x.exemplos.map(function (e) {
+        return '<li><span class="en">' + fmtEst(e.en) + '</span><span class="pt">' + fmtEst(e.pt) + '</span></li>';
+      }).join('') + '</ul></div>';
+    }
+    if (x.erro && x.erro.errado) {
+      h += '<div class="est-bloco est-erro"><b>🚫 Erro comum</b><p><s>' + fmtEst(x.erro.errado) + '</s> → <b>' + fmtEst(x.erro.certo) + '</b></p>' +
+        (x.erro.porque ? '<p class="pt">' + fmtEst(x.erro.porque) + '</p>' : '') + '</div>';
+    }
+    if (x.check && x.check.pergunta) {
+      h += '<div class="est-bloco est-check"><b>✅ Check</b> <span class="pt">(sem nota)</span><p>' + fmtEst(x.check.pergunta) + '</p><div class="est-opcoes">' +
+        x.check.opcoes.map(function (o, k) { return '<button type="button" class="est-op" data-est-op="' + i + '-' + k + '">' + fmtEst(o) + '</button>'; }).join('') +
+        '</div><p class="est-resp" id="est-resp-' + i + '" aria-live="polite"></p></div>';
+    }
+    return h + '</article>';
+  }
+
+  function desenharEstudo() {
+    var d = EST.dados, voltando = J.status !== 'concluido' && EST.marcou && !S.estudoInicial;
+    $('estudo').innerHTML = '<div class="est-topo"><span class="caption">📖 STUDY TIME</span><p class="est-intro">' +
+      (d.obrigatoria && !EST.liberado ? 'Leia a teoria <b>até o fim</b> para liberar o treino.' : 'Revise a teoria antes de treinar.') + '</p></div>' +
+      d.fichas.map(fichaEstudoHtml).join('') +
+      '<div class="est-fim" id="est-fim"><button class="btn" type="button" id="est-start"' + (EST.liberado ? '' : ' disabled') + '>' +
+      (voltando ? 'BACK TO TRAINING ›' : 'START TRAINING ›') + '</button>' +
+      (EST.liberado ? '' : '<p class="est-dica" id="est-dica">⬇️ Role até o fim para liberar.</p>') + '</div>';
+    observarFimEstudo();
+  }
+
+  function observarFimEstudo() {
+    if (EST.liberado) return;
+    if (EST.obs) EST.obs.disconnect();
+    if (!('IntersectionObserver' in window)) { liberarEstudo(); return; }
+    EST.obs = new IntersectionObserver(function (itens) {
+      if (itens.some(function (it) { return it.isIntersecting; })) liberarEstudo();
+    }, { threshold: 0.6 });
+    EST.obs.observe($('est-fim'));
+  }
+
+  function liberarEstudo() {
+    if (EST.obs) { EST.obs.disconnect(); EST.obs = null; }
+    EST.liberado = true;
+    var b = $('est-start'), dica = $('est-dica');
+    if (b) b.disabled = false;
+    if (dica) dica.remove();
+    var novas = EST.dados.fichas.filter(function (f) { return !f.lida; }).map(function (f) { return f.id; });
+    if (novas.length && !PROF) {
+      chamar('alunoMarcarFichasLidas', novas).then(function () {
+        EST.dados.fichas.forEach(function (f) { f.lida = true; });
+      }).catch(function () { /* se falhar, a ficha volta a ser obrigatória na próxima vez */ });
+    }
+  }
+
+  function abrirEstudo(inicial) {
+    S.estudoInicial = !!inicial;
+    $('estudo').hidden = false;
+    $('abertura').hidden = true;
+    $('grade').hidden = true;
+    desenharEstudo();
+    window.scrollTo(0, 0);
+  }
+
+  function fecharEstudo() {
+    EST.marcou = true;
+    S.estudoInicial = false;
+    $('estudo').hidden = true;
+    $('abertura').hidden = false;
+    $('grade').hidden = false;
+    window.scrollTo(0, 0);
+  }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t.closest('#btn-estudo')) { if ($('estudo').hidden) abrirEstudo(false); else if (EST.liberado) fecharEstudo(); return; }
+    if (t.closest('#est-start')) { if (EST.liberado) fecharEstudo(); return; }
+    var op = t.closest('[data-est-op]');
+    if (op) {
+      var p = op.getAttribute('data-est-op').split('-'), i = Number(p[0]), k = Number(p[1]);
+      var c = EST.dados.fichas[i].ficha.check;
+      var caixa = op.parentNode;
+      Array.prototype.forEach.call(caixa.querySelectorAll('.est-op'), function (b, n) {
+        b.disabled = true;
+        if (n === c.correta) b.classList.add('certo');
+        else if (n === k) b.classList.add('errado');
+      });
+      $('est-resp-' + i).innerHTML = (k === c.correta ? '✔ <b>Isso mesmo!</b> ' : '✘ <b>Quase!</b> ') + fmtEst(c.explicacao || '');
+    }
+  });
+
   /* ---------- Início ---------- */
   function erro(msg) {
     $('carregando').hidden = true;
@@ -723,13 +854,19 @@
 
   if (!CASO_ID) { erro('Caso não informado.'); return; }
   chamar('alunoAbrirCaso', CASO_ID).then(function (r) {
-    C = r.caso; J = r.jogada; PROF = !!r.professor || !!r.teste; TESTE = !!r.teste; PAT = r.patente; TRI = r.trilha || null; CIC = r.ciclo || null;
+    C = r.caso; J = r.jogada; PROF = !!r.professor || !!r.teste; TESTE = !!r.teste; PAT = r.patente; TRI = r.trilha || null; CIC = r.ciclo || null; REC = r.recuperacao || null;
     if (r.appUrl) APP = r.appUrl;
     S.concluidoAoAbrir = J.status === 'concluido';
     $('carregando').hidden = true;
     $('jogo').hidden = false;
     desenharTudo();
     if (C.dados.tutorial && J.status !== 'concluido') setTimeout(function () { iniciarTutorial(C.dados.tutorial); }, 400);
+    if (r.estudo && r.estudo.fichas && r.estudo.fichas.length) {
+      EST.dados = r.estudo;
+      EST.liberado = !r.estudo.obrigatoria;
+      $('btn-estudo').hidden = false;
+      if (J.status !== 'concluido') abrirEstudo(true);
+    }
   }).catch(function (e) { erro(e.message); });
 })();
 </script>

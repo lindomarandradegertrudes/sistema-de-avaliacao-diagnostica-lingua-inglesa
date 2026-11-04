@@ -156,6 +156,16 @@
       <div class="rodape-modal"><button class="btn primario" type="submit" id="enviar">Enviar respostas</button></div>
     </form>
 
+    <!-- Recuperação: as 10 atividades -->
+    <div id="rec-view" class="pilha" hidden>
+      <div class="linha">
+        <button class="btn" type="button" id="rec-sair">← Sair</button>
+        <strong style="flex:1">🔁 Recuperação · atividades</strong>
+        <span class="suave" id="rec-progresso"></span>
+      </div>
+      <div id="rec-corpo"></div>
+    </div>
+
     <!-- TDA -->
     <div id="tda-view" class="pilha" hidden>
       <div class="linha">
@@ -318,7 +328,7 @@
     }
 
     function mostrar(id) {
-      ['carregando', 'erro', 'cadastro', 'fechado', 'painel', 'quiz', 'enviado', 'tda-view', 'manual-view'].forEach((x) => ($(x).hidden = x !== id));
+      ['carregando', 'erro', 'cadastro', 'fechado', 'painel', 'quiz', 'enviado', 'tda-view', 'rec-view', 'manual-view'].forEach((x) => ($(x).hidden = x !== id));
       window.scrollTo(0, 0);
     }
 
@@ -446,7 +456,7 @@
             <div class="pendente">
               <div style="flex:1"><strong>${esc(t.titulo)}</strong>
                 <div class="suave pequeno">${t.modo === 'grupo' ? 'Em grupo' : 'Individual'}${t.nota != null ? ' · nota ' + t.nota + '%' : ''}</div></div>
-              <span class="selo ${SIT[t.situacao][0]}">${SIT[t.situacao][1]}</span>
+              <span class="selo ${SIT[t.situacao][0]}">${SIT[t.situacao][1]}</span>${t.recuperacao ? ' <span class="selo pendente-s">🔁 Recuperação</span>' : ''}
               <button class="btn ${t.situacao === 'pendente' ? 'primario' : ''}" data-tda="${esc(t.id)}">${t.situacao === 'pendente' ? 'Fazer' : 'Abrir'}</button>
             </div>`).join('')
         : '<p class="vazio" style="padding:8px 0">Nenhuma TDA no momento.</p>';
@@ -693,6 +703,80 @@
       try { render(await chamar('alunoObterEstado')); } catch (e) { mostrarErro(e.message); }
     });
 
+    // ---------- Recuperação: as 10 atividades (uma resposta por questão, sem voltar, sem dicas) ----------
+    const recAval = { id: null, v: null };
+    const nota10Rec = (pct) => String(Math.round(pct) / 10).replace('.', ',');
+
+    function htmlAtividadesRec(rec, c) {
+      const a = rec.avaliacao;
+      if (rec.nota != null) {
+        const tda = c ? c.percentual : 0;
+        return `<p>✅ Você acertou <strong>${rec.nota} de 10</strong>. Nota da recuperação: <strong>${rec.nota}</strong> · nota da TDA: ${nota10Rec(tda)}.<br>
+          Fica valendo: <strong>${nota10Rec(Math.max(tda, rec.nota * 10))}</strong>.${a && a.motivo === 'tempo' ? '<br><span class="suave pequeno">A liberação terminou antes do fim: as questões que faltaram valeram zero.</span>' : ''}</p>`;
+      }
+      if (!rec.liberada) return '<p class="suave">As atividades abrem quando o professor liberar a recuperação na aula.</p>';
+      return `<button class="btn primario" id="rec-atividades" type="button">${a ? `▶ Continuar as atividades (${a.respondidas}/${a.total})` : '▶ Começar as 10 atividades'}</button>`;
+    }
+
+    function renderRecAval(v) {
+      recAval.v = v;
+      $('rec-progresso').textContent = v.fim ? '' : `Questão ${v.questao.numero} de ${v.total} · até ${v.ate}`;
+      if (v.fim) {
+        pararMonitor(true);
+        $('rec-corpo').innerHTML = `<div class="cartao">
+          <h2>🏁 Atividades concluídas</h2>
+          <p>Você acertou <strong>${v.acertos} de ${v.total}</strong>. Nota da recuperação: <strong>${v.nota}</strong>.</p>
+          ${v.motivo === 'tempo' ? '<p class="suave pequeno">A liberação terminou antes do fim: as questões que faltaram valeram zero.</p>' : ''}
+          <p class="suave pequeno">Fica valendo a maior nota entre a TDA e a recuperação.</p>
+          <button class="btn primario" type="button" id="rec-fim-voltar">Voltar para a TDA</button>
+        </div>`;
+        mostrar('rec-view');
+        return;
+      }
+      const q = v.questao;
+      $('rec-corpo').innerHTML = `<p class="suave pequeno" style="margin:0">⚠️ Fique nesta tela até terminar: sair para outras abas ou janelas fica registrado para o professor. Depois de confirmar, não dá para voltar.</p>
+        <div class="cartao questao">
+          <span class="num">Questão ${q.numero} de ${v.total}</span>
+          ${q.contexto ? `<div class="apoio" style="font-style:normal">${esc(q.contexto)}</div>` : ''}
+          <div class="enunciado"><strong>${esc(q.enunciado)}</strong></div>
+          ${q.opcoes.map((o, j) => `
+            <label class="opcao"><input type="radio" name="rec-op" value="${j}"><span><strong>${LETRAS[j]})</strong> ${esc(o)}</span></label>`).join('')}
+          <div style="margin-top:14px"><button class="btn primario" type="button" id="rec-confirmar" disabled>Confirmar resposta</button></div>
+        </div>`;
+      mostrar('rec-view');
+    }
+
+    async function voltarDaRecAval() {
+      mostrar('carregando');
+      try { renderTda(await chamar('alunoAbrirTda', recAval.id)); } catch (e) { mostrarErro(e.message); }
+    }
+
+    $('rec-corpo').addEventListener('change', (ev) => {
+      if (ev.target.name === 'rec-op') $('rec-confirmar').disabled = false;
+    });
+    $('rec-corpo').addEventListener('click', async (ev) => {
+      if (ev.target.id === 'rec-fim-voltar') { voltarDaRecAval(); return; }
+      if (ev.target.id !== 'rec-confirmar') return;
+      const marcada = document.querySelector('input[name="rec-op"]:checked');
+      if (!marcada) return;
+      const b = ev.target;
+      b.disabled = true;
+      b.textContent = 'Enviando…';
+      try {
+        renderRecAval(await chamar('alunoRecResponder', recAval.id, recAval.v.questao.numero, Number(marcada.value), saidasAtuais()));
+        window.scrollTo(0, 0);
+      } catch (e) {
+        alert(e.message);
+        pararMonitor(true);
+        voltarDaRecAval();
+      }
+    });
+    $('rec-sair').addEventListener('click', () => {
+      if (recAval.v && !recAval.v.fim && !confirm('Sair agora? Você pode continuar enquanto a recuperação estiver liberada. Se a liberação acabar, o que faltar vale zero.')) return;
+      pararMonitor(false);
+      voltarDaRecAval();
+    });
+
     function renderTda(t) {
       tdaAtual = t;
       $('tda-titulo').textContent = t.titulo;
@@ -729,6 +813,49 @@
           </table></div>
         </div>` : '');
 
+      const rec = t.recuperacao;
+      if (rec) {
+        const tr = rec.treinos || { habilidades: [], concluidos: false };
+        const linhaHab = (h) => `<li>${esc(h.nome)}: ${h.atingiu ? `✅ ${h.melhor} pontos`
+          : h.encerrado ? `⚠️ ${h.melhor} pontos (abaixo de 70)`
+          : h.feitas ? `${h.melhor} pontos · falta a 2ª tentativa` : h.tentativas ? 'em andamento' : 'a fazer'}</li>`;
+        $('tda-correcao').insertAdjacentHTML('beforeend', `<div class="cartao" style="border:2px solid #f59f00">
+          <h2>🔁 Recuperação</h2>
+          <p>${rec.nota != null ? '✅ Recuperação concluída.' : rec.liberada ? `🟢 Liberada agora, até <strong>${esc(rec.ate)}</strong>.` : rec.iniciada ? 'Você já começou. O professor libera de novo na próxima aula.' : 'O professor indicou você para a recuperação. Ela será liberada pelo professor durante a aula.'}</p>
+          <p class="suave pequeno">Primeiro você estuda e treina cada habilidade desta TDA (sem nota; a meta é 70 pontos, com até 2 tentativas). Depois faz 10 atividades que valem de 0 a 10. Fica valendo a maior nota entre a TDA e a recuperação.</p>
+          ${tr.habilidades.length ? `<p style="margin:6px 0 2px"><strong>📖 Treinos</strong></p><ul class="pequeno" style="margin-top:0">${tr.habilidades.map(linhaHab).join('')}</ul>` : ''}
+          ${rec.liberada && !tr.concluidos ? `<button class="btn primario" id="rec-comecar" type="button">${rec.iniciada ? '▶ Continuar a recuperação' : '▶ Começar a recuperação'}</button>` : ''}
+          ${tr.concluidos ? `<p style="margin:10px 0 4px"><strong>📝 Atividades (valem de 0 a 10)</strong></p>${htmlAtividadesRec(rec, c)}` : ''}
+        </div>`);
+        const bAval = $('rec-atividades');
+        if (bAval) bAval.addEventListener('click', async () => {
+          if (!rec.avaliacao && !confirm('Atenção às regras:\n\n• 10 questões, 1 ponto cada.\n• Uma resposta por questão: depois de confirmar, não dá para voltar.\n• Sem dicas.\n• Sair da tela fica registrado para o professor.\n• Se a liberação acabar antes de terminar, o que faltar vale zero.\n\nComeçar agora?')) return;
+          bAval.disabled = true;
+          try {
+            const v = await chamar('alunoRecAvaliacao', t.id);
+            recAval.id = t.id;
+            iniciarMonitor('r:' + t.id);
+            renderRecAval(v);
+          } catch (e) {
+            alert(e.message);
+            bAval.disabled = false;
+          }
+        });
+        const bRec = $('rec-comecar');
+        if (bRec) bRec.addEventListener('click', async () => {
+          bRec.disabled = true;
+          bRec.textContent = 'Montando…';
+          try {
+            const x = await chamar('alunoRecuperacaoProximo', t.id);
+            if (x.url) irParaTreino(bRec, x.url);
+            else renderTda(await chamar('alunoAbrirTda', t.id));
+          } catch (e) {
+            alert(e.message);
+            bRec.disabled = false;
+            bRec.textContent = '▶ Continuar a recuperação';
+          }
+        });
+      }
       const e = t.entrega;
       const podeEditar = t.aberta && !c;
       $('tda-entrega-atual').innerHTML = e && !podeEditar ? `

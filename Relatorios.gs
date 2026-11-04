@@ -122,6 +122,8 @@ function profEvolucaoAluno(email) {
     return {
       titulo: q.titulo, tipo: q.tipo, mes: q.mes, data: r.respondido_em, origem: r.origem,
       pontuacao: r.pontuacao, total: r.total, percentual: r.percentual,
+      // TDA com recuperação concluída: percentual já é a maior nota; mostra as duas.
+      nota_tda: r.percentual_tda, recuperacao: r.recuperacao,
       mediaAcumulada: acumulada, nivel: nivelDe_(acumulada, cfg),
     };
   });
@@ -197,6 +199,19 @@ function profExportarPlanilha() {
     vigentes.length
       ? vigentes.map(function (g) { return [g.turma, "'" + g.mes, g.grupo, g.nome, g.nivel, g.media === null ? '' : g.media]; })
       : [['', '', '', 'Nenhum grupo formado ainda', '', '']]);
+
+  // Recuperações das TDAs (notas de 0 a 10; vale a maior entre a TDA e a recuperação).
+  const abaRec = ss.insertSheet('Recuperações');
+  const dez = function (pct) { return pct == null ? '' : Math.round(pct) / 10; };
+  const linhasRec = linhasRecuperacao_();
+  preencher(abaRec, ['Turma', 'Nome', 'TDA', 'Mês', 'Nota da TDA', 'Treinos', 'Atividades', 'Nota da recuperação', 'Nota final', 'Situação', 'Saídas da tela'],
+    linhasRec.length ? linhasRec.map(function (l) {
+      const a = l.avaliacao;
+      return [l.turma, l.nome, l.tda, "'" + l.mes, dez(l.nota_tda), textoTreinosRec_(l.treinos),
+        a ? (a.concluida ? a.acertos : a.respondidas) + '/' + a.total + (a.motivo === 'tempo' ? ' (tempo acabou)' : a.concluida ? '' : ' (em andamento)') : '',
+        l.nota_rec == null ? '' : l.nota_rec, dez(l.final), SITUACAO_REC[l.situacao],
+        a && a.saidas && a.saidas.vezes ? a.saidas.vezes + 'x (' + a.saidas.segundos + ' s)' : ''];
+    }) : [['', 'Nenhuma recuperação ainda', '', '', '', '', '', '', '', '', '']]);
 
   return ss.getUrl();
 }

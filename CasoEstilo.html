@@ -225,4 +225,33 @@ textarea { width: 100%; min-height: 80px; font: inherit; font-size: 1.05rem; bor
 .tut-acoes .btn { font-size: 1.1rem; padding: 2px 14px; }
 .tut-pular { border: 0; background: none; text-decoration: underline; cursor: pointer; font-family: var(--font-body); font-size: .85rem; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .tut-luz { transition: none; } }
+
+/* "📖 Study": teoria antes do treino do Meu reforço */
+button.voltar { cursor: pointer; font-size: inherit; line-height: inherit; }
+.est { padding: 18px 20px 22px; margin-bottom: 22px; display: grid; gap: 16px; }
+.est-topo { display: grid; gap: 6px; justify-items: start; }
+.est-intro { margin: 0; font-family: var(--font-balloon); font-weight: 700; }
+.est-ficha { border: var(--line); border-radius: 12px; background: var(--panel); padding: 14px 16px; box-shadow: 4px 4px 0 var(--ink); display: grid; gap: 10px; }
+.est-nome { font-size: 1.6rem; color: var(--blue); }
+.est-regra { margin: 0; font-size: 1.05rem; }
+.est-bloco { background: var(--soft); border: 2px solid var(--ink); border-radius: 10px; padding: 10px 12px; }
+.est-bloco ul { margin: 6px 0 0; padding-left: 20px; }
+.est-bloco p { margin: 6px 0 0; }
+.est-atencao { background: #FFF6CC; }
+.est-erro { background: #FFE3E3; }
+.est-erro s { color: #C92A2A; }
+.est-ex { list-style: none; padding-left: 0 !important; display: grid; gap: 6px; }
+.est-ex li { display: grid; gap: 1px; }
+.est-ex .en { font-weight: 700; }
+.est-ex .pt { font-style: italic; color: var(--muted); font-size: .92rem; }
+.est-check { background: #E7F5FF; }
+.est-opcoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.est-op { border: 2px solid var(--ink); background: var(--panel); color: var(--ink); border-radius: 10px; padding: 6px 12px; font: inherit; cursor: pointer; }
+.est-op:disabled { cursor: default; opacity: .85; }
+.est-op.certo { background: var(--go); color: var(--panel); opacity: 1; }
+.est-op.errado { background: #FFB3B3; opacity: 1; }
+.est-resp { min-height: 1.2em; }
+.est-fim { display: grid; justify-items: center; gap: 6px; padding-top: 4px; }
+.est-fim .btn:disabled { background: #C9C9C9; color: var(--muted); cursor: not-allowed; box-shadow: none; transform: none; }
+.est-dica { margin: 0; color: var(--muted); font-size: .9rem; }
 </style>

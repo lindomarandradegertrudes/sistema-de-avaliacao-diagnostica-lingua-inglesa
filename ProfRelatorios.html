@@ -25,6 +25,7 @@
       <button class="btn ativa" data-vista="turmas">Comparativo das turmas</button>
       <button class="btn" data-vista="topicos">Tópicos com mais erros</button>
       <button class="btn" data-vista="aluno">Evolução por aluno</button>
+      <button class="btn" data-vista="rec">🔁 Recuperações</button>
     </div>
     <span class="espaco"></span>
     <button class="btn" id="rel-imprimir">Imprimir / PDF</button>
@@ -51,6 +52,15 @@
     <div class="cartao" id="rel-top-lista"></div>
   </div>
 
+  <!-- Recuperações -->
+  <div id="rel-rec" class="pilha" data-titulo="Recuperações das TDAs" hidden>
+    <div class="linha">
+      <select id="rel-rec-turma" style="width:auto"></select>
+      <span class="suave pequeno">Notas de 0 a 10. Vale a maior entre a TDA e a recuperação.</span>
+    </div>
+    <div id="rel-rec-conteudo"></div>
+  </div>
+
   <!-- Aluno -->
   <div id="rel-aluno" class="pilha" data-titulo="Evolução do aluno" hidden>
     <div class="linha">
@@ -72,11 +82,13 @@
       if (!b) return;
       rel.vista = b.dataset.vista;
       document.querySelectorAll('#rel-vistas button').forEach((x) => x.classList.toggle('ativa', x === b));
-      ['turmas', 'topicos', 'aluno'].forEach((v) => ($('rel-' + v).hidden = v !== rel.vista));
+      ['turmas', 'topicos', 'aluno', 'rec'].forEach((v) => ($('rel-' + v).hidden = v !== rel.vista));
+      if (rel.vista === 'rec') carregarRecRel();
     });
     $('rel-top-serie').addEventListener('change', renderTopicos);
     $('rel-al-turma').addEventListener('change', preencherAlunosRel);
     $('rel-al-aluno').addEventListener('change', carregarAlunoRel);
+    $('rel-rec-turma').addEventListener('change', renderRecRel);
     $('rel-imprimir').addEventListener('click', imprimirRelatorio);
     $('rel-exportar').addEventListener('click', (ev) => comBotao(ev.target, async () => {
       $('rel-exportado').hidden = false;
@@ -91,6 +103,53 @@
     }));
     $('rel-top-serie').innerHTML = opcoesSerie(false);
     $('rel-al-turma').innerHTML = opcoesTurma(false);
+    $('rel-rec-turma').innerHTML = opcoesTurma(true);
+  }
+
+  // ---------- Recuperações ----------
+  async function carregarRecRel() {
+    $('rel-rec-conteudo').innerHTML = '<div class="carregando">Carregando…</div>';
+    try {
+      rel.rec = (await chamar('profRelatorioRecuperacoes')).linhas;
+      renderRecRel();
+    } catch (e) {
+      $('rel-rec-conteudo').innerHTML = `<div class="cartao vazio" style="color:var(--perigo)">Erro ao carregar: ${esc(e.message)}</div>`;
+    }
+  }
+
+  function renderRecRel() {
+    if (!rel.rec) return;
+    const turma = $('rel-rec-turma').value;
+    const linhas = rel.rec.filter((l) => !turma || l.turma === turma);
+    if (!linhas.length) { $('rel-rec-conteudo').innerHTML = '<div class="cartao vazio">Nenhuma recuperação' + (turma ? ' nesta turma' : '') + ' ainda.</div>'; return; }
+    const dez = (pct) => pct == null ? '—' : String(Math.round(pct) / 10).replace('.', ',');
+    const media = (v) => v.length ? String(Math.round(v.reduce((s, x) => s + x, 0) / v.length) / 10).replace('.', ',') : '—';
+    const concl = linhas.filter((l) => l.nota_rec != null);
+    const subiram = concl.filter((l) => l.nota_rec * 10 > l.nota_tda);
+    const alerta = linhas.filter((l) => l.treinos.some((h) => h.encerrado && !h.atingiu));
+    const sit = { indicado: 'Indicado', liberada: '🟢 Liberada', iniciada: 'Começou', concluida: '✅ Concluída' };
+    const treinos = (l) => l.treinos.map((h) => `${esc(h.nome)}: ${h.atingiu ? '✅ ' + h.melhor
+      : h.encerrado ? '<strong style="color:var(--perigo)">⚠️ ' + h.melhor + '</strong>' : h.melhor != null ? h.melhor + ' (1ª)' : '—'}`).join('<br>');
+    const ativ = (a) => !a ? '<span class="suave">—</span>' : (a.concluida ? `<strong>${a.acertos}/${a.total}</strong>` : `${a.respondidas}/${a.total} <span class="suave">(fazendo)</span>`)
+      + (a.motivo === 'tempo' ? '<br><span class="suave pequeno">tempo acabou</span>' : '');
+    const saidas = (a) => a && a.saidas && a.saidas.vezes ? `🚪 ${a.saidas.vezes}× (${a.saidas.segundos} s)` : '<span class="suave">—</span>';
+    $('rel-rec-conteudo').innerHTML = `
+      <div class="kpis">
+        <div class="cartao kpi"><div class="suave pequeno">Indicados</div><div class="valor">${linhas.length}</div></div>
+        <div class="cartao kpi"><div class="suave pequeno">Concluíram</div><div class="valor">${concl.length}</div></div>
+        <div class="cartao kpi"><div class="suave pequeno">Melhoraram a nota</div><div class="valor">${subiram.length}</div></div>
+        <div class="cartao kpi"><div class="suave pequeno">Média (concluídas): TDA → final</div><div class="valor">${media(concl.map((l) => l.nota_tda))} → ${media(concl.map((l) => l.final))}</div></div>
+        <div class="cartao kpi"><div class="suave pequeno">⚠️ Não atingiram 70% em algum treino</div><div class="valor">${alerta.length}</div></div>
+      </div>
+      <div class="cartao tabela-rolagem"><table class="pequeno">
+        <thead><tr><th>Turma</th><th>Aluno</th><th>TDA</th><th>Nota da TDA</th><th>Treinos</th><th>Atividades</th><th>Recuperação</th><th>Final</th><th>Situação</th><th>Saídas</th></tr></thead>
+        <tbody>${linhas.map((l) => `<tr>
+          <td>${esc(l.turma)}</td><td>${esc(l.nome)}</td><td>${esc(l.tda)} <span class="suave">${esc(l.mes)}</span></td>
+          <td>${dez(l.nota_tda)}</td><td>${treinos(l) || '<span class="suave">—</span>'}</td><td>${ativ(l.avaliacao)}</td>
+          <td>${l.nota_rec == null ? '<span class="suave">—</span>' : l.nota_rec}</td>
+          <td>${l.nota_rec != null && l.nota_rec * 10 > l.nota_tda ? '<strong style="color:var(--ok)">' + dez(l.final) + '</strong>' : dez(l.final)}</td>
+          <td>${sit[l.situacao]}</td><td>${saidas(l.avaliacao)}</td></tr>`).join('')}</tbody>
+      </table></div>`;
   }
 
   async function carregarRelatorios() {
@@ -226,7 +285,8 @@
         <div class="cartao grafico"><h3>Evolução</h3>${graficoEvolucao(a.avaliacoes, rel.dados.faixas)}</div>
         <div class="cartao tabela-rolagem"><h3>Avaliações</h3>
           <table><thead><tr><th>Mês</th><th>Avaliação</th><th>Acertos</th><th>Nota</th><th>Média acumulada</th><th>Nível</th></tr></thead>
-          <tbody>${a.avaliacoes.map((v) => `<tr><td>${esc(v.mes)}</td><td>${esc(v.titulo)} <span class="suave pequeno">(${v.origem === 'online' ? 'online' : v.origem === 'tda' ? 'TDA' : 'impresso'})</span></td>
+          <tbody>${a.avaliacoes.map((v) => `<tr><td>${esc(v.mes)}</td><td>${esc(v.titulo)} <span class="suave pequeno">(${v.origem === 'online' ? 'online' : v.origem === 'tda' ? 'TDA' : 'impresso'})</span>${v.recuperacao != null
+            ? `<br><span class="pequeno">🔁 recuperação: TDA ${v.nota_tda}% · recuperação ${v.recuperacao}% · vale ${v.percentual}%</span>` : ''}</td>
             <td>${v.pontuacao}/${v.total}</td><td>${v.percentual}%</td><td>${v.mediaAcumulada}%</td><td><span class="selo ${esc(v.nivel)}">${esc(v.nivel)}</span></td></tr>`).join('')}</tbody></table></div>
         <div class="cartao"><h3>Desempenho por tópico</h3>${a.topicos.length ? a.topicos.map((t) => `
           <div class="topico-linha">
@@ -246,6 +306,7 @@
     copia.querySelectorAll('select, button, .linha > .suave').forEach((el) => el.remove());
     let subtitulo = '';
     if (rel.vista === 'topicos') subtitulo = $('rel-top-serie').value + ' ano';
+    if (rel.vista === 'rec') subtitulo = $('rel-rec-turma').value || 'todas as turmas';
     $('impressao').innerHTML = `<h2>${esc(vista.dataset.titulo)}${subtitulo ? ' – ' + esc(subtitulo) : ''}</h2>
       <p style="font-size:10pt">Língua Inglesa · gerado em ${new Date().toLocaleString('pt-BR')}</p>`;
     $('impressao').appendChild(copia);

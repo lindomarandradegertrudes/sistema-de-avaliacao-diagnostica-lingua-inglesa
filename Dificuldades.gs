@@ -29,7 +29,7 @@ function contextoDificuldades_() {
 }
 
 function fonteDoCaso_(c) {
-  if (c.dados.reforco) return 'reforco';
+  if (c.dados.reforco || c.dados.recuperacao) return 'reforco';
   if (ehTrilha_(c)) return 'trilha';
   return 'jogos';
 }
@@ -170,7 +170,7 @@ function alvosReforco_(perfil, pool) {
 function cadeadosParaTreino_(serie, casos) {
   const lista = [];
   Object.keys(casos).map(function (k) { return casos[k]; }).forEach(function (c) {
-    if (c.dados.reforco || c.dados.missao === 'tutorial') return;
+    if (c.dados.reforco || c.dados.recuperacao || c.dados.missao === 'tutorial') return;
     // Exercícios gerados com IA só entram depois de "Liberar para o reforço".
     if (c.dados.gerado && ehAvulso_(c) && c.status !== 'aberto') return;
     if (c.serie !== serie && c.serie !== SERIE_TODAS) return;

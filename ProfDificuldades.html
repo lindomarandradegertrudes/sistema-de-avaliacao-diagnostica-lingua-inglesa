@@ -37,7 +37,48 @@
     <p class="suave pequeno" style="margin:0">Alunos com a mesma dificuldade, em grupos de até 5 (do menor acerto para o maior). Útil para uma atividade de reforço em sala.</p>
     <div id="hab-grupos" class="pilha"></div>
   </div>
+  <div class="cartao pilha">
+    <div class="linha">
+      <h2 style="margin:0">📖 Fichas teóricas (Meu reforço)</h2>
+      <span class="espaco"></span>
+      <select id="fic-serie" style="width:auto">
+        <option value="">Escolha a série…</option>
+        <option value="6º">6º ano</option><option value="7º">7º ano</option><option value="8º">8º ano</option><option value="9º">9º ano</option>
+        <option value="base">Trilha Base</option>
+      </select>
+    </div>
+    <p class="suave pequeno" style="margin:0">
+      Antes de cada treino do 💪 Meu reforço, o aluno vê as fichas das habilidades daquele treino. Na 1ª vez em cada habilidade, precisa rolar até o fim para liberar o START;
+      depois, pode pular. Edite qualquer ficha ou volte ao texto padrão. Marcações: <code>**negrito**</code> · <code>*itálico*</code> · <code>==destaque==</code> · <code>~~riscado~~</code>.
+    </p>
+    <div id="fic-lista" class="pilha"></div>
+  </div>
 </section>
+
+<dialog id="modal-ficha-teorica" style="width:min(720px, calc(100vw - 32px))">
+  <form id="form-ficha-teorica" method="dialog" class="pilha">
+    <div class="linha"><h2 style="margin:0" id="fic-titulo"></h2><span class="espaco"></span>
+      <button class="btn" type="button" data-fechar>Cancelar</button></div>
+    <div class="campo"><label for="fic-regra">Regra / explicação</label><textarea id="fic-regra" rows="4" required></textarea></div>
+    <div class="campo"><label for="fic-atencao">⚠️ Atenção <span class="suave pequeno">(um item por linha)</span></label><textarea id="fic-atencao" rows="3"></textarea></div>
+    <div class="campo"><label for="fic-exemplos">💬 Exemplos <span class="suave pequeno">(um por linha: inglês | tradução)</span></label><textarea id="fic-exemplos" rows="4" placeholder="I am from Joinville. | Eu sou de Joinville."></textarea></div>
+    <div class="grade-2">
+      <div class="campo"><label for="fic-errado">🚫 Erro comum: errado</label><input id="fic-errado"></div>
+      <div class="campo"><label for="fic-certo">Certo</label><input id="fic-certo"></div>
+    </div>
+    <div class="campo"><label for="fic-porque">Por quê</label><input id="fic-porque"></div>
+    <fieldset style="border:1px solid var(--borda);border-radius:10px;padding:10px 12px">
+      <legend class="pequeno"><strong>✅ Check</strong> (1 pergunta, sem nota; deixe a pergunta vazia para não ter Check)</legend>
+      <div class="campo"><label for="fic-pergunta">Pergunta</label><input id="fic-pergunta"></div>
+      <div class="campo"><label for="fic-opcoes">Alternativas <span class="suave pequeno">(uma por linha, 2 a 4)</span></label><textarea id="fic-opcoes" rows="3"></textarea></div>
+      <div class="grade-2">
+        <div class="campo"><label for="fic-correta">Alternativa correta</label><select id="fic-correta"></select></div>
+        <div class="campo"><label for="fic-explicacao">Explicação da resposta</label><input id="fic-explicacao"></div>
+      </div>
+    </fieldset>
+    <div class="rodape-modal"><button class="btn primario" type="submit">Salvar ficha</button></div>
+  </form>
+</dialog>
 
 <dialog id="modal-hab-ficha" style="width:min(640px, calc(100vw - 32px))">
   <div class="linha" style="margin-bottom:8px"><h2 style="margin:0" id="hab-ficha-titulo"></h2><span class="espaco"></span>
@@ -100,7 +141,90 @@
     $('modal-hab-ficha').showModal();
   }
 
+  /* ---------- Fichas teóricas do Meu reforço ---------- */
+  const fic = { lista: [], atual: null };
+
+  function marcarFicha(s) {
+    return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\*([^*]+?)\*/g, '<i>$1</i>')
+      .replace(/==(.+?)==/g, '<mark>$1</mark>').replace(/~~(.+?)~~/g, '<s>$1</s>');
+  }
+
+  async function carregarFichas() {
+    const serie = $('fic-serie').value;
+    if (!serie) { $('fic-lista').innerHTML = ''; return; }
+    $('fic-lista').innerHTML = '<p class="vazio">Carregando…</p>';
+    fic.lista = await chamar('profFichas', serie);
+    $('fic-lista').innerHTML = fic.lista.map((h, i) => {
+      const f = h.ficha;
+      const situacao = h.editada ? `<span class="selo aberto">editada ${esc(h.atualizado_em)}</span>`
+        : (h.compartilhada ? `<span class="selo">usa a ficha de ${esc(h.compartilhada)}</span>` : '<span class="selo">texto padrão</span>');
+      return `<div class="hab-grupo">
+        <div class="linha"><h3 style="margin:0">${esc(h.nome)} <span class="suave pequeno">${esc(h.codigo)}</span></h3><span class="espaco"></span>${situacao}
+          <button class="btn mini" type="button" data-fic-editar="${i}">Editar</button>
+          ${h.editada ? `<button class="btn mini perigo" type="button" data-fic-restaurar="${i}">Voltar ao padrão</button>` : ''}</div>
+        ${f ? `<p class="pequeno" style="margin:6px 0 0">${marcarFicha(f.regra)}</p>
+          ${f.check ? `<p class="suave pequeno" style="margin:4px 0 0">✅ Check: ${marcarFicha(f.check.pergunta)}</p>` : ''}`
+          : '<p class="suave pequeno" style="margin:6px 0 0">Sem ficha.</p>'}
+      </div>`;
+    }).join('');
+  }
+
+  function atualizarOpcoesCorreta(valor) {
+    const ops = $('fic-opcoes').value.split('\n').map((s) => s.trim()).filter(Boolean);
+    $('fic-correta').innerHTML = ops.map((o, k) => `<option value="${k}">${String.fromCharCode(65 + k)}) ${esc(o)}</option>`).join('') || '<option value="0">—</option>';
+    if (valor != null && valor < ops.length) $('fic-correta').value = String(valor);
+  }
+
+  function abrirEditorFicha(h) {
+    fic.atual = h;
+    const f = h.ficha || { regra: '', atencao: [], exemplos: [], erro: {}, check: null };
+    $('fic-titulo').textContent = `📖 ${h.nome}`;
+    $('fic-regra').value = f.regra || '';
+    $('fic-atencao').value = (f.atencao || []).join('\n');
+    $('fic-exemplos').value = (f.exemplos || []).map((e) => `${e.en} | ${e.pt}`).join('\n');
+    $('fic-errado').value = (f.erro && f.erro.errado) || '';
+    $('fic-certo').value = (f.erro && f.erro.certo) || '';
+    $('fic-porque').value = (f.erro && f.erro.porque) || '';
+    $('fic-pergunta').value = (f.check && f.check.pergunta) || '';
+    $('fic-opcoes').value = f.check ? f.check.opcoes.join('\n') : '';
+    $('fic-explicacao').value = (f.check && f.check.explicacao) || '';
+    atualizarOpcoesCorreta(f.check ? f.check.correta : 0);
+    $('modal-ficha-teorica').showModal();
+  }
+
+  function lerEditorFicha() {
+    const linhas = (id) => $(id).value.split('\n').map((s) => s.trim()).filter(Boolean);
+    return {
+      regra: $('fic-regra').value,
+      atencao: linhas('fic-atencao'),
+      exemplos: linhas('fic-exemplos').map((l) => { const p = l.split('|'); return { en: p[0].trim(), pt: (p.slice(1).join('|') || '').trim() }; }),
+      erro: { errado: $('fic-errado').value, certo: $('fic-certo').value, porque: $('fic-porque').value },
+      check: { pergunta: $('fic-pergunta').value, opcoes: linhas('fic-opcoes'), correta: Number($('fic-correta').value), explicacao: $('fic-explicacao').value },
+    };
+  }
+
   function configurarDificuldades() {
+    $('fic-serie').addEventListener('change', carregarFichas);
+    $('fic-opcoes').addEventListener('input', () => atualizarOpcoesCorreta(Number($('fic-correta').value)));
+    $('fic-lista').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      if (b.dataset.ficEditar !== undefined) abrirEditorFicha(fic.lista[Number(b.dataset.ficEditar)]);
+      if (b.dataset.ficRestaurar !== undefined) {
+        const h = fic.lista[Number(b.dataset.ficRestaurar)];
+        if (!confirm(`Voltar a ficha "${h.nome}" para o texto padrão? A sua edição será apagada.`)) return;
+        comBotao(b, async () => { await chamar('profRestaurarFicha', h.id); await carregarFichas(); avisar('Ficha restaurada.'); });
+      }
+    });
+    $('form-ficha-teorica').addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      comBotao(ev.submitter, async () => {
+        await chamar('profSalvarFicha', fic.atual.id, lerEditorFicha());
+        $('modal-ficha-teorica').close();
+        await carregarFichas();
+        avisar('Ficha salva. Os próximos treinos já usam o texto novo.');
+      });
+    });
     $('hab-turma').innerHTML = opcoesTurma(false);
     document.querySelector('.abas button[data-aba="habilidades"]').addEventListener('click', () => carregarHabilidades());
     $('hab-turma').addEventListener('change', carregarHabilidades);

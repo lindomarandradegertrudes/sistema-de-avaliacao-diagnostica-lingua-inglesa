@@ -4,6 +4,48 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# Recuperação das TDAs (por ciclo) e 📖 Study
+
+**Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `Fichas` | **arquivo novo:** **+ > Script**, nome `Fichas`, cole **Fichas.gs** |
+| `Recuperacao` | **arquivo novo:** **+ > Script**, nome `Recuperacao`, cole **Recuperacao.gs** |
+| `Codigo`, `Casos`, `Dificuldades`, `Questionarios`, `Relatorios`, `RelatoriosJogos`, `Tda`, `Teste` | apague tudo e cole as novas versões (.gs) |
+| `Aluno`, `CasoMotor`, `CasoEstilo`, `Manual`, `Professor`, `ProfDificuldades`, `ProfRelatorios`, `ProfTda` | apague tudo e cole as novas versões (.html) |
+
+Depois: **Salvar** → **Implantar → Gerenciar implantações → ✏️ → Versão: Nova versão → Implantar** → **F5**.
+
+O Tutor IA (Gemini) e a reescrita foram retirados: a rede bloqueia IA para os alunos nos Chromebooks.
+
+## 📖 Study (fichas teóricas)
+- Antes de cada treino do 💪 Meu reforço, o aluno vê uma ficha de cada habilidade: regra em português, exemplos em inglês, erro comum e um ✅ Check sem nota. Na 1ª vez em cada habilidade, o START só libera depois de rolar até o fim.
+- Para revisar ou editar as fichas: aba **Habilidades** → cartão **📖 Fichas teóricas**. **Restaurar** volta ao texto original.
+
+## Recuperação: passo a passo
+1. **No editor da TDA**, marque de **1 a 3 habilidades** que ela cobra (🔁 Habilidades que a TDA cobra) e salve. A recuperação é montada com elas.
+2. **Pacote das atividades** (uma vez por TDA): **Questionários → Resultados da TDA → 🔁 Recuperação → 📦 Pacote de recuperação**.
+   - **📋 Copiar pedido para o claude.ai** → cole numa conversa nova do claude.ai → copie a resposta inteira → cole no campo → **Importar**.
+   - O app confere as regras (15 questões, 4 opções, só as habilidades da TDA, pelo menos 2 por habilidade). Se recusar, ele diz o motivo: peça a correção ao claude.ai na mesma conversa.
+   - **👁 Ver questões** mostra as respostas e o "por quê". Confira antes de liberar. Importar de novo substitui o pacote (quem já começou continua com as questões sorteadas).
+3. **Indicar:** na tabela aparecem os alunos da turma com nota abaixo de 10 (só os já corrigidos). Marque quem vai fazer e clique em **Indicar**. O aluno vê o selo 🔁 na TDA.
+4. **Na aula**, marque os presentes e clique em **▶ Liberar agora (1 h)**. A liberação fecha sozinha em 1 hora ou quando você clicar em **■ Encerrar**.
+5. **O aluno:**
+   - **Treinos (sem nota):** ficha 📖 + treino de 4 cadeados por habilidade, com dicas. Meta: 70 pontos; até 2 tentativas; abaixo disso, segue e você vê ⚠️. Os treinos continuam na próxima liberação.
+   - **10 atividades (0 a 10):** 10 das 15 questões do pacote, sorteadas e com as opções embaralhadas para cada aluno. Uma resposta por questão, sem voltar, sem dicas, com monitor de saída de tela. Se a liberação acabar no meio, o que faltou vale zero.
+6. **Acompanhar:** **↻ Atualizar** no painel mostra treinos (✅/⚠️), atividades (📝 7/10), saídas da tela (🚪) e a **Nota final**.
+7. **Nota:** vale a **maior** entre a TDA e a recuperação. Níveis, relatórios e planilha já usam essa nota; a correção da TDA continua mostrando a original. Uma recuperação por TDA.
+
+**Tirar indicação** só funciona antes de o aluno começar. Apagar a correção da TDA tira a indicação de quem ainda não começou.
+
+## Relatórios
+- **Relatórios → 🔁 Recuperações:** todas as TDAs, por turma: nota da TDA, treinos, atividades, nota da recuperação, final, situação e saídas da tela, com um resumo (quantos concluíram, quantos melhoraram, média antes e depois).
+- **Exportar para planilha:** nova aba **Recuperações** com as mesmas colunas.
+- **Evolução por aluno:** a TDA recuperada aparece com "🔁 recuperação" e as duas notas.
+
+---
+
 # Manual do aluno
 
 **Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**

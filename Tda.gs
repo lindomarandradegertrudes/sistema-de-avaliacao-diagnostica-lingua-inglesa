@@ -8,7 +8,7 @@ const MODOS_TDA = ['individual', 'grupo'];
 const MAX_ANEXOS = 3;
 const MAX_BYTES_ANEXO = 10 * 1024 * 1024;
 
-function validarTda_(t) {
+function validarTda_(t, serie) {
   t = t || {};
   const texto = function (v) { return String(v || '').trim(); };
   const lista = function (v) {
@@ -21,6 +21,8 @@ function validarTda_(t) {
     tarefas: lista(t.tarefas),
     criterios: lista(t.criterios),
     canva: t.canva !== false,
+    // Habilidades do Mapa que a TDA cobra (1 a 3): a recuperação é montada com elas.
+    habilidades: validarHabilidadesTda_(t.habilidades, serie),
     rubrica: (Array.isArray(t.rubrica) ? t.rubrica : []).map(function (r) {
       return { criterio: texto(r.criterio), n4: texto(r.n4), n3: texto(r.n3), n2: texto(r.n2), n1: texto(r.n1) };
     }).filter(function (r) { return r.criterio; }),
@@ -102,7 +104,8 @@ function correcaoDe_(r) {
   if (!r) return null;
   const d = r.detalhe || {};
   return {
-    pontuacao: r.pontuacao, total: r.total, percentual: r.percentual, respondido_em: r.respondido_em,
+    // percentual = nota da TDA; final = a que vale (a maior entre a TDA e a recuperação).
+    pontuacao: r.pontuacao, total: r.total, percentual: r.percentual_tda, final: r.percentual, recuperacao: r.recuperacao, respondido_em: r.respondido_em,
     niveis: d.rubrica || [], comentario: d.comentario || '',
   };
 }
@@ -161,6 +164,7 @@ function alunoTdas_(email, turma) {
   const serie = serieDaTurma_(turma);
   const entregas = lerEntregas_();
   const respostas = lerRespostas_().filter(function (r) { return r.email === email; });
+  const recs = lerRecuperacoes_().filter(function (r) { return r.email === email; });
   return lerQuestionarios_()
     .filter(function (q) { return q.tipo === 'tda' && q.serie === serie && q.status !== 'rascunho'; })
     .map(function (q) {
@@ -170,6 +174,8 @@ function alunoTdas_(email, turma) {
         id: q.id, titulo: q.titulo, mes: q.mes, modo: q.tda.modo, aberta: q.status === 'aberto',
         situacao: corr ? 'corrigida' : ent ? 'enviada' : 'pendente',
         nota: corr ? corr.percentual : null,
+        nota_tda: corr ? corr.percentual_tda : null,
+        recuperacao: recs.some(function (r) { return r.questionario_id === q.id; }),
       };
     })
     .filter(function (t) { return t.aberta || t.situacao !== 'pendente'; })
@@ -192,6 +198,7 @@ function alunoAbrirTda(id) {
     correcao: correcao,
     entrega: entregaPublica_(entrega, nomes),
     grupo: grupo ? { numero: grupo.numero, nomes: grupo.membros.map(function (m) { return nomes[m] || m; }) } : null,
+    recuperacao: recuperacaoDoAluno_(q.id, aluno.email),
   };
 }
 
@@ -285,6 +292,9 @@ function profTdaResultados(id) {
     questionario: q, turmas: turmas, alunos: alunos, grupos: gruposSerie,
     entregas: lerEntregas_().filter(function (e) { return e.questionario_id === id; })
       .map(function (e) { return entregaPublica_(e, nomes, true); }),
+    recuperacoes: recuperacoesDaTda_(id),
+    pacoteRec: (function (p) { return p ? { questoes: p.itens.length, criado_em: p.criado_em } : null; })(lerPacoteRec_(id)),
+    habilidades: (q.tda.habilidades || []).map(nomeHabilidade_),
   };
 }
 
@@ -326,6 +336,7 @@ function profApagarCorrecaoTda(id, emails) {
       .map(function (r) { return r._linha; })
       .sort(function (a, b) { return b - a; })
       .forEach(function (l) { aba.deleteRow(l); });
+    removerRecuperacoesNaoIniciadas_(id, alvos);
   });
   return profTdaResultados(id);
 }
