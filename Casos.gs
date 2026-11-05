@@ -74,6 +74,17 @@ function lerJogadas_(incluirTeste) {
   });
 }
 
+/** Jogadas sem o histórico dos cadeados (só as 8 primeiras colunas): leitura rápida, para usar dentro da trava. */
+function jogadasLeves_(incluirTeste) {
+  const aba = garantirAba_('Jogadas');
+  const n = aba.getLastRow() - 1;
+  if (n < 1) return [];
+  return aba.getRange(2, 1, n, 8).getValues().map(function (v, i) {
+    return { _linha: i + 2, id: String(v[0]), caso_id: String(v[1]), email: String(v[2]).toLowerCase(), turma: String(v[3]),
+      numero: Number(v[4]) || 1, status: String(v[5]), pontos: Number(v[6]) || 0, total: Number(v[7]) || 100 };
+  }).filter(function (j) { return j.id && (incluirTeste || j.turma !== TURMA_TESTE); });
+}
+
 /** Lê uma jogada pela linha, conferindo o id (a linha pode ter mudado se alguém apagou outra). */
 function buscarJogada_(id) {
   const aba = garantirAba_('Jogadas');
@@ -496,7 +507,7 @@ function alunoNovaJogada(id) {
 function criarJogada_(caso, eu, numero) {
   if (!(caso.dados.travas || []).length) throw new Error('Este caso ainda não tem cadeados.');
   return comTrava_(function () {
-    const existe = lerJogadas_(eu.teste).filter(function (j) { return j.email === eu.email && j.caso_id === caso.id && j.numero === numero && (!eu.teste || j.turma === TURMA_TESTE); })[0];
+    const existe = jogadasLeves_(eu.teste).filter(function (j) { return j.email === eu.email && j.caso_id === caso.id && j.numero === numero && (!eu.teste || j.turma === TURMA_TESTE); })[0];
     if (existe) return buscarJogada_(existe.id);
     const agora = new Date();
     const j = {
@@ -553,7 +564,10 @@ function alunoVerificar(jogadaId, indice, respostas) {
     }
     if (t.aberta) avancar_(j);
     gravarJogada_(j);
-    if (j.status === 'concluido' && j.numero === 1 && !eu.professor && !eu.teste) atualizarNotasDoAluno_(j.email, j.turma, j.caso_id);
+    if (j.status === 'concluido' && j.numero === 1 && !eu.professor && !eu.teste) {
+      // A jogada já está gravada; se a nota do ciclo não puder ser atualizada agora (fila), ela é refeita no fechamento do ciclo.
+      try { atualizarNotasDoAluno_(j.email, j.turma, j.caso_id); } catch (e) { console.warn('Nota do ciclo não atualizada: ' + e.message); }
+    }
     return { resultado: resultado, msg: r.msg || '', jogada: visaoJogada_(caso, j) };
   });
 }

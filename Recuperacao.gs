@@ -222,12 +222,12 @@ function resumoTreinosRec_(r, habs, jogadas) {
 
 function jogadasRec_(email) {
   const res = {};
-  lerJogadas_().forEach(function (j) { if (j.numero === 1 && (!email || j.email === email) && /^rec-/.test(j.caso_id)) res[j.caso_id] = j; });
+  jogadasLeves_(false).forEach(function (j) { if (j.numero === 1 && (!email || j.email === email) && /^rec-/.test(j.caso_id)) res[j.caso_id] = j; });
   return res;
 }
 
-/** Monta um treino de 4 cadeados da habilidade, evitando os cadeados já usados nesta recuperação. */
-function criarTreinoRec_(q, r, hab, tentativa) {
+/** Monta (sem gravar) um treino de 4 cadeados da habilidade, evitando os cadeados já usados nesta recuperação. */
+function montarTreinoRec_(q, r, hab, tentativa) {
   const casosMap = {};
   lerCasos_().forEach(function (c) { casosMap[c.id] = c; });
   const pool = cadeadosParaTreino_(q.serie, casosMap).filter(function (x) { return x.hab === hab; });
@@ -250,10 +250,7 @@ function criarTreinoRec_(q, r, hab, tentativa) {
       evidencias: [], travas: escolhidos.map(function (x) { return JSON.parse(JSON.stringify(x.trava)); }), final: null,
     },
   };
-  garantirAba_('Casos').appendRow(linhaDe_('Casos', {
-    id: caso.id, serie: caso.serie, mes: "'" + caso.mes, titulo: caso.titulo, status: 'aberto', dados_json: JSON.stringify(caso.dados), criado_em: new Date(),
-  }));
-  return caso.id;
+  return caso;
 }
 
 /**
@@ -266,28 +263,44 @@ function alunoRecuperacaoProximo(qid) {
   const q = buscarTda_(qid);
   const habs = q.tda.habilidades || [];
   if (!habs.length) throw new Error('O professor ainda não marcou as habilidades desta TDA.');
-  const id = comTrava_(function () {
-    const r = exigirRecLiberada_(qid, eu.email);
+  // As leituras pesadas (jogadas, banco de cadeados) ficam FORA da trava única: com a turma toda
+  // começando junta, a trava presa por segundos formava fila e dava "Tempo limite do bloqueio".
+  const r0 = exigirRecLiberada_(qid, eu.email);
+  const treinos0 = (r0.dados && r0.dados.treinos) || {};
+  const jogadas = jogadasRec_(eu.email);
+  let proximo = null, novo = null;
+  for (let i = 0; i < habs.length && !proximo && !novo; i++) {
+    const h = habs[i];
+    const casos = treinos0[h] || [];
+    const ultimo = casos[casos.length - 1];
+    if (ultimo && !(jogadas[ultimo] && jogadas[ultimo].status === 'concluido')) { proximo = ultimo; break; }
+    if (resumoTreinosRec_(r0, [h], jogadas).habilidades[0].encerrado) continue;
+    novo = { hab: h, tentativa: casos.length + 1, caso: montarTreinoRec_(q, r0, h, casos.length + 1) };
+  }
+  const urlDe = function (id) { return { url: ScriptApp.getService().getUrl() + '?caso=' + encodeURIComponent(id) }; };
+  if (proximo && r0.dados && r0.dados.iniciada_em) return urlDe(proximo);
+  // Dentro da trava: só reler a linha do aluno e gravar.
+  comTrava_(function () {
+    const r = lerRecuperacoes_().filter(function (x) { return x.questionario_id === qid && x.email === eu.email; })[0];
+    if (!r) throw new Error('Você não foi indicado para esta recuperação.');
     r.dados = r.dados || {};
-    if (!r.dados.iniciada_em) r.dados.iniciada_em = Utilities.formatDate(new Date(), FUSO, 'dd/MM/yyyy HH:mm');
     r.dados.treinos = r.dados.treinos || {};
-    const jogadas = jogadasRec_(eu.email);
-    let proximo = null;
-    for (let i = 0; i < habs.length && !proximo; i++) {
-      const h = habs[i];
-      const casos = r.dados.treinos[h] || [];
-      const ultimo = casos[casos.length - 1];
-      if (ultimo && !(jogadas[ultimo] && jogadas[ultimo].status === 'concluido')) { proximo = ultimo; break; }
-      const linha = resumoTreinosRec_(r, [h], jogadas).habilidades[0];
-      if (linha.encerrado) continue;
-      proximo = criarTreinoRec_(q, r, h, casos.length + 1);
-      r.dados.treinos[h] = casos.concat([proximo]);
-    }
-    if (!proximo && !r.dados.treinos_concluidos_em) r.dados.treinos_concluidos_em = Utilities.formatDate(new Date(), FUSO, 'dd/MM/yyyy HH:mm');
+    if (!r.dados.iniciada_em) r.dados.iniciada_em = Utilities.formatDate(new Date(), FUSO, 'dd/MM/yyyy HH:mm');
+    if (novo) {
+      const lista = r.dados.treinos[novo.hab] || [];
+      if (lista.length >= novo.tentativa) proximo = lista[lista.length - 1]; // clique duplo: o treino já foi montado
+      else {
+        const c = novo.caso;
+        garantirAba_('Casos').appendRow(linhaDe_('Casos', {
+          id: c.id, serie: c.serie, mes: "'" + c.mes, titulo: c.titulo, status: 'aberto', dados_json: JSON.stringify(c.dados), criado_em: new Date(),
+        }));
+        r.dados.treinos[novo.hab] = lista.concat([c.id]);
+        proximo = c.id;
+      }
+    } else if (!proximo && !r.dados.treinos_concluidos_em) r.dados.treinos_concluidos_em = Utilities.formatDate(new Date(), FUSO, 'dd/MM/yyyy HH:mm');
     gravarRecuperacao_(r);
-    return proximo;
   });
-  return id ? { url: ScriptApp.getService().getUrl() + '?caso=' + encodeURIComponent(id) } : { fim: true };
+  return proximo ? urlDe(proximo) : { fim: true };
 }
 
 // ============================================================
@@ -480,8 +493,8 @@ function visaoAvaliacaoRec_(r) {
   return Object.assign(base, { questao: { numero: a.respostas.length + 1, tipo: x.tipo, contexto: x.contexto, enunciado: x.enunciado, opcoes: x.opcoes } });
 }
 
-function exigirAvaliacaoAberta_(qid, email) {
-  const r = recuperacoesAtualizadas_(qid, email, true)[0];
+function exigirAvaliacaoAberta_(qid, email, travado) {
+  const r = recuperacoesAtualizadas_(qid, email, travado)[0];
   if (!r) throw new Error('Você não foi indicado para esta recuperação.');
   if (r.dados.avaliacao && r.dados.avaliacao.concluida_em) return r;
   if (!(r.liberado_ate > Date.now())) throw new Error('A recuperação não está liberada agora. Ela é feita na aula, quando o professor libera.');
@@ -493,14 +506,17 @@ function alunoRecAvaliacao(qid) {
   const eu = jogador_();
   if (eu.professor || eu.teste) throw new Error('A recuperação é feita pelo aluno indicado.');
   const q = buscarTda_(qid);
+  // Conferências e sorteio fora da trava; dentro dela, só gravar.
+  const r0 = exigirAvaliacaoAberta_(qid, eu.email, false);
+  if (r0.dados.avaliacao) return visaoAvaliacaoRec_(r0);
+  if (!resumoTreinosRec_(r0, q.tda.habilidades || [], jogadasRec_(eu.email)).concluidos) throw new Error('Termine os treinos primeiro.');
+  const p = lerPacoteRec_(qid);
+  if (!p) throw new Error('O professor ainda está preparando as atividades. Aguarde.');
+  const questoes = sortearAvaliacaoRec_(p.itens);
   return comTrava_(function () {
-    const r = exigirAvaliacaoAberta_(qid, eu.email);
-    r.dados = r.dados || {};
+    const r = exigirAvaliacaoAberta_(qid, eu.email, true);
     if (!r.dados.avaliacao) {
-      if (!resumoTreinosRec_(r, q.tda.habilidades || [], jogadasRec_(eu.email)).concluidos) throw new Error('Termine os treinos primeiro.');
-      const p = lerPacoteRec_(qid);
-      if (!p) throw new Error('O professor ainda está preparando as atividades. Aguarde.');
-      r.dados.avaliacao = { iniciada_em: Utilities.formatDate(new Date(), FUSO, 'dd/MM/yyyy HH:mm'), questoes: sortearAvaliacaoRec_(p.itens), respostas: [], saidas: { vezes: 0, segundos: 0 } };
+      r.dados.avaliacao = { iniciada_em: Utilities.formatDate(new Date(), FUSO, 'dd/MM/yyyy HH:mm'), questoes: questoes, respostas: [], saidas: { vezes: 0, segundos: 0 } };
       gravarRecuperacao_(r);
     }
     return visaoAvaliacaoRec_(r);
@@ -512,7 +528,7 @@ function alunoRecResponder(qid, numero, opcao, saidas) {
   const eu = jogador_();
   if (eu.professor || eu.teste) throw new Error('A recuperação é feita pelo aluno indicado.');
   return comTrava_(function () {
-    const r = exigirAvaliacaoAberta_(qid, eu.email);
+    const r = exigirAvaliacaoAberta_(qid, eu.email, true);
     const a = r.dados.avaliacao;
     if (!a) throw new Error('Comece as atividades primeiro.');
     if (a.concluida_em) return visaoAvaliacaoRec_(r);

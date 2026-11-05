@@ -26,6 +26,7 @@ const CABECALHOS = {
   FichasLidas: ['email', 'hab_id', 'lida_em'],
   Recuperacoes: ['questionario_id', 'email', 'turma', 'indicado_em', 'liberado_ate', 'dados_json', 'atualizado_em'],
   PacotesRec: ['questionario_id', 'itens_json', 'criado_em'],
+  RascunhosTda: ['questionario_id', 'email', 'rascunho_json', 'criado_em'],
 };
 
 const CONFIG_PADRAO = [
@@ -153,7 +154,7 @@ function listarTurmas_() {
 
 function comTrava_(fn) {
   const trava = LockService.getScriptLock();
-  trava.waitLock(20000);
+  trava.waitLock(28000);
   try { return fn(); } finally { trava.releaseLock(); }
 }
 

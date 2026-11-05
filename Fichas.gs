@@ -369,6 +369,16 @@ function estudoDoTreino_(caso, email, professor, sempreObrigatoria) {
   return { fichas: fichas, obrigatoria: !professor && (!!sempreObrigatoria || fichas.some(function (f) { return !f.lida; })) };
 }
 
+/** Ficha de uma habilidade para o aluno abrir pelo "O que estudar" da TDA corrigida (não marca como lida). */
+function alunoFichaHabilidade(id) {
+  jogador_();
+  id = String(id || '');
+  if (!habilidadeExiste_(id)) throw new Error('Habilidade não encontrada.');
+  const f = fichaDe_(id, fichasEditadas_(), fichasPadrao_());
+  if (!f) throw new Error('Esta habilidade ainda não tem ficha.');
+  return { id: id, nome: nomeHabilidade_(id).replace(/^Base: /, ''), ficha: f };
+}
+
 /** O aluno rolou a teoria até o fim: nas próximas vezes essas fichas ficam opcionais. */
 function alunoMarcarFichasLidas(ids) {
   const eu = jogador_();

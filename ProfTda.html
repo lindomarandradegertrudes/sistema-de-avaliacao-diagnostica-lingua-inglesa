@@ -20,6 +20,20 @@
   .rub-grade th.n4 { background: #1a7a5e; color: #fff; } .rub-grade th.n3 { background: #ffd700; }
   .rub-grade th.n2 { background: #ff8c00; color: #fff; } .rub-grade th.n1 { background: #e74c3c; color: #fff; }
   #tda-nota-previa { font-size: 1.1rem; font-weight: 700; }
+  /* Revisão com o feedback detalhado: texto do aluno ao lado */
+  .mt-corpo:not(.com-fb) > * + * { margin-top: 14px; }
+  #modal-tda.com-fb { width: min(1280px, calc(100vw - 32px)) !important; }
+  .mt-corpo.com-fb { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; align-items: start; }
+  .mt-corpo.com-fb #mt-entrega { position: sticky; top: 0; max-height: 70vh; overflow-y: auto; }
+  @media (max-width: 860px) { .mt-corpo.com-fb { display: block; } .mt-corpo.com-fb #mt-entrega { position: static; max-height: none; } }
+  .fb-bloco { border: 1px solid var(--borda); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+  .fb-bloco h4 { margin: 0 0 6px; }
+  .fb-item { display: grid; grid-template-columns: 1fr 1fr 1.4fr auto; gap: 6px; margin-bottom: 6px; }
+  @media (max-width: 640px) { .fb-item { grid-template-columns: 1fr; } }
+  .fb-hab { display: flex; gap: 8px; align-items: center; padding: 3px 0; font-weight: 400; }
+  .fb-hab input[type=text] { flex: 1; }
+  .fb-previa { background: var(--fundo); border-radius: 8px; padding: 12px 14px; margin-top: 10px; }
+  .fb-previa mark { background: #d3f9d8; padding: 0 2px; border-radius: 3px; }
 </style>
 
 <!-- Tela de entregas e correção -->
@@ -34,6 +48,7 @@
   <div class="chips" id="tda-turmas"></div>
   <p class="suave pequeno" id="tda-info" style="margin:0"></p>
   <div id="tda-lista" class="tda-grade"></div>
+  <div id="tda-ia" class="cartao" style="margin-top:14px" hidden></div>
   <div id="tda-rec" class="cartao" style="margin-top:14px"></div>
 </div>
 
@@ -43,20 +58,26 @@
     <span class="espaco"></span>
     <button class="btn" type="button" data-fechar>Fechar</button>
   </div>
-  <div style="max-height:72vh;overflow-y:auto" class="pilha">
+  <div style="max-height:72vh;overflow-y:auto" class="mt-corpo" id="mt-corpo">
     <div id="mt-entrega"></div>
+    <div class="pilha">
     <div>
       <h3>Rubrica <span class="suave pequeno">— clique no nível de cada critério</span></h3>
       <div class="tabela-rolagem"><table class="rub-grade" id="mt-rubrica"></table></div>
     </div>
     <div class="campo"><label for="mt-comentario">Comentário para o aluno (feedback)</label>
       <textarea id="mt-comentario" rows="3" placeholder="Ex.: Great job on the vocabulary! Next time, check the verb tenses in paragraph 2."></textarea></div>
+    <div id="mt-fb"></div>
     <div id="mt-alvos"></div>
-    <div class="linha">
+    <div class="linha" style="flex-wrap:wrap;gap:8px">
       <span id="tda-nota-previa"></span>
       <span class="espaco"></span>
+      <button class="btn" id="mt-previa" hidden>👁 Como o aluno verá</button>
+      <button class="btn perigo" id="mt-descartar" hidden>Descartar rascunho</button>
       <button class="btn perigo" id="mt-apagar" hidden>Apagar correção</button>
       <button class="btn primario" id="mt-salvar">Salvar correção</button>
+    </div>
+    <div id="mt-previa-caixa"></div>
     </div>
   </div>
 </dialog>
@@ -119,6 +140,8 @@
     $('ed-tda-criterios').value = (tda.criterios || []).join('\n');
     renderRubricaEditor(tda.rubrica && tda.rubrica.length ? tda.rubrica : tdaVazia().rubrica);
     renderHabilidadesTda(tda.habilidades || []);
+    $('ed-tda-obsia').value = tda.obsIa || '';
+    $('ed-tda-corrigida').checked = tda.mostrarCorrigida === true;
   }
 
   // ---------- Habilidades da TDA (base da recuperação) ----------
@@ -145,7 +168,9 @@
     const bloqueada = estado.edicao && estado.edicao.respostas > 0;
     const dis = bloqueada ? 'disabled' : '';
     $('ed-tda-rubrica').innerHTML = rubrica.map((r) => `<tr>
-      ${['criterio', 'n4', 'n3', 'n2', 'n1'].map((c) => `<td><textarea data-rub="${c}" ${dis}>${esc(r[c] || '')}</textarea></td>`).join('')}
+      ${['criterio', 'n4', 'n3', 'n2', 'n1'].map((c) => `<td><textarea data-rub="${c}" ${dis}>${esc(r[c] || '')}</textarea>${c === 'criterio'
+        ? `<label class="pequeno" style="display:flex;gap:6px;align-items:flex-start;font-weight:400;margin-top:4px" title="A correção com IA não avalia este critério: você marca o nível na revisão.">
+            <input type="checkbox" data-rub-prof style="width:auto;margin-top:2px" ${r.soProfessor ? 'checked' : ''}> 👩‍🏫 só o professor avalia</label>` : ''}</td>`).join('')}
       <td><button class="btn mini perigo" data-rub-remover ${dis}>×</button></td></tr>`).join('');
     $('ed-tda-add').disabled = bloqueada;
   }
@@ -154,6 +179,7 @@
     return [...$('ed-tda-rubrica').querySelectorAll('tr')].map((tr) => {
       const r = {};
       tr.querySelectorAll('[data-rub]').forEach((el) => (r[el.dataset.rub] = el.value));
+      r.soProfessor = !!(tr.querySelector('[data-rub-prof]') || {}).checked;
       return r;
     });
   }
@@ -169,6 +195,8 @@
       criterios: linhas('ed-tda-criterios'),
       rubrica: lerRubricaEditor().filter((r) => r.criterio.trim()),
       habilidades: lerHabilidadesTda(),
+      obsIa: $('ed-tda-obsia').value,
+      mostrarCorrigida: $('ed-tda-corrigida').checked,
     };
   }
 
@@ -279,7 +307,70 @@
       </div>`;
     }).join('') : '<div class="cartao vazio">Nenhum aluno cadastrado nesta turma.</div>';
     tdaEstado.unidades = unidades;
+    renderCorrecaoIa();
     renderRecuperacao();
+  }
+
+  // ---------- 🤖 Correção com IA (opcional): pedido em lotes para o claude.ai e rascunhos ----------
+  const iaTda = { lotes: [], aberto: false };
+
+  function renderCorrecaoIa() {
+    const d = tdaEstado.dados;
+    const ia = d.correcaoIa;
+    $('tda-ia').hidden = !ia;
+    if (!ia) return;
+    const alunos = d.alunos.filter((a) => a.turma === tdaEstado.turma && !a.correcao).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    const comTexto = alunos.filter((a) => ia.comTexto[a.email]);
+    const rascunhos = alunos.filter((a) => ia.rascunhos[a.email]).length;
+    const linha = (a) => {
+      const pode = ia.comTexto[a.email];
+      const sit = ia.rascunhos[a.email] ? `<span class="selo Intermediário">🤖 rascunho pronto</span> <button class="btn mini" data-ia-ver="${esc(a.email)}">👁 ver</button>`
+        : pode ? '<span class="suave">sem rascunho</span>'
+        : ia.comTexto[a.email] === false ? '<span class="suave">texto muito curto: corrija à mão</span>' : '<span class="suave">sem texto no editor: corrija à mão</span>';
+      return `<tr><td><input type="checkbox" data-ia-aluno="${esc(a.email)}" style="width:auto" ${pode ? '' : 'disabled'}></td><td>${esc(a.nome)}</td><td>${sit}</td></tr>
+        <tr data-ia-previa="${esc(a.email)}" hidden><td></td><td colspan="2"></td></tr>`;
+    };
+    $('tda-ia').innerHTML = `
+      <div class="linha"><h3 style="margin:0">🤖 Corrigir com IA · ${esc(tdaEstado.turma)}</h3><span class="espaco"></span>
+        <button class="btn mini" data-ia-acao="abrir">${iaTda.aberto ? 'Fechar' : 'Abrir'}</button></div>
+      <p class="suave pequeno" style="margin:4px 0 0">Opcional. O app monta um pedido com a rubrica e os textos (com o primeiro nome) para você colar no claude.ai.
+        A resposta vira <strong>rascunho</strong>: nada chega ao aluno antes de você revisar e publicar.
+        ${comTexto.length} sem correção com texto · ${rascunhos} com rascunho.</p>
+      <div ${iaTda.aberto ? '' : 'hidden'}>
+        ${alunos.length ? `<div class="tabela-rolagem" style="margin-top:10px"><table class="pequeno">
+          <thead><tr><th><input type="checkbox" id="ia-todos" style="width:auto" title="Marcar todos com texto"></th><th>Aluno (sem correção)</th><th>Correção com IA</th></tr></thead>
+          <tbody>${alunos.map(linha).join('')}</tbody></table></div>
+        <div class="linha" style="gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button class="btn mini primario" data-ia-acao="lotes">Preparar lotes (até ${ia.lote} alunos cada)</button>
+          <a class="btn mini" href="https://claude.ai/new" target="_blank" rel="noopener">Abrir claude.ai ↗</a>
+        </div>
+        <div id="ia-lotes" class="linha" style="gap:8px;flex-wrap:wrap;margin-top:8px"></div>
+        <textarea id="ia-pedido" rows="4" readonly hidden style="margin-top:8px"></textarea>
+        <div style="margin-top:8px"><textarea id="ia-resposta" rows="3" placeholder="Cole aqui a resposta inteira do claude.ai (de um lote) e clique em Importar."></textarea>
+          <button class="btn mini primario" data-ia-acao="importar" style="margin-top:6px">Importar rascunhos</button></div>
+        <div id="ia-avisos" class="pequeno"></div>`
+        : '<p class="vazio">Todos os alunos desta turma já foram corrigidos.</p>'}
+      </div>`;
+    iaTda.lotes = [];
+  }
+
+  function htmlRascunhoIa(x) {
+    const q = tdaEstado.dados.questionario;
+    return `<div class="pequeno" style="background:var(--fundo);border-radius:8px;padding:8px 10px;margin:4px 0 8px">
+      <div class="suave">🤖 Rascunho de ${esc(x.criado_em)} (ainda não publicado)</div>
+      <ol style="margin:6px 0;padding-left:20px">${x.criterios.map((c, i) => `<li><strong>${esc(q.tda.rubrica[i] ? q.tda.rubrica[i].criterio : '')}: ${c.nivel ? 'nível ' + c.nivel + '</strong> — ' + esc(c.porque) : '</strong><span class="suave">👩‍🏫 você avalia na revisão</span>'}</li>`).join('')}</ol>
+      ${x.pontos_fortes.length ? `<div>💪 ${x.pontos_fortes.map(esc).join(' · ')}</div>` : ''}
+      ${x.melhorar.length ? '<div style="margin-top:4px"><strong>Abaixo seguem algumas correções:</strong></div>' : ''}
+      ${x.melhorar.map((m) => `<div>🎯 "${esc(m.trecho)}" → <strong>${esc(m.correcao)}</strong> <span class="suave">${esc(m.explicacao)}</span></div>`).join('')}
+      ${x.estudar.length ? `<div>📚 ${x.estudar.map((s) => esc(s.nome) + (s.motivo ? ' (' + esc(s.motivo) + ')' : '')).join(' · ')}</div>` : ''}
+      ${x.versao_corrigida ? `<div style="margin-top:4px"><strong>Seu texto ficaria melhor assim:</strong></div><div>✍️ <span style="white-space:pre-wrap">${esc(x.versao_corrigida)}</span></div>` : ''}
+    </div>`;
+  }
+
+  async function copiarTextoTda(texto, campo) {
+    try { await navigator.clipboard.writeText(texto); return true; } catch (e) { /* sem permissão: usa a seleção */ }
+    campo.hidden = false; campo.value = texto; campo.focus(); campo.select();
+    try { return document.execCommand('copy'); } catch (e) { return false; }
   }
 
   // ---------- Recuperação (por ciclo) ----------
@@ -375,8 +466,115 @@
           <label style="font-weight:400;display:flex;gap:8px;align-items:center"><input type="checkbox" data-alvo="${esc(m.email)}" checked style="width:auto"> ${esc(m.nome)}</label>`).join('')}</div>`
       : '';
     $('mt-apagar').hidden = !alvos.some((m) => m.correcao);
+    // Feedback detalhado (só TDA individual): o publicado, ou o rascunho da IA de quem ainda não foi corrigido.
+    const ia = tdaEstado.dados.correcaoIa;
+    const um = !soEmail && unidade.membros.length === 1 ? unidade.membros[0] : null;
+    const rasc = ia && um && !um.correcao ? ia.rascunhos[um.email] : null;
+    const publicado = ia && um && um.correcao ? um.correcao.feedback : null;
+    tdaEstado.fb = rasc ? { origem: 'rascunho', criado_em: rasc.criado_em, porques: rasc.criterios.map((c) => c.porque), pontos_fortes: rasc.pontos_fortes.slice(),
+        melhorar: rasc.melhorar.map((m) => ({ ...m })), estudar: rasc.estudar.map((s) => ({ ...s })), versao_corrigida: rasc.versao_corrigida }
+      : publicado ? { origem: 'publicado', ...JSON.parse(JSON.stringify(publicado)) } : null;
+    if (rasc) tdaEstado.niveis = rasc.criterios.map((c) => c.nivel || 0);
+    tdaEstado.emailFb = um ? um.email : null;
+    const comFb = !!tdaEstado.fb;
+    $('modal-tda').classList.toggle('com-fb', comFb);
+    $('mt-corpo').classList.toggle('com-fb', comFb);
+    $('mt-previa').hidden = !comFb;
+    $('mt-descartar').hidden = !rasc;
+    $('mt-salvar').textContent = rasc ? 'Publicar para o aluno' : 'Salvar correção';
+    $('mt-previa-caixa').innerHTML = '';
+    renderFeedbackCorrecao();
     renderRubricaCorrecao();
     $('modal-tda').showModal();
+  }
+
+  // ---------- Feedback detalhado (revisão do rascunho da IA ou do feedback publicado) ----------
+  function renderFeedbackCorrecao() {
+    const fb = tdaEstado.fb;
+    if (!fb) { $('mt-fb').innerHTML = ''; return; }
+    const ia = tdaEstado.dados.correcaoIa;
+    const rub = tdaEstado.dados.questionario.tda.rubrica;
+    const marcadas = Object.fromEntries(fb.estudar.map((s) => [s.habilidade, s.motivo]));
+    const hab = (h) => `<label class="fb-hab"><input type="checkbox" data-fb-hab="${esc(h.id)}" style="width:auto" ${h.id in marcadas ? 'checked' : ''}>
+      <span style="min-width:180px">${esc(h.nome)}</span>
+      <input type="text" data-fb-motivo="${esc(h.id)}" value="${esc(marcadas[h.id] || '')}" placeholder="motivo (opcional)" ${h.id in marcadas ? '' : 'hidden'}></label>`;
+    const marcadasHab = ia.habilidades.filter((h) => h.id in marcadas), outras = ia.habilidades.filter((h) => !(h.id in marcadas));
+    $('mt-fb').innerHTML = `<div class="cartao" style="border:2px solid ${fb.origem === 'rascunho' ? '#f59f00' : 'var(--borda)'}">
+      <h3 style="margin:0">${fb.origem === 'rascunho' ? `🤖 Rascunho da IA <span class="suave pequeno">· ${esc(fb.criado_em)} · revise e edite antes de publicar</span>` : 'Feedback publicado <span class="suave pequeno">· edite e salve para atualizar o que o aluno vê</span>'}</h3>
+      <div class="fb-bloco"><h4>Por que cada nível</h4>${rub.map((r, i) => `<div class="campo" style="margin:0 0 6px"><label class="pequeno">${esc(r.criterio)}${r.soProfessor
+        ? ' <strong style="color:#c92a2a">· 👩‍🏫 só você avalia: marque o nível na rubrica (o porquê é opcional)</strong>' : ''}</label>
+        <textarea data-fb-porque="${i}" rows="2">${esc(fb.porques[i] || '')}</textarea></div>`).join('')}</div>
+      <div class="fb-bloco"><h4>💪 Pontos fortes</h4>${[0, 1, 2].map((k) => `<input type="text" data-fb-forte="${k}" value="${esc(fb.pontos_fortes[k] || '')}" style="margin-bottom:6px" placeholder="${k ? '(opcional)' : 'Ex.: Você se apresentou de forma clara.'}">`).join('')}</div>
+      <div class="fb-bloco"><h4>🎯 Abaixo seguem algumas correções:</h4>
+        <div id="fb-melhorar">${fb.melhorar.map((m, k) => `<div class="fb-item" data-fb-item="${k}">
+          <input type="text" data-fb-campo="trecho" value="${esc(m.trecho)}" placeholder="como o aluno escreveu">
+          <input type="text" data-fb-campo="correcao" value="${esc(m.correcao)}" placeholder="forma certa">
+          <input type="text" data-fb-campo="explicacao" value="${esc(m.explicacao)}" placeholder="explicação (português)">
+          <button class="btn mini perigo" type="button" data-fb-remover="${k}" title="Remover">✕</button></div>`).join('')}</div>
+        <button class="btn mini" type="button" id="fb-add">+ correção</button></div>
+      <div class="fb-bloco"><h4>📚 O que estudar <span class="suave pequeno">(até 3)</span></h4>
+        ${marcadasHab.map(hab).join('')}
+        <details style="margin-top:4px"><summary class="pequeno">Outras habilidades da série e da Trilha Base</summary>${outras.map(hab).join('')}</details></div>
+      <div class="fb-bloco"><h4>✍️ Seu texto ficaria melhor assim:</h4>
+        ${ia.mostrarCorrigida ? '' : '<p class="suave pequeno" style="margin:0 0 6px">Esta TDA não mostra a versão corrigida ao aluno (opção no editor da TDA).</p>'}
+        <textarea id="fb-corrigida" rows="5">${esc(fb.versao_corrigida || '')}</textarea></div>
+    </div>`;
+  }
+
+  /** Lê os campos do feedback (guarda no estado para re-desenhar sem perder o que foi digitado). */
+  function lerFeedbackCorrecao() {
+    const fb = tdaEstado.fb;
+    if (!fb) return null;
+    fb.porques = [...document.querySelectorAll('#mt-fb [data-fb-porque]')].map((t) => t.value.trim());
+    fb.pontos_fortes = [...document.querySelectorAll('#mt-fb [data-fb-forte]')].map((t) => t.value.trim()).filter(Boolean);
+    fb.melhorar = [...document.querySelectorAll('#mt-fb [data-fb-item]')].map((d) => ({
+      trecho: d.querySelector('[data-fb-campo="trecho"]').value.trim(), correcao: d.querySelector('[data-fb-campo="correcao"]').value.trim(),
+      explicacao: d.querySelector('[data-fb-campo="explicacao"]').value.trim() }));
+    fb.estudar = [...document.querySelectorAll('#mt-fb [data-fb-hab]:checked')].map((c) => ({
+      habilidade: c.dataset.fbHab, motivo: document.querySelector(`#mt-fb [data-fb-motivo="${CSS.escape(c.dataset.fbHab)}"]`).value.trim() }));
+    fb.versao_corrigida = $('fb-corrigida').value.trim();
+    return fb;
+  }
+
+  /** Destaca, na versão corrigida, as palavras que mudaram em relação ao texto do aluno (diferença por palavras). */
+  function destacarMudancas(original, corrigida) {
+    const a = String(original || '').split(/(\s+)/), b = String(corrigida || '').split(/(\s+)/);
+    const pa = a.filter((_, i) => i % 2 === 0), pb = b.filter((_, i) => i % 2 === 0);
+    const limpa = (w) => w.toLowerCase().replace(/[^a-z0-9'à-ÿ]/g, '');
+    const n = pa.length, m = pb.length;
+    if (n * m > 400000) return esc(corrigida);
+    const lcs = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+      lcs[i][j] = limpa(pa[i]) === limpa(pb[j]) ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    const igual = new Array(m).fill(false);
+    for (let i = 0, j = 0; i < n && j < m;) {
+      if (limpa(pa[i]) === limpa(pb[j])) { igual[j] = true; i++; j++; } else if (lcs[i + 1][j] >= lcs[i][j + 1]) i++; else j++;
+    }
+    return b.map((t, k) => k % 2 ? esc(t) : (igual[k / 2] || !t ? esc(t) : `<mark>${esc(t)}</mark>`)).join('');
+  }
+
+  /** O feedback como o aluno vai ver (mesma ordem e textos da tela do aluno). */
+  function previaFeedbackAluno() {
+    const fb = lerFeedbackCorrecao();
+    const d = tdaEstado.dados, rub = d.questionario.tda.rubrica, ia = d.correcaoIa;
+    const nomes = Object.fromEntries(ia.habilidades.map((h) => [h.id, h.nome]));
+    const soma = tdaEstado.niveis.reduce((s, v) => s + v, 0);
+    const e = tdaEstado.unidade.entrega;
+    const original = e ? (e.formato === 'html' ? textoPuroTdaProf(e.texto) : e.texto) : '';
+    const rotulo = { 4: 'Excelente', 3: 'Satisfatório', 2: 'Em desenvolvimento', 1: 'Insuficiente' };
+    return `<div class="fb-previa"><p class="suave pequeno" style="margin:0 0 6px">👁 Prévia: é assim que o aluno vai ver o feedback na TDA corrigida.</p>
+      <h3 style="margin:0 0 6px">Nota: ${Math.round((soma / (4 * rub.length)) * 1000) / 10}%</h3>
+      <ul style="margin:0 0 8px;padding-left:20px">${rub.map((r, i) => `<li><strong>${esc(r.criterio)}: ${tdaEstado.niveis[i]} – ${rotulo[tdaEstado.niveis[i]] || ''}</strong>${fb.porques[i] ? '<br>' + esc(fb.porques[i]) : ''}</li>`).join('')}</ul>
+      ${$('mt-comentario').value.trim() ? `<p>💬 ${esc($('mt-comentario').value.trim())}</p>` : ''}
+      ${fb.pontos_fortes.length ? `<p><strong>💪 Pontos fortes</strong><br>${fb.pontos_fortes.map(esc).join('<br>')}</p>` : ''}
+      ${fb.melhorar.filter((m) => m.trecho || m.correcao).length ? `<p style="margin-bottom:2px"><strong>🎯 Abaixo seguem algumas correções:</strong></p>
+        <ul style="margin-top:0;padding-left:20px">${fb.melhorar.filter((m) => m.trecho || m.correcao).map((m) => `<li>"${esc(m.trecho)}" → <strong>${esc(m.correcao)}</strong>${m.explicacao ? ' <span class="suave">' + esc(m.explicacao) + '</span>' : ''}</li>`).join('')}</ul>` : ''}
+      ${fb.estudar.length ? `<p style="margin-bottom:2px"><strong>📚 O que estudar</strong></p>${fb.estudar.map((s) => `<div class="linha" style="gap:8px;margin:4px 0">
+        <span style="flex:1">${esc(nomes[s.habilidade] || s.habilidade)}${s.motivo ? ' <span class="suave">· ' + esc(s.motivo) + '</span>' : ''}</span>
+        <span class="btn mini">📖 Abrir a ficha</span></div>`).join('')}<div style="margin-top:6px"><span class="btn mini">💪 Ir para o Meu reforço</span></div>` : ''}
+      ${fb.versao_corrigida && ia.mostrarCorrigida ? `<p style="margin-bottom:2px"><strong>✍️ Seu texto ficaria melhor assim:</strong> <span class="suave pequeno">(em verde, o que mudou)</span></p>
+        <div style="white-space:pre-wrap;background:#fff;border-radius:6px;padding:8px 10px">${destacarMudancas(original, fb.versao_corrigida)}</div>` : ''}
+    </div>`;
   }
 
   function renderRubricaCorrecao() {
@@ -413,6 +611,59 @@
       if (!b) return;
       if (b.dataset.corrigir !== undefined) abrirCorrecao(tdaEstado.unidades[Number(b.dataset.corrigir)]);
       if (b.dataset.ajustar !== undefined) abrirCorrecao(tdaEstado.unidades[Number(b.dataset.ajustar)], b.dataset.email);
+    });
+    $('tda-ia').addEventListener('change', (ev) => {
+      if (ev.target.id === 'ia-todos') document.querySelectorAll('#tda-ia [data-ia-aluno]:not(:disabled)').forEach((c) => (c.checked = ev.target.checked));
+    });
+    $('tda-ia').addEventListener('click', async (ev) => {
+      const id = tdaEstado.dados.questionario.id;
+      const ver = ev.target.closest('[data-ia-ver]');
+      if (ver) {
+        const email = ver.dataset.iaVer;
+        const tr = document.querySelector(`#tda-ia tr[data-ia-previa="${CSS.escape(email)}"]`);
+        if (!tr.hidden) { tr.hidden = true; return; }
+        comBotao(ver, async () => { tr.children[1].innerHTML = htmlRascunhoIa(await chamar('profVerRascunhoIa', id, email)); tr.hidden = false; });
+        return;
+      }
+      const lote = ev.target.closest('[data-ia-lote]');
+      if (lote) {
+        const emails = iaTda.lotes[Number(lote.dataset.iaLote)];
+        comBotao(lote, async () => {
+          const texto = await chamar('profPedidoCorrecaoIa', id, emails);
+          const ok = await copiarTextoTda(texto, $('ia-pedido'));
+          lote.textContent = '✔ ' + lote.textContent.replace(/^✔ /, '');
+          avisar(ok ? 'Pedido copiado. Cole numa conversa NOVA do claude.ai (Ctrl+V) e depois cole a resposta aqui.' : 'Selecione o texto do pedido e copie com Ctrl+C.');
+        });
+        return;
+      }
+      const b = ev.target.closest('button[data-ia-acao]');
+      if (!b) return;
+      const acao = b.dataset.iaAcao;
+      if (acao === 'abrir') { iaTda.aberto = !iaTda.aberto; renderCorrecaoIa(); return; }
+      if (acao === 'lotes') {
+        const emails = [...document.querySelectorAll('#tda-ia [data-ia-aluno]:checked')].map((c) => c.dataset.iaAluno);
+        if (!emails.length) { avisar('Marque pelo menos um aluno com texto.', true); return; }
+        const n = tdaEstado.dados.correcaoIa.lote;
+        iaTda.lotes = [];
+        for (let i = 0; i < emails.length; i += n) iaTda.lotes.push(emails.slice(i, i + n));
+        $('ia-lotes').innerHTML = iaTda.lotes.map((l, i) => `<button class="btn mini" data-ia-lote="${i}">📋 Copiar lote ${i + 1} (${l.length})</button>`).join('') +
+          '<span class="suave pequeno">Um lote por conversa do claude.ai; importe a resposta de cada lote.</span>';
+        return;
+      }
+      if (acao === 'importar') {
+        const texto = $('ia-resposta').value.trim();
+        if (!texto) { avisar('Cole a resposta do claude.ai no campo.', true); return; }
+        comBotao(b, async () => {
+          const r = await chamar('profImportarCorrecaoIa', id, texto);
+          const lotes = iaTda.lotes, lotesHtml = $('ia-lotes') ? $('ia-lotes').innerHTML : '';
+          tdaEstado.dados = r.dados;
+          renderTda();
+          iaTda.lotes = lotes;
+          if ($('ia-lotes')) $('ia-lotes').innerHTML = lotesHtml;
+          $('ia-avisos').innerHTML = `<p>✅ ${r.importados} rascunho(s) importado(s).</p>` + (r.avisos.length ? `<ul>${r.avisos.map((a) => `<li>⚠️ ${esc(a)}</li>`).join('')}</ul>` : '');
+          avisar(r.importados + ' rascunho(s) importado(s). Confira com 👁 ver.');
+        });
+      }
     });
     $('tda-rec').addEventListener('change', (ev) => {
       if (ev.target.id === 'rec-todos') document.querySelectorAll('#tda-rec [data-rec]').forEach((c) => (c.checked = ev.target.checked));
@@ -499,12 +750,40 @@
       if (!emails.length) { avisar('Marque pelo menos um aluno.', true); return; }
       if (!tdaEstado.niveis.every((v) => v > 0)) { avisar('Marque um nível em todos os critérios.', true); return; }
       comBotao(ev.target, async () => {
-        tdaEstado.dados = await chamar('profCorrigirTda', tdaEstado.dados.questionario.id, emails, tdaEstado.niveis, $('mt-comentario').value);
+        const fb = lerFeedbackCorrecao();
+        const feedback = fb ? { porques: fb.porques, pontos_fortes: fb.pontos_fortes, melhorar: fb.melhorar, estudar: fb.estudar, versao_corrigida: fb.versao_corrigida } : null;
+        tdaEstado.dados = await chamar('profCorrigirTda', tdaEstado.dados.questionario.id, emails, tdaEstado.niveis, $('mt-comentario').value, feedback);
         $('modal-tda').close();
         renderTda();
         estado.alunos = await chamar('profListarAlunos');
         renderAlunos();
-        avisar('Correção salva. O aluno já pode ver a nota e o comentário.');
+        avisar(fb ? 'Correção publicada com o feedback. O aluno já pode ver.' : 'Correção salva. O aluno já pode ver a nota e o comentário.');
+      });
+    });
+    $('mt-fb').addEventListener('click', (ev) => {
+      if (ev.target.id === 'fb-add') { lerFeedbackCorrecao(); tdaEstado.fb.melhorar.push({ trecho: '', correcao: '', explicacao: '' }); renderFeedbackCorrecao(); return; }
+      const rem = ev.target.closest('[data-fb-remover]');
+      if (rem) { lerFeedbackCorrecao(); tdaEstado.fb.melhorar.splice(Number(rem.dataset.fbRemover), 1); renderFeedbackCorrecao(); }
+    });
+    $('mt-fb').addEventListener('change', (ev) => {
+      const c = ev.target.closest('[data-fb-hab]');
+      if (!c) return;
+      if (c.checked && document.querySelectorAll('#mt-fb [data-fb-hab]:checked').length > 3) { c.checked = false; avisar('Marque no máximo 3 habilidades.', true); return; }
+      document.querySelector(`#mt-fb [data-fb-motivo="${CSS.escape(c.dataset.fbHab)}"]`).hidden = !c.checked;
+    });
+    $('mt-previa').addEventListener('click', () => {
+      if (!tdaEstado.niveis.every((v) => v > 0)) { avisar('Marque um nível em todos os critérios.', true); return; }
+      const caixa = $('mt-previa-caixa');
+      caixa.innerHTML = caixa.innerHTML ? '' : previaFeedbackAluno();
+      if (caixa.innerHTML) caixa.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    $('mt-descartar').addEventListener('click', (ev) => {
+      if (!confirm('Descartar o rascunho da IA? Você pode corrigir à mão ou pedir outro lote.')) return;
+      comBotao(ev.target, async () => {
+        tdaEstado.dados = await chamar('profDescartarRascunhoIa', tdaEstado.dados.questionario.id, tdaEstado.emailFb);
+        $('modal-tda').close();
+        renderTda();
+        avisar('Rascunho descartado.');
       });
     });
     $('mt-apagar').addEventListener('click', (ev) => {

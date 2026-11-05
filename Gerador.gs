@@ -240,7 +240,7 @@ function extrairJson_(texto) {
     while (f > i && tentativas < 60) {
       try {
         const obj = JSON.parse(limpar(t.slice(i, f + 1)));
-        if (obj && typeof obj === 'object' && (obj.degraus || obj.itens || obj.tipo)) return obj;
+        if (obj && typeof obj === 'object' && (obj.degraus || obj.itens || obj.alunos || obj.tipo)) return obj;
         break;
       } catch (e) { /* tenta o "}" anterior */ }
       f = t.lastIndexOf('}', f - 1);

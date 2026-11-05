@@ -11,6 +11,7 @@ Roda **gratuitamente** no Google Workspace da escola: Google Apps Script e Googl
 - **Cadastro:** o aluno se cadastra no primeiro acesso com a conta Google da escola, e o professor pode editar ou excluir cadastros.
 - **Questionários:** há o diagnóstico e os mensais, respondidos online (com correção automática) ou impressos (com lançamento das respostas). As questões podem ser geradas com IA a partir do conteúdo do mês, o que é opcional.
 - **TDAs (Tarefas de Desempenho Autêntico):** a entrega final do mês pode ser individual ou em grupo, feita no papel ou no sistema, com texto, link e anexos. A correção usa uma rubrica de 4 níveis, e o aluno vê a nota, o feedback e a rubrica.
+- **Correção de TDA com apoio da IA (opcional):** o professor copia um pedido com a rubrica e os textos (primeiro nome) para o claude.ai, em lotes de até 10, e importa a resposta como rascunho. Revisa e publica aluno a aluno; o aluno vê por que ficou em cada nível, pontos fortes, correções, o que estudar (com a ficha 📖 e o Meu reforço) e, se a TDA permitir, a versão corrigida com as mudanças destacadas. O aluno nunca usa IA.
 - **Recuperação das TDAs:** para quem tirou menos de 10, indicado e liberado pelo professor em sala (1 hora). Treinos sem nota (ficha 📖 + 4 cadeados por habilidade da TDA, meta de 70 pontos, até 2 tentativas) e depois 10 atividades valendo de 0 a 10, sorteadas de um pacote de 15 questões gerado no claude.ai: uma resposta por questão, sem dicas, com monitor de saída de tela. Vale a maior nota entre a TDA e a recuperação.
 - **Entregas diárias com bônus:** o professor marca a entrega da tarefa de cada aula. O percentual de entregas no período vira um ponto extra (vermelho 0 · laranja 0,2 · amarelo 0,5 · verde 1,0), e o aluno acompanha numa barra colorida no painel dele.
 - **Monitoramento de saídas da tela:** questionários e TDAs registram quando o aluno troca de aba ou de janela.
@@ -63,6 +64,7 @@ Roda **gratuitamente** no Google Workspace da escola: Google Apps Script e Googl
 | `Grupos.gs` | Leitura e gravação dos grupos mensais |
 | `Relatorios.gs` | Comparativo, tópicos, evolução e exportação |
 | `Tda.gs` | TDAs: entregas, anexos no Drive e correção por rubrica |
+| `CorrecaoIa.gs` | Correção de TDA com apoio da IA: pedido em lotes, importação dos rascunhos, revisão e publicação do feedback |
 | `Recuperacao.gs` | Recuperação das TDAs: indicação, liberação em sala, treinos, pacote de questões, atividades, nota e relatórios |
 | `Fichas.gs` | Fichas teóricas (📖 Study) de cada habilidade: padrão, edição pelo professor e leitura pelo aluno |
 | `ProfTda.html` | Tela de entregas e correção das TDAs |

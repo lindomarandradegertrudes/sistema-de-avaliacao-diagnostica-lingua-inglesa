@@ -149,6 +149,14 @@
             <label>🔁 Habilidades que a TDA cobra <span class="suave pequeno">(de 1 a 3; a recuperação é montada com elas)</span></label>
             <div id="ed-tda-habilidades" class="pequeno"></div>
           </div>
+          <div class="campo so-tda" hidden style="margin-top:14px">
+            <label for="ed-tda-obsia">🤖 Observações para a correção com IA <span class="suave pequeno">(opcional; vão em todos os pedidos desta TDA)</span></label>
+            <textarea id="ed-tda-obsia" rows="2" maxlength="2000" placeholder="Ex.: seja exigente com o simple past; não desconte a ortografia de nomes próprios."></textarea>
+            <label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;margin-top:8px">
+              <input type="checkbox" id="ed-tda-corrigida" style="width:auto;margin-top:4px">
+              <span><strong>Mostrar a versão corrigida ao aluno</strong><br><span class="suave pequeno">Na correção com IA, o aluno vê o próprio texto reescrito sem erros, com as mudanças destacadas.</span></span>
+            </label>
+          </div>
           <div class="campo" style="margin-top:14px">
             <label for="ed-conteudo">Conteúdo do mês</label>
             <textarea id="ed-conteudo" rows="4" placeholder="Cole aqui o conteúdo/expectativas trabalhados (ex.: Simple past – verbos regulares; leitura de biografias; preposições in/on/at)."></textarea>

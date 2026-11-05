@@ -131,10 +131,11 @@ function corrigir_(questoes, marcadas) {
   };
 }
 
-/** Grava (ou substitui) a resposta de um aluno a um questionário. Chamar dentro de comTrava_. */
-function gravarResposta_(q, email, turma, resultado, origem) {
+/** Grava (ou substitui) a resposta de um aluno a um questionário. Chamar dentro de comTrava_.
+ *  existente: a resposta atual, se quem chama já leu (null = não há); omitido, lê a aba Respostas. */
+function gravarResposta_(q, email, turma, resultado, origem, existente) {
   const aba = aba_('Respostas');
-  const existente = lerRespostas_().filter(function (r) { return r.questionario_id === q.id && r.email === email; })[0];
+  if (existente === undefined) existente = lerRespostas_().filter(function (r) { return r.questionario_id === q.id && r.email === email; })[0];
   const linha = linhaDe_('Respostas', {
     questionario_id: q.id, email: email, turma: turma,
     pontuacao: resultado.pontuacao, total: resultado.total, percentual: resultado.percentual,
@@ -252,7 +253,9 @@ function profSalvarQuestionario(dados) {
     if (temRespostas && !ehTda && JSON.stringify(atual.questoes) !== json) {
       throw new Error('Este questionário já tem respostas: as questões não podem mais ser alteradas.');
     }
-    if (temRespostas && ehTda && JSON.stringify(atual.tda.rubrica) !== JSON.stringify(conteudoValidado.rubrica)) {
+    // Compara só os textos da rubrica: a marcação "só o professor avalia" pode mudar a qualquer momento.
+    const textosRubrica = function (rub) { return JSON.stringify((rub || []).map(function (r) { return [r.criterio, r.n4, r.n3, r.n2, r.n1]; })); };
+    if (temRespostas && ehTda && textosRubrica(atual.tda.rubrica) !== textosRubrica(conteudoValidado.rubrica)) {
       throw new Error('Esta TDA já tem correções: a rubrica não pode mais ser alterada (os demais campos, sim).');
     }
     if (temRespostas && atual.serie !== dados.serie) throw new Error('Este questionário já tem respostas: a série não pode mudar.');

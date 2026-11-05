@@ -4,6 +4,39 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# 🤖 Correção de TDA com apoio da IA (opcional)
+
+**Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `CorrecaoIa` | **arquivo novo:** **+ > Script**, nome `CorrecaoIa`, cole **CorrecaoIa.gs** |
+| `Codigo`, `Fichas`, `Gerador`, `Questionarios`, `Tda` | apague tudo e cole as novas versões (.gs) |
+| `Aluno`, `Manual`, `Professor`, `ProfTda` | apague tudo e cole as novas versões (.html) |
+
+Depois: **Salvar** → **Implantar → Gerenciar implantações → ✏️ → Versão: Nova versão → Implantar** → **F5**.
+
+Só para **TDAs individuais**. O aluno nunca usa IA: quem cola o pedido no claude.ai é você, e nada chega ao aluno sem a sua revisão.
+
+## Passo a passo
+1. **No editor da TDA** (opcional):
+   - **🤖 Observações para a correção com IA**: orientações que vão em todos os pedidos desta TDA (ex.: "seja exigente com o simple past");
+   - ☐ **Mostrar a versão corrigida ao aluno**;
+   - na rubrica, ☐ **👩‍🏫 só o professor avalia** nos critérios que a IA não consegue ver pelo texto (apresentação oral, cartaz no Canva, trabalho em sala). Eles não vão no pedido, chegam no rascunho **sem nível** e o app só publica depois que você marcar. Pode ser marcado mesmo em TDA já corrigida.
+2. **Resultados da TDA → 🤖 Corrigir com IA → Abrir.** Aparecem os alunos **sem correção** da turma. Quem não tem texto no editor (só Canva, anexo ou papel) ou escreveu menos de 5 palavras fica marcado "corrija à mão".
+3. Marque os alunos → **Preparar lotes** (até 10 por lote) → **📋 Copiar lote 1**. O pedido leva a TDA, a rubrica com os 4 níveis, as suas observações, as habilidades e cada texto com o **primeiro nome** e um código (sem e-mail, sobrenome ou turma).
+4. Cole numa **conversa nova** do claude.ai, copie a resposta inteira, cole no campo e clique em **Importar rascunhos**. O app confere a resposta e avisa o que ignorou. Repita para cada lote. **👁 ver** mostra o rascunho.
+5. **Revisar e publicar:** clique em **Corrigir** no aluno com 🤖 rascunho. O texto do aluno fica à esquerda; à direita, a rubrica já marcada e os blocos editáveis (porquê de cada nível, 💪 pontos fortes, 🎯 correções, 📚 o que estudar, ✍️ versão corrigida). O **Comentário** continua sendo a sua mensagem.
+   - **👁 Como o aluno verá** mostra a prévia;
+   - **Descartar rascunho** apaga o rascunho (corrija à mão ou peça outro lote);
+   - **Publicar para o aluno** grava a nota e o feedback.
+6. **Rever correção** reabre o feedback publicado para editar. Correções publicadas nunca são trocadas por um rascunho da IA.
+
+## O que o aluno vê
+Na TDA corrigida, abaixo da rubrica: 📝 por que ficou em cada nível, 💪 pontos fortes, 🎯 "Abaixo seguem algumas correções:", 📚 o que estudar (com **📖 Abrir a ficha** e **💪 Ir para o Meu reforço**) e ✍️ "Seu texto ficaria melhor assim:" com o que mudou em verde (se a TDA permitir).
+
+---
+
 # Recuperação das TDAs (por ciclo) e 📖 Study
 
 **Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**

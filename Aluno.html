@@ -28,6 +28,21 @@
     .rub { width: 100%; border-collapse: collapse; font-size: .85rem; }
     .rub th, .rub td { border: 1px solid var(--borda); padding: 6px; vertical-align: top; text-align: left; }
     .rub td.minha { background: var(--primaria-clara); outline: 3px solid var(--primaria); outline-offset: -3px; font-weight: 600; }
+    /* Feedback detalhado da TDA corrigida e ficha 📖 */
+    .fb-sec { margin-top: 14px; }
+    .fb-sec h3 { margin: 0 0 6px; font-size: 1.02rem; }
+    .fb-sec ul { margin: 0; padding-left: 20px; }
+    .fb-sec li { margin-bottom: 4px; }
+    .fb-hab-linha { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--borda); }
+    .fb-corrigida { white-space: pre-wrap; background: var(--fundo); border-radius: 8px; padding: 10px 12px; }
+    .fb-corrigida mark { background: #d3f9d8; padding: 0 2px; border-radius: 3px; }
+    #ficha-dlg { width: min(720px, calc(100vw - 32px)); }
+    .fx-bloco { border-radius: 8px; padding: 10px 12px; margin-top: 10px; background: var(--fundo); }
+    .fx-bloco ul { margin: 6px 0 0; padding-left: 20px; }
+    .fx-atencao { background: #fff6cc; } .fx-erro { background: #ffe3e3; } .fx-check { background: #e7f5ff; }
+    .fx-glossa { border-bottom: 1px dotted currentColor; cursor: help; }
+    .fx-op { width: auto; margin: 6px 6px 0 0; }
+    .fx-op.certo { background: #2b8a3e; color: #fff; } .fx-op.errado { background: #ffb3b3; }
     .feedback { background: #fff9db; border-left: 4px solid #fab005; border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; }
     .anexo-atual { display: flex; gap: 8px; align-items: center; font-size: .9rem; margin-top: 4px; }
     .anexo-atual input { width: auto; }
@@ -240,6 +255,11 @@
 
   <div id="aviso-saida" role="alert" hidden></div>
 
+  <dialog id="ficha-dlg">
+    <div class="linha"><h2 style="margin:0;flex:1" id="ficha-titulo">📖</h2><button class="btn" type="button" id="ficha-fechar">Fechar</button></div>
+    <div id="ficha-corpo" style="max-height:70vh;overflow-y:auto;margin-top:8px"></div>
+  </dialog>
+
   <dialog id="confirmar">
     <h2>Confira seus dados</h2>
     <p>Nome: <strong id="conf-nome"></strong><br>Turma: <strong id="conf-turma"></strong></p>
@@ -324,7 +344,13 @@
         if (fn === 'alunoObterEstado' || fn === 'alunoNovoReforco') args = [serieTeste];
         fn = MAPA_TESTE[fn];
       }
-      return new Promise((ok, falha) => google.script.run.withSuccessHandler(ok).withFailureHandler(falha)[fn](...args));
+      // Fila na trava do servidor ("Tempo limite do bloqueio"): nada foi gravado; espera um pouco e tenta de novo (até 3 vezes).
+      const tentar = (n) => new Promise((ok, falha) => google.script.run.withSuccessHandler(ok).withFailureHandler(falha)[fn](...args))
+        .catch((e) => {
+          if (n >= 3 || !/bloqueio|lock/i.test(String(e && e.message))) throw e;
+          return new Promise((ok) => setTimeout(ok, 1500 + Math.random() * 3500)).then(() => tentar(n + 1));
+        });
+      return tentar(0);
     }
 
     function mostrar(id) {
@@ -777,6 +803,98 @@
       voltarDaRecAval();
     });
 
+    // ---------- Feedback detalhado da TDA (correção revisada pelo professor) ----------
+    const ROTULO_NIVEL = { 4: 'Excelente', 3: 'Satisfatório', 2: 'Em desenvolvimento', 1: 'Insuficiente' };
+    const textoPuroAluno = (html) => String(html || '').replace(/<(br|\/p|\/div|\/h2|\/h3|\/li)\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
+
+    /** Destaca, na versão corrigida, as palavras que mudaram em relação ao texto do aluno (diferença por palavras). */
+    function destacarMudancasAluno(original, corrigida) {
+      const a = String(original || '').split(/(\s+)/), b = String(corrigida || '').split(/(\s+)/);
+      const pa = a.filter((_, i) => i % 2 === 0), pb = b.filter((_, i) => i % 2 === 0);
+      const limpa = (w) => w.toLowerCase().replace(/[^a-z0-9'à-ÿ]/g, '');
+      const n = pa.length, m = pb.length;
+      if (n * m > 400000) return esc(corrigida);
+      const lcs = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+      for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+        lcs[i][j] = limpa(pa[i]) === limpa(pb[j]) ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+      const igual = new Array(m).fill(false);
+      for (let i = 0, j = 0; i < n && j < m;) {
+        if (limpa(pa[i]) === limpa(pb[j])) { igual[j] = true; i++; j++; } else if (lcs[i + 1][j] >= lcs[i][j + 1]) i++; else j++;
+      }
+      return b.map((x, k) => k % 2 ? esc(x) : (igual[k / 2] || !x ? esc(x) : `<mark>${esc(x)}</mark>`)).join('');
+    }
+
+    function htmlFeedbackTda(t, c) {
+      const fb = c.feedback;
+      const porques = t.rubrica.map((r, i) => ({ r, nivel: c.niveis[i], porque: (fb.porques || [])[i] })).filter((x) => x.porque);
+      const melhorar = (fb.melhorar || []).filter((m) => m.trecho || m.correcao);
+      const original = t.entrega ? (t.entrega.formato === 'html' ? textoPuroAluno(t.entrega.texto) : t.entrega.texto) : '';
+      return `
+        ${porques.length ? `<div class="fb-sec"><h3>📝 Por que você ficou em cada nível</h3><ul>${porques.map((x) =>
+          `<li><strong>${esc(x.r.criterio)}: ${x.nivel} – ${ROTULO_NIVEL[x.nivel] || ''}.</strong> ${esc(x.porque)}</li>`).join('')}</ul></div>` : ''}
+        ${(fb.pontos_fortes || []).length ? `<div class="fb-sec"><h3>💪 Pontos fortes</h3><ul>${fb.pontos_fortes.map((p) => `<li>${esc(p)}</li>`).join('')}</ul></div>` : ''}
+        ${melhorar.length ? `<div class="fb-sec"><h3>🎯 Abaixo seguem algumas correções:</h3><ul>${melhorar.map((m) =>
+          `<li><s>${esc(m.trecho)}</s> → <strong>${esc(m.correcao)}</strong>${m.explicacao ? `<br><span class="suave">${esc(m.explicacao)}</span>` : ''}</li>`).join('')}</ul></div>` : ''}
+        ${(fb.estudar || []).length ? `<div class="fb-sec"><h3>📚 O que estudar</h3>${fb.estudar.map((s) => `<div class="fb-hab-linha">
+            <span style="flex:1"><strong>${esc(s.nome || s.habilidade)}</strong>${s.motivo ? ` <span class="suave">· ${esc(s.motivo)}</span>` : ''}</span>
+            <button class="btn" type="button" data-ficha="${esc(s.habilidade)}">📖 Abrir a ficha</button></div>`).join('')}
+          ${t.teste ? '' : '<div style="margin-top:8px"><button class="btn primario" type="button" id="fb-reforco">💪 Ir para o Meu reforço</button></div>'}</div>` : ''}
+        ${fb.versao_corrigida ? `<div class="fb-sec"><h3>✍️ Seu texto ficaria melhor assim:</h3>
+          <p class="suave pequeno" style="margin:0 0 6px">Em verde, o que mudou em relação ao que você escreveu.</p>
+          <div class="fb-corrigida">${destacarMudancasAluno(original, fb.versao_corrigida)}</div></div>` : ''}`;
+    }
+
+    // Ficha 📖 (mesmo conteúdo do Study do Meu reforço): regra, atenção, exemplos, erro comum e Check sem nota.
+    const fmtFicha = (s) => esc(s).replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g, '<span class="fx-glossa" title="$2">$1</span>')
+      .replace(/==(.+?)==/g, '<mark>$1</mark>').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/~~(.+?)~~/g, '<s>$1</s>').replace(/\*([^*]+?)\*/g, '<i>$1</i>');
+    let fichaAberta = null;
+    async function abrirFicha(id, botao) {
+      botao.disabled = true;
+      try {
+        const f = await chamar('alunoFichaHabilidade', id);
+        fichaAberta = f;
+        const x = f.ficha;
+        $('ficha-titulo').textContent = '📖 ' + f.nome;
+        $('ficha-corpo').innerHTML = `<p style="margin-top:0">${fmtFicha(x.regra)}</p>
+          ${(x.atencao || []).length ? `<div class="fx-bloco fx-atencao"><strong>⚠️ Atenção</strong><ul>${x.atencao.map((a) => `<li>${fmtFicha(a)}</li>`).join('')}</ul></div>` : ''}
+          ${(x.exemplos || []).length ? `<div class="fx-bloco"><strong>💬 Exemplos</strong><ul>${x.exemplos.map((e) => `<li><strong>${fmtFicha(e.en)}</strong><br><span class="suave">${fmtFicha(e.pt)}</span></li>`).join('')}</ul></div>` : ''}
+          ${x.erro && x.erro.errado ? `<div class="fx-bloco fx-erro"><strong>🚫 Erro comum</strong><p style="margin:6px 0 0"><s>${fmtFicha(x.erro.errado)}</s> → <strong>${fmtFicha(x.erro.certo)}</strong></p>${x.erro.porque ? `<p class="suave" style="margin:4px 0 0">${fmtFicha(x.erro.porque)}</p>` : ''}</div>` : ''}
+          ${x.check && x.check.pergunta ? `<div class="fx-bloco fx-check"><strong>✅ Check</strong> <span class="suave pequeno">(sem nota)</span><p style="margin:6px 0 0">${fmtFicha(x.check.pergunta)}</p>
+            <div>${x.check.opcoes.map((o, k) => `<button type="button" class="btn fx-op" data-fx-op="${k}">${fmtFicha(o)}</button>`).join('')}</div><p id="fx-resp" aria-live="polite"></p></div>` : ''}`;
+        $('ficha-dlg').showModal();
+      } catch (e) {
+        alert(e.message);
+      } finally { botao.disabled = false; }
+    }
+    $('ficha-fechar').addEventListener('click', () => $('ficha-dlg').close());
+    $('ficha-corpo').addEventListener('click', (ev) => {
+      const op = ev.target.closest('[data-fx-op]');
+      if (!op || !fichaAberta) return;
+      const c = fichaAberta.ficha.check, k = Number(op.dataset.fxOp);
+      document.querySelectorAll('#ficha-corpo [data-fx-op]').forEach((b, n) => {
+        b.disabled = true;
+        if (n === c.correta) b.classList.add('certo'); else if (n === k) b.classList.add('errado');
+      });
+      $('fx-resp').innerHTML = (k === c.correta ? '✔ <strong>Isso mesmo!</strong> ' : '✘ <strong>Quase!</strong> ') + fmtFicha(c.explicacao || '');
+    });
+    $('tda-correcao').addEventListener('click', async (ev) => {
+      const f = ev.target.closest('[data-ficha]');
+      if (f) { abrirFicha(f.dataset.ficha, f); return; }
+      if (ev.target.id !== 'fb-reforco') return;
+      const b = ev.target;
+      b.disabled = true;
+      b.textContent = 'Montando…';
+      try {
+        const x = await chamar('alunoNovoReforco');
+        irParaTreino(b, `${estadoAtual.appUrl}?caso=${encodeURIComponent(x.id)}`);
+      } catch (e) {
+        alert(e.message);
+        b.disabled = false;
+        b.textContent = '💪 Ir para o Meu reforço';
+      }
+    });
+
     function renderTda(t) {
       tdaAtual = t;
       $('tda-titulo').textContent = t.titulo;
@@ -803,6 +921,7 @@
               `<td class="${c.niveis[i] === n ? 'minha' : ''}">${esc(r['n' + n])}</td>`).join('')}</tr>`).join('')}
           </table></div>
           <p class="suave pequeno">O quadro destacado mostra o nível que você alcançou em cada critério.</p>
+          ${c.feedback ? htmlFeedbackTda(t, c) : ''}
         </div>` : (t.teste && t.rubrica ? `
         <div class="cartao">
           <h2>Rubrica de avaliação</h2>

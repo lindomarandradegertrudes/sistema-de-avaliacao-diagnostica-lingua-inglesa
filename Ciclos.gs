@@ -154,7 +154,7 @@ function gravarNotasCiclo_(ciclo, emails, fechando) {
       gravarResposta_(q, email, ciclo.turma, {
         pontuacao: Math.round(r.nota * r.itens.length), total: total, percentual: r.nota,
         detalhe: { casos: r.itens.map(function (i) { return { missao: i.missao, degrau: i.degrau, pontos: i.noPrazo ? i.pontos : 0 }; }) },
-      }, 'jogos');
+      }, 'jogos', existente || null);
     });
     apagar.sort(function (a, b) { return b - a; }).forEach(function (l) { aba_('Respostas').deleteRow(l); });
   });

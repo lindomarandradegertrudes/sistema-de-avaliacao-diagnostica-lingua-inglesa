@@ -23,8 +23,12 @@ function validarTda_(t, serie) {
     canva: t.canva !== false,
     // Habilidades do Mapa que a TDA cobra (1 a 3): a recuperação é montada com elas.
     habilidades: validarHabilidadesTda_(t.habilidades, serie),
+    // Correção com apoio da IA (opcional): mostrar a versão corrigida ao aluno e orientações do professor para o pedido.
+    mostrarCorrigida: t.mostrarCorrigida === true,
+    obsIa: texto(t.obsIa).slice(0, 2000),
     rubrica: (Array.isArray(t.rubrica) ? t.rubrica : []).map(function (r) {
-      return { criterio: texto(r.criterio), n4: texto(r.n4), n3: texto(r.n3), n2: texto(r.n2), n1: texto(r.n1) };
+      // soProfessor: critério que a IA não avalia pelo texto (ex.: apresentação oral); fica fora do pedido da correção com IA.
+      return { criterio: texto(r.criterio), n4: texto(r.n4), n3: texto(r.n3), n2: texto(r.n2), n1: texto(r.n1), soProfessor: r.soProfessor === true };
     }).filter(function (r) { return r.criterio; }),
   };
   if (!tda.situacao) throw new Error('Preencha a situação-problema da TDA.');
@@ -106,7 +110,7 @@ function correcaoDe_(r) {
   return {
     // percentual = nota da TDA; final = a que vale (a maior entre a TDA e a recuperação).
     pontuacao: r.pontuacao, total: r.total, percentual: r.percentual_tda, final: r.percentual, recuperacao: r.recuperacao, respondido_em: r.respondido_em,
-    niveis: d.rubrica || [], comentario: d.comentario || '',
+    niveis: d.rubrica || [], comentario: d.comentario || '', feedback: d.feedback || null,
   };
 }
 
@@ -189,6 +193,13 @@ function alunoAbrirTda(id) {
   const nomes = nomesPorEmail_();
   const entrega = lerEntregas_().filter(function (e) { return e.questionario_id === id && e.membros.indexOf(aluno.email) !== -1; })[0];
   const correcao = correcaoDe_(lerRespostas_().filter(function (r) { return r.questionario_id === id && r.email === aluno.email; })[0]);
+  // A versão corrigida só vai ao aluno se a TDA permitir.
+  if (correcao && correcao.feedback) {
+    correcao.feedback = Object.assign({}, correcao.feedback, {
+      versao_corrigida: q.tda.mostrarCorrigida === true ? correcao.feedback.versao_corrigida : '',
+      estudar: (correcao.feedback.estudar || []).map(function (s) { return Object.assign({}, s, { nome: nomeHabilidade_(s.habilidade).replace(/^Base: /, '') }); }),
+    });
+  }
   const grupo = q.tda.modo === 'grupo' ? grupoAtualDoAluno_(aluno.email, aluno.turma) : null;
   return {
     id: q.id, titulo: q.titulo, aberta: q.status === 'aberto', modo: q.tda.modo, monitorar: q.monitorar, canva: canvaLiberado_(q),
@@ -293,13 +304,15 @@ function profTdaResultados(id) {
     entregas: lerEntregas_().filter(function (e) { return e.questionario_id === id; })
       .map(function (e) { return entregaPublica_(e, nomes, true); }),
     recuperacoes: recuperacoesDaTda_(id),
+    correcaoIa: situacaoCorrecaoIa_(q),
     pacoteRec: (function (p) { return p ? { questoes: p.itens.length, criado_em: p.criado_em } : null; })(lerPacoteRec_(id)),
     habilidades: (q.tda.habilidades || []).map(nomeHabilidade_),
   };
 }
 
 /** Grava a correção (níveis 1–4 por critério + comentário) para um ou mais alunos. */
-function profCorrigirTda(id, emails, niveis, comentario) {
+/** feedback (opcional): o feedback detalhado revisado (correção com IA ou escrito pelo professor). */
+function profCorrigirTda(id, emails, niveis, comentario, feedback) {
   exigirProfessor_();
   const q = buscarTda_(id);
   const n = q.tda.rubrica.length;
@@ -320,8 +333,12 @@ function profCorrigirTda(id, emails, niveis, comentario) {
     pontuacao: soma, total: 4 * n, percentual: Math.round((soma / (4 * n)) * 1000) / 10,
     detalhe: { rubrica: lv, comentario: String(comentario || '').trim().slice(0, 5000) },
   };
+  const fb = q.tda.modo === 'grupo' ? null : validarFeedbackIa_(feedback, q);
+  if (fb) resultado.detalhe.feedback = fb;
   comTrava_(function () {
     alvos.forEach(function (e) { gravarResposta_(q, e, turmaDe[e], resultado, 'tda'); });
+    // Publicado: o rascunho da IA (se havia) sai da fila.
+    apagarRascunhosIa_(id, alvos);
   });
   return profTdaResultados(id);
 }
