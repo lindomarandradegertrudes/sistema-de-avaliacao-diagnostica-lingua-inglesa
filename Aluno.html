@@ -91,7 +91,7 @@
     }
   </style>
 </head>
-<body data-teste="<?= modoTeste ?>">
+<body data-teste="<?= modoTeste ?>" data-rec="<?= rec ?>">
   <header class="topo">
     <div class="marca">English Learning App</div>
     <div class="suave pequeno"><?= email ?></div>
@@ -744,6 +744,51 @@
       return `<button class="btn primario" id="rec-atividades" type="button">${a ? `▶ Continuar as atividades (${a.respondidas}/${a.total})` : '▶ Começar as 10 atividades'}</button>`;
     }
 
+    /** Abre as 10 atividades: a tela de regras (na 1ª vez) ou a questão em que parou. Usado pelo botão do cartão e pelo link do fim dos treinos.
+     *  As regras ficam numa tela do app (não numa janela do navegador, que o Chrome bloqueia quando abre sozinha). */
+    async function comecarAtividadesRec(t, botao) {
+      recAval.id = t.id;
+      recAval.v = null;
+      if (!t.recuperacao.avaliacao) { renderRegrasRec(t); return; }
+      if (botao) botao.disabled = true;
+      try {
+        await iniciarAtividadesRec();
+      } catch (e) {
+        alert(e.message);
+        if (botao) botao.disabled = false;
+      }
+    }
+
+    async function iniciarAtividadesRec() {
+      const v = await chamar('alunoRecAvaliacao', recAval.id);
+      // Começando do zero (nenhuma resposta): descarta a contagem de saídas que tenha sobrado neste navegador (ex.: recuperação zerada para teste).
+      if (!v.fim && v.respondidas === 0) { try { localStorage.removeItem('saidas:r:' + recAval.id); } catch (e) { /* sem armazenamento */ } }
+      iniciarMonitor('r:' + recAval.id);
+      renderRecAval(v);
+    }
+
+    function renderRegrasRec(t) {
+      $('rec-progresso').textContent = t.recuperacao.ate ? `liberada até ${t.recuperacao.ate}` : '';
+      $('rec-corpo').innerHTML = `<div class="cartao">
+        <h2>📝 As 10 atividades da recuperação</h2>
+        <p style="margin-top:0"><strong>${esc(t.titulo)}</strong></p>
+        <p>Antes de começar, leia as regras:</p>
+        <ul>
+          <li><strong>10 questões</strong>, 1 ponto cada (nota de 0 a 10).</li>
+          <li><strong>Uma resposta por questão</strong>: depois de confirmar, não dá para voltar.</li>
+          <li><strong>Sem dicas.</strong></li>
+          <li>Sair desta tela para outras abas ou janelas <strong>fica registrado</strong> para o professor.</li>
+          <li>Se a liberação acabar antes de você terminar, <strong>o que faltar vale zero</strong>.</li>
+        </ul>
+        <p class="suave pequeno">Fica valendo a maior nota entre a TDA e a recuperação.</p>
+        <div class="linha" style="gap:8px;flex-wrap:wrap">
+          <button class="btn primario" type="button" id="rec-iniciar">▶ Começar a questão 1</button>
+          <button class="btn" type="button" id="rec-regras-voltar">Voltar para a TDA</button>
+        </div>
+      </div>`;
+      mostrar('rec-view');
+    }
+
     function renderRecAval(v) {
       recAval.v = v;
       $('rec-progresso').textContent = v.fim ? '' : `Questão ${v.questao.numero} de ${v.total} · até ${v.ate}`;
@@ -781,7 +826,14 @@
       if (ev.target.name === 'rec-op') $('rec-confirmar').disabled = false;
     });
     $('rec-corpo').addEventListener('click', async (ev) => {
-      if (ev.target.id === 'rec-fim-voltar') { voltarDaRecAval(); return; }
+      if (ev.target.id === 'rec-fim-voltar' || ev.target.id === 'rec-regras-voltar') { voltarDaRecAval(); return; }
+      if (ev.target.id === 'rec-iniciar') {
+        const b = ev.target;
+        b.disabled = true;
+        b.textContent = 'Abrindo…';
+        try { await iniciarAtividadesRec(); } catch (e) { alert(e.message); voltarDaRecAval(); }
+        return;
+      }
       if (ev.target.id !== 'rec-confirmar') return;
       const marcada = document.querySelector('input[name="rec-op"]:checked');
       if (!marcada) return;
@@ -947,19 +999,7 @@
           ${tr.concluidos ? `<p style="margin:10px 0 4px"><strong>📝 Atividades (valem de 0 a 10)</strong></p>${htmlAtividadesRec(rec, c)}` : ''}
         </div>`);
         const bAval = $('rec-atividades');
-        if (bAval) bAval.addEventListener('click', async () => {
-          if (!rec.avaliacao && !confirm('Atenção às regras:\n\n• 10 questões, 1 ponto cada.\n• Uma resposta por questão: depois de confirmar, não dá para voltar.\n• Sem dicas.\n• Sair da tela fica registrado para o professor.\n• Se a liberação acabar antes de terminar, o que faltar vale zero.\n\nComeçar agora?')) return;
-          bAval.disabled = true;
-          try {
-            const v = await chamar('alunoRecAvaliacao', t.id);
-            recAval.id = t.id;
-            iniciarMonitor('r:' + t.id);
-            renderRecAval(v);
-          } catch (e) {
-            alert(e.message);
-            bAval.disabled = false;
-          }
-        });
+        if (bAval) bAval.addEventListener('click', () => comecarAtividadesRec(t, bAval));
         const bRec = $('rec-comecar');
         if (bRec) bRec.addEventListener('click', async () => {
           bRec.disabled = true;
@@ -1246,7 +1286,20 @@
     });
     ['manual-voltar', 'manual-voltar-fim'].forEach((id) => $(id).addEventListener('click', () => (estadoAtual ? render(estadoAtual) : mostrar('carregando'))));
 
-    chamar('alunoObterEstado').then(render).catch((e) => mostrarErro(e.message));
+    // Veio do fim dos treinos da recuperação (?rec=): abre as 10 atividades sem esperar o painel (que é a parte mais pesada).
+    const recInicial = { id: TESTE ? '' : document.body.dataset.rec, aberto: false };
+    if (recInicial.id) {
+      chamar('alunoAbrirTda', recInicial.id).then((t) => {
+        recInicial.aberto = true;
+        const r = t.recuperacao;
+        if (r && r.liberada && r.nota == null && r.treinos && r.treinos.concluidos) comecarAtividadesRec(t, null);
+        else renderTda(t);
+      }).catch(() => { /* sem acesso à TDA: fica no painel */ });
+    }
+    chamar('alunoObterEstado').then((estado) => {
+      // Se as atividades (ou a TDA) já abriram, só guarda o painel para quando o aluno voltar.
+      if (recInicial.aberto) estadoAtual = estado; else render(estado);
+    }).catch((e) => mostrarErro(e.message));
   </script>
 </body>
 </html>

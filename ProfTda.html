@@ -425,7 +425,8 @@
         <thead><tr><th><input type="checkbox" id="rec-todos" style="width:auto" title="Marcar todos"></th><th>Aluno</th><th>Nota da TDA</th><th>Recuperação</th><th>Nota final</th></tr></thead>
         <tbody>${alunos.map((a) => `<tr>
           <td><input type="checkbox" data-rec="${esc(a.email)}" style="width:auto"></td>
-          <td>${esc(a.nome)}</td><td>${nota10(a.correcao.percentual)}</td><td>${situacao(recs[a.email])}</td><td>${final(a, recs[a.email])}</td></tr>`).join('')}</tbody>
+          <td>${esc(a.nome)}</td><td>${nota10(a.correcao.percentual)}</td><td>${situacao(recs[a.email])}${recs[a.email] && /teste/i.test(a.nome)
+            ? `<br><button class="btn mini perigo" data-rec-zerar="${esc(a.email)}" title="Só para alunos de teste: apaga a recuperação para testar de novo">🔄 Zerar recuperação</button>` : ''}</td><td>${final(a, recs[a.email])}</td></tr>`).join('')}</tbody>
       </table></div>
       <div class="linha" style="gap:8px;flex-wrap:wrap;margin-top:10px">
         <button class="btn mini" data-rec-acao="indicar">Indicar</button>
@@ -669,6 +670,16 @@
       if (ev.target.id === 'rec-todos') document.querySelectorAll('#tda-rec [data-rec]').forEach((c) => (c.checked = ev.target.checked));
     });
     $('tda-rec').addEventListener('click', (ev) => {
+      const z = ev.target.closest('button[data-rec-zerar]');
+      if (z) {
+        if (!confirm('Zerar a recuperação deste aluno de teste? Apaga a indicação, os treinos, as atividades e a nota da recuperação desta TDA.')) return;
+        comBotao(z, async () => {
+          tdaEstado.dados = await chamar('profZerarRecuperacao', tdaEstado.dados.questionario.id, z.dataset.recZerar);
+          renderTda();
+          avisar('Recuperação zerada. Indique e libere de novo para testar.');
+        });
+        return;
+      }
       const b = ev.target.closest('button[data-rec-acao]');
       if (!b) return;
       const id = tdaEstado.dados.questionario.id;

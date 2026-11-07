@@ -589,7 +589,9 @@
     chamar('alunoRecuperacaoProximo', REC.questionario_id).then(function (r) {
       if (r.fim) {
         b.remove();
-        $('rec-fim').innerHTML = '<div class="say ok">' + rosto('max') + '<div class="balloon"><span class="name">COACH MAX</span>🎉 <b>Treinos concluídos!</b> Volte para a TDA: as 10 atividades da recuperação vêm a seguir.</div></div>';
+        $('rec-fim').innerHTML = '<div class="say ok">' + rosto('max') + '<div class="balloon"><span class="name">COACH MAX</span>🎉 <b>Treinos concluídos!</b> ' +
+          (r.atividades ? 'Agora vêm as 10 atividades da recuperação, que valem nota.' : 'As atividades ainda estão sendo preparadas pelo professor. Aguarde.') + '</div></div>' +
+          (r.atividades ? '<div class="actions"><a class="btn blue" href="' + esc(r.atividades) + '" target="_top">▶ GO TO THE 10 ACTIVITIES</a></div>' : '');
         return;
       }
       var a = document.createElement('a');

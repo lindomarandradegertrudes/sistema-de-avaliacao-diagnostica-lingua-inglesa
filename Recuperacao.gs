@@ -300,7 +300,11 @@ function alunoRecuperacaoProximo(qid) {
     } else if (!proximo && !r.dados.treinos_concluidos_em) r.dados.treinos_concluidos_em = Utilities.formatDate(new Date(), FUSO, 'dd/MM/yyyy HH:mm');
     gravarRecuperacao_(r);
   });
-  return proximo ? urlDe(proximo) : { fim: true };
+  if (proximo) return urlDe(proximo);
+  // Treinos concluídos: link direto para as 10 atividades (abre a TDA já nas regras), se o pacote existir.
+  const atividades = lerPacoteRec_(qid) && !(r0.dados && r0.dados.concluida_em)
+    ? ScriptApp.getService().getUrl() + '?rec=' + encodeURIComponent(qid) : null;
+  return { fim: true, atividades: atividades };
 }
 
 // ============================================================
@@ -602,4 +606,34 @@ function textoTreinosRec_(treinos) {
   return treinos.map(function (h) {
     return h.nome + ' ' + (h.atingiu ? '✅ ' + h.melhor : h.encerrado ? '⚠️ ' + h.melhor + ' (não atingiu 70%)' : h.melhor != null ? h.melhor + ' (1ª tentativa)' : '—');
   }).join(' · ');
+}
+
+// ============================================================
+// Testes do professor: zerar a recuperação de um aluno de teste
+// ============================================================
+
+/** Apaga a recuperação, os treinos e as jogadas dos treinos de um aluno com "Teste" no nome (para testar de novo). */
+function profZerarRecuperacao(id, email) {
+  exigirProfessor_();
+  buscarTda_(id);
+  email = String(email || '').toLowerCase();
+  const nome = nomesPorEmail_()[email] || '';
+  if (!/teste/i.test(nome)) throw new Error('Só alunos com "Teste" no nome podem ter a recuperação zerada.');
+  // Fora da trava: quais casos são os treinos deste aluno nesta TDA (a aba Casos é grande).
+  const casos = {};
+  lerCasos_().forEach(function (c) {
+    const rc = c.dados && c.dados.recuperacao;
+    if (rc && rc.questionario_id === id && rc.email === email) casos[c.id] = true;
+  });
+  // Dentro da trava: só colunas pequenas para achar as linhas e apagar (de baixo para cima).
+  comTrava_(function () {
+    const apagar = function (aba, linhas) { linhas.sort(function (a, b) { return b - a; }).forEach(function (l) { aba.deleteRow(l); }); };
+    apagar(garantirAba_('Recuperacoes'), lerRecuperacoes_().filter(function (r) { return r.questionario_id === id && r.email === email; }).map(function (r) { return r._linha; }));
+    apagar(garantirAba_('Jogadas'), jogadasLeves_(false).filter(function (j) { return j.email === email && casos[j.caso_id]; }).map(function (j) { return j._linha; }));
+    const abaC = garantirAba_('Casos');
+    const n = abaC.getLastRow() - 1;
+    const ids = n > 0 ? abaC.getRange(2, 1, n, 1).getValues() : [];
+    apagar(abaC, ids.map(function (v, i) { return casos[String(v[0])] ? i + 2 : 0; }).filter(Boolean));
+  });
+  return profTdaResultados(id);
 }

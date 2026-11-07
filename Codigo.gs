@@ -209,6 +209,8 @@ function doGet(e) {
     const t = HtmlService.createTemplateFromFile(pagina);
     t.email = email;
     t.modoTeste = modoTeste ? '1' : '';
+    // ?rec=<id da TDA>: vindo do fim dos treinos da recuperação, abre direto as 10 atividades.
+    t.rec = e && e.parameter ? String(e.parameter.rec || '').replace(/[^\w-]/g, '') : '';
     return t.evaluate()
       .setTitle(pagina === 'Professor' ? 'English Learning App – Professor' : 'English Learning App')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
