@@ -17,16 +17,18 @@ function contextoRelJogos_() {
   const casos = lerCasos_().filter(function (c) { return !ehRecuperacao_(c); });
   const porId = {};
   casos.forEach(function (c) { porId[c.id] = c; });
-  const alunos = lerTabela_('Alunos').map(function (a) { return { email: String(a.email).toLowerCase(), nome: String(a.nome), turma: String(a.turma) }; })
+  // Sem o Aluno Teste (turmas TESTE).
+  const alunos = lerTabela_('Alunos').filter(function (a) { return !ehTurmaTeste_(a.turma); })
+    .map(function (a) { return { email: String(a.email).toLowerCase(), nome: String(a.nome), turma: String(a.turma) }; })
     .sort(function (a, b) { return a.turma.localeCompare(b.turma) || a.nome.localeCompare(b.nome, 'pt-BR'); });
   const alunoDe = {};
   alunos.forEach(function (a) { alunoDe[a.email] = a; });
-  const turmas = listarTurmas_();
+  const turmas = turmasReais_();
   const serieDe = {};
   turmas.forEach(function (t) { serieDe[t.turma] = t.serie; });
   return {
     casos: casos, porId: porId, alunos: alunos, alunoDe: alunoDe, turmas: turmas, serieDe: serieDe,
-    jogadas: lerJogadas_().filter(function (j) { return j.turma !== 'PROF' && porId[j.caso_id]; }),
+    jogadas: lerJogadas_().filter(function (j) { return j.turma !== 'PROF' && !ehTurmaTeste_(j.turma) && porId[j.caso_id]; }),
     niveis: calcularNiveis_(lerConfig_()),
   };
 }
@@ -151,8 +153,8 @@ function profSalvarTrimestres(lista) {
 function profRelJogosOpcoes() {
   exigirProfessor_();
   return {
-    turmas: listarTurmas_(),
-    alunos: lerTabela_('Alunos').map(function (a) { return { email: String(a.email).toLowerCase(), nome: String(a.nome), turma: String(a.turma) }; })
+    turmas: turmasReais_(),
+    alunos: lerTabela_('Alunos').filter(function (a) { return !ehTurmaTeste_(a.turma); }).map(function (a) { return { email: String(a.email).toLowerCase(), nome: String(a.nome), turma: String(a.turma) }; })
       .sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); }),
     trimestres: lerTrimestres_(),
   };

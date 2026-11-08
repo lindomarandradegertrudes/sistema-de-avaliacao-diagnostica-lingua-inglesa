@@ -26,7 +26,7 @@ function profGruposResumo(mes) {
   const niveis = calcularNiveis_(lerConfig_());
   const alunos = lerTabela_('Alunos');
   const grupos = lerGrupos_();
-  return listarTurmas_().map(function (t) {
+  return turmasReais_().map(function (t) {
     const daTurma = alunos.filter(function (a) { return String(a.turma) === t.turma; });
     const linhas = grupos.filter(function (g) { return g.turma === t.turma; });
     const meses = linhas.map(function (g) { return g.mes; }).filter(function (m, i, arr) { return arr.indexOf(m) === i; }).sort();

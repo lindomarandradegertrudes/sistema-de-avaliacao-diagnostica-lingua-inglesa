@@ -571,12 +571,13 @@ function linhasRecuperacao_() {
   const tdas = {};
   lerQuestionarios_().forEach(function (q) { if (q.tipo === 'tda' && q.tda) tdas[q.id] = q; });
   const ids = {};
-  lerRecuperacoes_().forEach(function (r) { if (tdas[r.questionario_id]) ids[r.questionario_id] = true; });
+  lerRecuperacoes_().forEach(function (r) { if (tdas[r.questionario_id] && !ehTurmaTeste_(r.turma)) ids[r.questionario_id] = true; });
   const agora = Date.now();
   const linhas = [];
   Object.keys(ids).forEach(function (id) {
     const q = tdas[id];
     recuperacoesAtualizadas_(id, null).forEach(function (r) {
+      if (ehTurmaTeste_(r.turma)) return; // relatório sem o Aluno Teste
       const s = situacaoRecuperacao_(r, agora, q.tda.habilidades || [], jogadas);
       const resp = respostas[id + '|' + r.email];
       const tda = resp ? resp.percentual_tda : null;

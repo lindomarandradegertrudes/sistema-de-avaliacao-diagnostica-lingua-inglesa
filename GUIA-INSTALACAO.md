@@ -4,6 +4,32 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# 🧪 Aluno Teste do professor (grava resultados)
+
+**Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `AlunoTeste` | **arquivo novo:** **+ > Script**, nome `AlunoTeste`, cole **AlunoTeste.gs** (é diferente do arquivo `Teste`, que continua lá) |
+| `Codigo`, `Ciclos`, `Grupos`, `Recuperacao`, `Relatorios`, `RelatoriosJogos` | apague tudo e cole as novas versões (.gs) |
+| `Aluno`, `Caso`, `CasoMotor`, `Professor`, `ProfAlunoTeste`, `ProfRelatorios` | apague tudo e cole as novas versões (.html) |
+
+Depois: **Salvar** → **Implantar → Gerenciar implantações → ✏️ → Versão: Nova versão → Implantar** → **F5**.
+
+## Como usar
+1. Aba **Aluno teste** → cartão **🧪 Entrar como Aluno Teste** → **Aluno Teste 6º, 7º, 8º ou 9º ↗**. Abre o app do aluno numa nova aba, com a **sua conta**, e uma faixa amarela no topo ("Você está como Aluno Teste 7º · Sair do Aluno Teste").
+2. Na primeira vez, o app cria sozinho as turmas **TESTE 6º… TESTE 9º** e os 4 alunos (e-mails fictícios `aluno.teste.N@teste.invalid`, que não são contas Google).
+3. **Tudo grava de verdade:** entregas de TDA (você corrige à mão ou com IA na turma TESTE da série), recuperação completa (com **🔄 Zerar recuperação** para repetir), questionários, casos e ciclos (crie um ciclo para a turma TESTE), Meu reforço e tarefas diárias.
+4. Só a sua conta de professor consegue entrar como Aluno Teste, e só nesses 4 alunos.
+
+## Onde ele aparece e onde fica de fora
+- **Aparece:** TDAs, correção com IA, recuperação, jogos (ciclos e resultados), entregas diárias, Habilidades e as abas Turmas e Alunos.
+- **Fica de fora:** cadastro de alunos (as turmas TESTE não aparecem nem são aceitas), relatórios, exportação, relatórios de jogos, médias e níveis somados, formação de grupos e o total de "alunos cadastrados".
+
+O link de demonstração para colegas (`?modo=teste`, mais abaixo) continua igual: não grava nada.
+
+---
+
 # 🤖 Correção de TDA com apoio da IA (opcional)
 
 **Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**

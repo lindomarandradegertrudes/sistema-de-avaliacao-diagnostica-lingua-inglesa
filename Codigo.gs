@@ -163,6 +163,9 @@ function comTrava_(fn) {
 // ============================================================
 
 function usuarioAtual_() {
+  // Professor usando o Aluno Teste (AlunoTeste.gs): nesta execução, age como o aluno de teste.
+  // (typeof: se o arquivo AlunoTeste não estiver instalado, o app segue normal.)
+  if (typeof PERSONIFICADO_ !== 'undefined' && PERSONIFICADO_) return PERSONIFICADO_;
   return String(Session.getActiveUser().getEmail() || '').toLowerCase().trim();
 }
 
@@ -181,6 +184,7 @@ function exigirProfessor_() {
 
 function validarAluno_(email, cfg) {
   if (!email) throw new Error('Não foi possível identificar sua conta. Entre com a sua conta Google da escola.');
+  if (typeof PERSONIFICADO_ !== 'undefined' && PERSONIFICADO_ && email === PERSONIFICADO_) return;
   const dominio = String(cfg.dominio || '').replace(/^@/, '').toLowerCase().trim();
   if (dominio && !email.endsWith('@' + dominio)) {
     throw new Error('Use a sua conta Google da escola (@' + dominio + '). Você entrou como ' + email + '.');
@@ -196,19 +200,23 @@ function doGet(e) {
     const email = usuarioAtual_();
     const caso = e && e.parameter ? String(e.parameter.caso || '') : '';
     const modoTeste = !!(e && e.parameter && e.parameter.modo === 'teste');
+    // ?como=7: o professor abre o app como o Aluno Teste do 7º (grava resultados; só para professores).
+    const como = e && e.parameter && /^[6-9]$/.test(String(e.parameter.como || '')) && ehProfessor_(email) ? String(e.parameter.como) : '';
     if (caso) {
       // Tela do jogo (caso investigativo), em página própria.
       const tc = HtmlService.createTemplateFromFile('Caso');
       tc.casoId = caso.replace(/[^\w-]/g, '');
       tc.appUrl = ScriptApp.getService().getUrl() + (modoTeste ? '?modo=teste' : '');
+      tc.como = como;
       return tc.evaluate().setTitle('English Learning App – Missions')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1');
     }
     // ?modo=teste abre a tela do aluno em modo de demonstração (qualquer conta da escola, inclusive professores).
-    const pagina = !modoTeste && ehProfessor_(email) ? 'Professor' : 'Aluno';
+    const pagina = !modoTeste && !como && ehProfessor_(email) ? 'Professor' : 'Aluno';
     const t = HtmlService.createTemplateFromFile(pagina);
     t.email = email;
     t.modoTeste = modoTeste ? '1' : '';
+    t.como = como;
     // ?rec=<id da TDA>: vindo do fim dos treinos da recuperação, abre direto as 10 atividades.
     t.rec = e && e.parameter ? String(e.parameter.rec || '').replace(/[^\w-]/g, '') : '';
     return t.evaluate()
@@ -245,7 +253,8 @@ function validarNome_(nome) {
 }
 
 function validarTurma_(turma) {
-  const ok = listarTurmas_().some(function (t) { return t.turma === turma; });
+  // As turmas TESTE (Aluno Teste do professor) não aceitam cadastro nem mudança de turma.
+  const ok = turmasReais_().some(function (t) { return t.turma === turma; });
   if (!ok) throw new Error('Turma inválida.');
 }
 
@@ -261,7 +270,7 @@ function alunoObterEstado() {
   return {
     email: email,
     cadastroAberto: String(cfg.cadastro_aberto).toUpperCase() !== 'NÃO' && String(cfg.cadastro_aberto).toUpperCase() !== 'NAO',
-    turmas: listarTurmas_(),
+    turmas: turmasReais_(),
     aluno: aluno ? { nome: aluno.nome, turma: String(aluno.turma) } : null,
     grupo: aluno ? grupoDoAluno_(email, String(aluno.turma)) : null,
     questionarios: aluno ? pendentesDoAluno_(email, String(aluno.turma)) : [],
@@ -321,7 +330,7 @@ function profResumo() {
   return {
     turmas: turmas,
     series: SERIES,
-    totalAlunos: alunos.length,
+    totalAlunos: alunos.filter(function (a) { return !ehEmailAlunoTeste_(a.email); }).length,
     maxPorTurma: MAX_ALUNOS_TURMA,
     link: ScriptApp.getService().getUrl(),
     temChaveApi: !!PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY'),

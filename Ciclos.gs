@@ -176,7 +176,7 @@ function emailsDaTurma_(turma) {
 /** Ciclos como "avaliações" para os relatórios (evolução, exportação). */
 function questionariosComCiclos_() {
   return lerQuestionarios_().concat(lerCiclos_().map(function (c) {
-    return { id: c.id, tipo: 'jogos', serie: c.serie, mes: c.mes, titulo: c.titulo, questoes: [], tda: null, status: c.status };
+    return { id: c.id, tipo: 'jogos', serie: c.serie, mes: c.mes, titulo: c.titulo, questoes: [], tda: null, status: c.status, turma: c.turma };
   }));
 }
 

@@ -91,7 +91,11 @@
     }
   </style>
 </head>
-<body data-teste="<?= modoTeste ?>" data-rec="<?= rec ?>">
+<body data-teste="<?= modoTeste ?>" data-rec="<?= rec ?>" data-como="<?= como ?>">
+  <div id="faixa-como" hidden style="position:sticky;top:0;z-index:50;background:#fff3bf;border-bottom:2px solid #f59f00;padding:8px 16px;font-size:.92rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <span style="flex:1">🧪 Você está como <strong id="faixa-como-nome"></strong>: tudo é gravado de verdade (fora das médias e dos relatórios).</span>
+    <a class="btn mini" id="faixa-como-sair" target="_top">Sair do Aluno Teste</a>
+  </div>
   <header class="topo">
     <div class="marca">English Learning App</div>
     <div class="suave pequeno"><?= email ?></div>
@@ -328,7 +332,12 @@
      * se o servidor demorou mais, a abertura é bloqueada sem erro. Por isso o botão vira um link
      * "START ›": se a abertura automática falhar, um toque (clique novo) leva ao treino.
      */
+    // Aluno Teste do professor (?como=7): as chamadas passam por comoAlunoTeste e os links levam o parâmetro junto.
+    const COMO = document.body.dataset.como || '';
+    const comComo = (url) => (COMO && url ? url + (url.indexOf('?') === -1 ? '?' : '&') + 'como=' + COMO : url);
+
     function irParaTreino(botao, url) {
+      url = comComo(url);
       const a = document.createElement('a');
       a.className = botao.className;
       a.href = url;
@@ -345,7 +354,11 @@
         fn = MAPA_TESTE[fn];
       }
       // Fila na trava do servidor ("Tempo limite do bloqueio"): nada foi gravado; espera um pouco e tenta de novo (até 3 vezes).
-      const tentar = (n) => new Promise((ok, falha) => google.script.run.withSuccessHandler(ok).withFailureHandler(falha)[fn](...args))
+      const executar = (ok, falha) => {
+        const r = google.script.run.withSuccessHandler(ok).withFailureHandler(falha);
+        if (COMO) r.comoAlunoTeste(COMO, fn, args); else r[fn](...args);
+      };
+      const tentar = (n) => new Promise(executar)
         .catch((e) => {
           if (n >= 3 || !/bloqueio|lock/i.test(String(e && e.message))) throw e;
           return new Promise((ok) => setTimeout(ok, 1500 + Math.random() * 3500)).then(() => tentar(n + 1));
@@ -504,7 +517,7 @@
       const p = m.patente;
       const SIT = { nova: 'Nova', andamento: 'Em andamento', concluida: 'Concluída', bloqueada: 'Bloqueada' };
       const BOTAO = { nova: 'PLAY', andamento: 'CONTINUE', concluida: 'OPEN' };
-      const link = (id) => `${esc(app)}?caso=${encodeURIComponent(id)}`;
+      const link = (id) => esc(comComo(`${app}?caso=${encodeURIComponent(id)}`));
       const estrelas = (n) => (n ? '★'.repeat(n) + '☆'.repeat(3 - n) : '');
       const dataBr = (iso) => { const [a, mm, d] = String(iso || '').split('-'); return d ? `${d}/${mm}` : ''; };
       const linhaCaso = (c, extra) => `
@@ -1296,7 +1309,12 @@
         else renderTda(t);
       }).catch(() => { /* sem acesso à TDA: fica no painel */ });
     }
+    if (COMO) {
+      $('faixa-como').hidden = false;
+      $('faixa-como-nome').textContent = 'Aluno Teste ' + COMO + 'º';
+    }
     chamar('alunoObterEstado').then((estado) => {
+      if (COMO) $('faixa-como-sair').href = estado.appUrl;
       // Se as atividades (ou a TDA) já abriram, só guarda o painel para quando o aluno voltar.
       if (recInicial.aberto) estadoAtual = estado; else render(estado);
     }).catch((e) => mostrarErro(e.message));

@@ -56,13 +56,14 @@ function profRelatorioGeral() {
   exigirProfessor_();
   const cfg = lerConfig_();
   const niveis = calcularNiveis_(cfg);
-  const alunos = lerTabela_('Alunos');
-  const questionarios = questionariosComCiclos_();
-  const respostas = lerRespostas_();
+  // Relatórios só com turmas reais: o Aluno Teste (turmas TESTE) fica de fora.
+  const alunos = lerTabela_('Alunos').filter(function (a) { return !ehEmailAlunoTeste_(a.email); });
+  const questionarios = questionariosComCiclos_().filter(function (q) { return !ehTurmaTeste_(q.turma); });
+  const respostas = lerRespostas_().filter(function (r) { return !ehEmailAlunoTeste_(r.email); });
   const mesDe = {};
   questionarios.forEach(function (q) { mesDe[q.id] = q.mes; });
 
-  const turmas = listarTurmas_().map(function (t) {
+  const turmas = turmasReais_().map(function (t) {
     const daTurma = alunos.filter(function (a) { return String(a.turma) === t.turma; })
       .map(function (a) { return niveis[String(a.email).toLowerCase()]; });
     const avaliados = daTurma.filter(Boolean);
@@ -146,7 +147,8 @@ function profExportarPlanilha() {
   const cfg = lerConfig_();
   const geral = profRelatorioGeral();
   const niveis = calcularNiveis_(cfg);
-  const questionarios = questionariosComCiclos_().sort(function (a, b) { return a.mes.localeCompare(b.mes) || a.serie.localeCompare(b.serie); });
+  const questionarios = questionariosComCiclos_().filter(function (q) { return !ehTurmaTeste_(q.turma); })
+    .sort(function (a, b) { return a.mes.localeCompare(b.mes) || a.serie.localeCompare(b.serie); });
   const respostas = lerRespostas_();
   const agora = Utilities.formatDate(new Date(), FUSO, 'dd/MM/yyyy HH:mm');
 
@@ -169,7 +171,7 @@ function profExportarPlanilha() {
 
   // Alunos: uma coluna por questionário da série.
   const abaAlunos = ss.insertSheet('Alunos');
-  const alunos = lerTabela_('Alunos').sort(function (a, b) {
+  const alunos = lerTabela_('Alunos').filter(function (a) { return !ehEmailAlunoTeste_(a.email); }).sort(function (a, b) {
     return String(a.turma).localeCompare(String(b.turma)) || String(a.nome).localeCompare(String(b.nome), 'pt-BR');
   });
   const titulos = questionarios.map(function (q) { return q.titulo; });

@@ -1,5 +1,15 @@
 <!-- Aba "Aluno teste": link de demonstração para colegas e direção (incluída em Professor.html) -->
 <section id="aba-alunoteste" class="pilha" hidden>
+  <div class="cartao pilha" style="border:2px solid #f59f00">
+    <h2 style="margin:0">🧪 Entrar como Aluno Teste <span class="suave pequeno">(só você · grava resultados)</span></h2>
+    <p class="suave pequeno" style="margin:0">
+      Abre o app do aluno com a <strong>sua conta</strong>, como o Aluno Teste da série. Tudo é gravado de verdade: entregas de TDA (que você corrige),
+      recuperação (com "🔄 Zerar recuperação"), questionários, casos e ciclos, Meu reforço e tarefas diárias. Cada um fica na turma <strong>TESTE</strong> da série.
+      Para jogos com nota, crie um ciclo para a turma TESTE.
+    </p>
+    <div class="linha" style="gap:8px;flex-wrap:wrap" id="at-como"></div>
+  </div>
+
   <div class="cartao pilha">
     <div class="linha">
       <h2 style="margin:0">🧪 Aluno teste</h2>
@@ -54,6 +64,8 @@
   async function carregarAlunoTeste() {
     at.dados = await chamar('profAlunoTeste');
     renderAlunoTeste();
+    const links = await chamar('profLinksAlunoTeste');
+    $('at-como').innerHTML = links.map((l) => `<a class="btn primario" href="${esc(l.link)}" target="_blank" rel="noopener">${esc(l.nome)} ↗</a>`).join('');
   }
 
   function configurarAlunoTeste() {

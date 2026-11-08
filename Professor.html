@@ -400,10 +400,11 @@
     });
 
     // ---------- Alunos ----------
-    function opcoesTurma(incluirTodas) {
+    // semTeste: sem as turmas TESTE do Aluno Teste (para relatórios).
+    function opcoesTurma(incluirTodas, semTeste) {
       const r = estado.resumo;
       return (incluirTodas ? '<option value="">Todas as turmas</option>' : '') +
-        r.series.map((s) => `<optgroup label="${esc(s)} ano">${r.turmas.filter((t) => t.serie === s)
+        r.series.map((s) => `<optgroup label="${esc(s)} ano">${r.turmas.filter((t) => t.serie === s && !(semTeste && /^TESTE \d/.test(t.turma)))
           .map((t) => `<option value="${esc(t.turma)}">${esc(t.turma)}</option>`).join('')}</optgroup>`).join('');
     }
 
