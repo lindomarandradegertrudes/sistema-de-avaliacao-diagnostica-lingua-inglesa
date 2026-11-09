@@ -96,6 +96,8 @@ O Tutor IA (Gemini) e a reescrita foram retirados: a rede bloqueia IA para os al
 6. **Acompanhar:** **↻ Atualizar** no painel mostra treinos (✅/⚠️), atividades (📝 7/10), saídas da tela (🚪) e a **Nota final**.
 7. **Nota:** vale a **maior** entre a TDA e a recuperação. Níveis, relatórios e planilha já usam essa nota; a correção da TDA continua mostrando a original. Uma recuperação por TDA.
 
+**↩ Reabrir atividades:** se a liberação acabou (ou você encerrou) antes de o aluno responder as 10 questões, aparece este botão ao lado dele. As respostas já dadas continuam valendo, a nota da recuperação fica em aberto e, depois de **▶ Liberar agora**, ele faz só as que faltaram. Pode reabrir quantas vezes precisar; quem respondeu as 10 não pode ser reaberto.
+
 **Tirar indicação** só funciona antes de o aluno começar. Apagar a correção da TDA tira a indicação de quem ainda não começou.
 
 ## Relatórios

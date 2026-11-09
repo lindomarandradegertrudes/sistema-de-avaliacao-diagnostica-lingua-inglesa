@@ -71,7 +71,8 @@ function avaliacaoPublica_(r) {
   const a = r.dados && r.dados.avaliacao;
   if (!a) return null;
   return { iniciada_em: a.iniciada_em, respondidas: a.respostas.length, total: a.questoes.length,
-    acertos: a.concluida_em ? a.acertos : null, concluida: !!a.concluida_em, motivo: a.motivo || '', saidas: a.saidas || null };
+    acertos: a.concluida_em ? a.acertos : null, concluida: !!a.concluida_em, motivo: a.motivo || '', saidas: a.saidas || null,
+    reaberta: !!a.reaberta, reaberturas: a.reaberturas || 0 };
 }
 
 /** { email: situação } da recuperação de uma TDA (para o painel do professor). */
@@ -159,6 +160,7 @@ function profLiberarRecuperacao(id, emails) {
       // Atividades interrompidas numa liberação anterior ficam fechadas (o que faltou vale zero).
       if (fecharAvaliacaoVencida_(r, Date.now())) { gravarRecuperacao_(r); return; }
       if (r.dados.concluida_em) return;
+      if (r.dados.avaliacao && r.dados.avaliacao.reaberta) delete r.dados.avaliacao.reaberta; // reaberta: agora volta a valer o tempo
       r.liberado_ate = ate;
       gravarRecuperacao_(r);
     });
@@ -469,7 +471,8 @@ function concluirAvaliacaoRec_(r, motivo) {
 /** Liberação acabou (1 hora ou "Encerrar") com a avaliação no meio: fecha valendo o que foi respondido. */
 function fecharAvaliacaoVencida_(r, agora) {
   const a = r.dados && r.dados.avaliacao;
-  if (!a || a.concluida_em || r.liberado_ate > agora) return false;
+  // Reaberta pelo professor e ainda não liberada de novo: espera a liberação (não fecha).
+  if (!a || a.concluida_em || a.reaberta || r.liberado_ate > agora) return false;
   concluirAvaliacaoRec_(r, 'tempo');
   return true;
 }
@@ -484,7 +487,7 @@ function recuperacoesAtualizadas_(id, email, travado) {
   };
   const agora = Date.now();
   const lista = lerRecuperacoes_().filter(filtro);
-  if (!lista.some(function (r) { return r.dados.avaliacao && !r.dados.avaliacao.concluida_em && !(r.liberado_ate > agora); })) return lista;
+  if (!lista.some(function (r) { return r.dados.avaliacao && !r.dados.avaliacao.concluida_em && !r.dados.avaliacao.reaberta && !(r.liberado_ate > agora); })) return lista;
   return travado ? fechar() : comTrava_(fechar);
 }
 
@@ -607,6 +610,36 @@ function textoTreinosRec_(treinos) {
   return treinos.map(function (h) {
     return h.nome + ' ' + (h.atingiu ? '✅ ' + h.melhor : h.encerrado ? '⚠️ ' + h.melhor + ' (não atingiu 70%)' : h.melhor != null ? h.melhor + ' (1ª tentativa)' : '—');
   }).join(' · ');
+}
+
+// ============================================================
+// Reabrir as 10 atividades de quem foi interrompido
+// ============================================================
+
+/**
+ * A liberação acabou (ou o professor encerrou) antes das 10 respostas: reabre as atividades.
+ * As respostas já dadas continuam valendo; o aluno faz só as que faltaram, quando o professor liberar de novo.
+ */
+function profReabrirAvaliacaoRec(id, email) {
+  exigirProfessor_();
+  buscarTda_(id);
+  email = String(email || '').toLowerCase();
+  comTrava_(function () {
+    const r = lerRecuperacoes_().filter(function (x) { return x.questionario_id === id && x.email === email; })[0];
+    const a = r && r.dados && r.dados.avaliacao;
+    if (!a || !a.concluida_em || a.motivo !== 'tempo' || a.respostas.length >= a.questoes.length) {
+      throw new Error('Só dá para reabrir as atividades de quem foi interrompido antes de responder as 10 questões.');
+    }
+    delete a.concluida_em;
+    delete a.acertos;
+    delete a.motivo;
+    a.reaberta = true;
+    a.reaberturas = (a.reaberturas || 0) + 1;
+    delete r.dados.nota;
+    delete r.dados.concluida_em;
+    gravarRecuperacao_(r);
+  });
+  return profTdaResultados(id);
 }
 
 // ============================================================

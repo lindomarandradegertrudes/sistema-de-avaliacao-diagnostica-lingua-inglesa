@@ -389,17 +389,20 @@
         : h.encerrado ? '<strong style="color:#c92a2a">⚠️ ' + h.melhor + ' (não atingiu 70%)</strong>'
         : h.feitas ? h.melhor + ' (1ª tentativa)' : h.tentativas ? 'treinando' : '—')).join(' · ') + '</span>';
     };
-    const atividades = (r) => {
+    const atividades = (r, email) => {
       const a = r.avaliacao;
       if (!a) return '';
       const saidas = a.saidas && a.saidas.vezes ? ` · <span title="Saídas da tela">🚪 ${a.saidas.vezes}× (${a.saidas.segundos} s)</span>` : '';
-      return '<br>📝 ' + (a.concluida ? `<strong>${a.acertos}/${a.total}</strong>${a.motivo === 'tempo' ? ' (tempo acabou; o que faltou valeu zero)' : ''}`
-        : `respondendo: ${a.respondidas}/${a.total}`) + saidas;
+      const reabrir = a.concluida && a.motivo === 'tempo' && a.respondidas < a.total
+        ? ` <button class="btn mini" data-rec-reabrir="${esc(email)}" title="Reabre as questões que faltaram; depois libere com ▶ Liberar agora">↩ Reabrir atividades</button>` : '';
+      return '<br>📝 ' + (a.concluida ? `<strong>${a.acertos}/${a.total}</strong>${a.motivo === 'tempo' ? ` (interrompida com ${a.respondidas}/${a.total} respondidas; o que faltou valeu zero)` : ''}`
+        : a.reaberta ? `<strong style="color:#e67700">↩ reaberta: ${a.respondidas}/${a.total} respondidas · libere para ele continuar</strong>`
+        : `respondendo: ${a.respondidas}/${a.total}`) + (a.reaberturas ? ` <span class="suave">(reaberta ${a.reaberturas}×)</span>` : '') + saidas + reabrir;
     };
-    const situacao = (r) => !r ? '<span class="suave">—</span>'
+    const situacao = (r, email) => !r ? '<span class="suave">—</span>'
       : (r.nota != null ? '✅ Concluída'
       : r.liberada ? `<strong style="color:#2b8a3e">🟢 Liberada até ${esc(r.ate)}</strong>`
-      : r.iniciada ? 'Começou (aguardando nova liberação)' : 'Indicado') + treinos(r) + atividades(r);
+      : r.iniciada ? 'Começou (aguardando nova liberação)' : 'Indicado') + treinos(r) + atividades(r, email);
     const final = (a, r) => r && r.nota != null ? `<strong>${nota10(Math.max(a.correcao.percentual, r.nota * 10))}</strong>` : '<span class="suave">—</span>';
     const pac = d.pacoteRec;
     $('tda-rec').innerHTML = `
@@ -425,7 +428,7 @@
         <thead><tr><th><input type="checkbox" id="rec-todos" style="width:auto" title="Marcar todos"></th><th>Aluno</th><th>Nota da TDA</th><th>Recuperação</th><th>Nota final</th></tr></thead>
         <tbody>${alunos.map((a) => `<tr>
           <td><input type="checkbox" data-rec="${esc(a.email)}" style="width:auto"></td>
-          <td>${esc(a.nome)}</td><td>${nota10(a.correcao.percentual)}</td><td>${situacao(recs[a.email])}${recs[a.email] && /teste/i.test(a.nome)
+          <td>${esc(a.nome)}</td><td>${nota10(a.correcao.percentual)}</td><td>${situacao(recs[a.email], a.email)}${recs[a.email] && /teste/i.test(a.nome)
             ? `<br><button class="btn mini perigo" data-rec-zerar="${esc(a.email)}" title="Só para alunos de teste: apaga a recuperação para testar de novo">🔄 Zerar recuperação</button>` : ''}</td><td>${final(a, recs[a.email])}</td></tr>`).join('')}</tbody>
       </table></div>
       <div class="linha" style="gap:8px;flex-wrap:wrap;margin-top:10px">
@@ -670,6 +673,16 @@
       if (ev.target.id === 'rec-todos') document.querySelectorAll('#tda-rec [data-rec]').forEach((c) => (c.checked = ev.target.checked));
     });
     $('tda-rec').addEventListener('click', (ev) => {
+      const ra = ev.target.closest('button[data-rec-reabrir]');
+      if (ra) {
+        if (!confirm('Reabrir as atividades deste aluno? As respostas já dadas continuam valendo e a nota da recuperação fica em aberto até ele terminar. Depois, libere com "▶ Liberar agora".')) return;
+        comBotao(ra, async () => {
+          tdaEstado.dados = await chamar('profReabrirAvaliacaoRec', tdaEstado.dados.questionario.id, ra.dataset.recReabrir);
+          renderTda();
+          avisar('Atividades reabertas. Marque o aluno e clique em "▶ Liberar agora" para ele continuar.');
+        });
+        return;
+      }
       const z = ev.target.closest('button[data-rec-zerar]');
       if (z) {
         if (!confirm('Zerar a recuperação deste aluno de teste? Apaga a indicação, os treinos, as atividades e a nota da recuperação desta TDA.')) return;
