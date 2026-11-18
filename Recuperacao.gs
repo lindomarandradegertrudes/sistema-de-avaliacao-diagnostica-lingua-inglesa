@@ -454,7 +454,7 @@ function sortearAvaliacaoRec_(itens) {
   return embaralhar_(escolhidas).map(function (x) {
     const ordem = embaralhar_(x.opcoes.map(function (_, k) { return k; }));
     return { tipo: x.tipo, hab: x.hab, contexto: x.contexto, enunciado: x.enunciado,
-      opcoes: ordem.map(function (k) { return x.opcoes[k]; }), certa: ordem.indexOf(x.certa) };
+      opcoes: ordem.map(function (k) { return x.opcoes[k]; }), certa: ordem.indexOf(x.certa), porque: x.porque || '' };
   });
 }
 
@@ -495,9 +495,44 @@ function recuperacoesAtualizadas_(id, email, travado) {
 function visaoAvaliacaoRec_(r) {
   const a = r.dados.avaliacao;
   const base = { total: a.questoes.length, respondidas: a.respostas.length, ate: Utilities.formatDate(new Date(r.liberado_ate), FUSO, 'HH:mm') };
-  if (a.concluida_em) return Object.assign(base, { fim: true, acertos: a.acertos, nota: r.dados.nota, motivo: a.motivo });
+  // Terminou: o aluno já vê a correção de cada questão.
+  if (a.concluida_em) return Object.assign(base, { fim: true, acertos: a.acertos, nota: r.dados.nota, motivo: a.motivo, correcao: respostasAvaliacaoRec_(r) });
   const x = a.questoes[a.respostas.length];
   return Object.assign(base, { questao: { numero: a.respostas.length + 1, tipo: x.tipo, contexto: x.contexto, enunciado: x.enunciado, opcoes: x.opcoes } });
+}
+
+/**
+ * As questões da avaliação com o que o aluno marcou, a resposta certa, a explicação e a habilidade.
+ * marcada: índice da opção (null = não respondida, quando a liberação acabou antes).
+ */
+function respostasAvaliacaoRec_(r) {
+  const a = r.dados && r.dados.avaliacao;
+  if (!a) return [];
+  // Avaliações sorteadas antes de a explicação ser guardada: busca no pacote pela mesma questão.
+  let pacote = null;
+  const porqueDe = function (x) {
+    if (x.porque) return x.porque;
+    pacote = pacote || lerPacoteRec_(r.questionario_id) || { itens: [] };
+    const igual = pacote.itens.filter(function (p) { return p.enunciado === x.enunciado && p.contexto === x.contexto; })[0];
+    return igual ? igual.porque || '' : '';
+  };
+  return a.questoes.map(function (x, k) {
+    const resp = a.respostas[k];
+    return { numero: k + 1, tipo: x.tipo, hab: x.hab, habNome: nomeHabilidade_(x.hab).replace(/^Base: /, ''), contexto: x.contexto, enunciado: x.enunciado,
+      opcoes: x.opcoes, certa: x.certa, marcada: resp ? resp.o : null, ok: !!(resp && resp.ok), porque: porqueDe(x) };
+  });
+}
+
+/** Para o professor: as respostas de um aluno na recuperação (também as parciais). */
+function profRespostasRecuperacao(id, email) {
+  exigirProfessor_();
+  buscarTda_(id);
+  email = String(email || '').toLowerCase();
+  const r = recuperacoesAtualizadas_(id, email)[0];
+  if (!r || !r.dados.avaliacao) throw new Error('Este aluno ainda não começou as 10 atividades.');
+  const a = r.dados.avaliacao;
+  return { nome: nomesPorEmail_()[email] || email, respondidas: a.respostas.length, total: a.questoes.length,
+    acertos: a.respostas.filter(function (x) { return x.ok; }).length, concluida: !!a.concluida_em, questoes: respostasAvaliacaoRec_(r) };
 }
 
 function exigirAvaliacaoAberta_(qid, email, travado) {

@@ -52,6 +52,16 @@
   <div id="tda-rec" class="cartao" style="margin-top:14px"></div>
 </div>
 
+<dialog id="modal-rec-resp" style="width:min(760px, calc(100vw - 32px))">
+  <div class="linha" style="margin-bottom:6px">
+    <h2 style="margin:0" id="rr-titulo">Respostas</h2>
+    <span class="espaco"></span>
+    <button class="btn" type="button" id="rr-fechar">Fechar</button>
+  </div>
+  <p class="suave pequeno" id="rr-resumo" style="margin:0 0 8px"></p>
+  <div id="rr-corpo" style="max-height:70vh;overflow-y:auto"></div>
+</dialog>
+
 <dialog id="modal-tda" style="width:min(900px, calc(100vw - 32px))">
   <div class="linha" style="margin-bottom:8px">
     <h2 style="margin:0" id="mt-titulo">Corrigir</h2>
@@ -395,9 +405,10 @@
       const saidas = a.saidas && a.saidas.vezes ? ` · <span title="Saídas da tela">🚪 ${a.saidas.vezes}× (${a.saidas.segundos} s)</span>` : '';
       const reabrir = a.concluida && a.motivo === 'tempo' && a.respondidas < a.total
         ? ` <button class="btn mini" data-rec-reabrir="${esc(email)}" title="Reabre as questões que faltaram; depois libere com ▶ Liberar agora">↩ Reabrir atividades</button>` : '';
+      const verResp = a.respondidas ? ` <button class="btn mini" data-rec-respostas="${esc(email)}">👁 Ver respostas</button>` : '';
       return '<br>📝 ' + (a.concluida ? `<strong>${a.acertos}/${a.total}</strong>${a.motivo === 'tempo' ? ` (interrompida com ${a.respondidas}/${a.total} respondidas; o que faltou valeu zero)` : ''}`
         : a.reaberta ? `<strong style="color:#e67700">↩ reaberta: ${a.respondidas}/${a.total} respondidas · libere para ele continuar</strong>`
-        : `respondendo: ${a.respondidas}/${a.total}`) + (a.reaberturas ? ` <span class="suave">(reaberta ${a.reaberturas}×)</span>` : '') + saidas + reabrir;
+        : `respondendo: ${a.respondidas}/${a.total}`) + (a.reaberturas ? ` <span class="suave">(reaberta ${a.reaberturas}×)</span>` : '') + saidas + verResp + reabrir;
     };
     const situacao = (r, email) => !r ? '<span class="suave">—</span>'
       : (r.nota != null ? '✅ Concluída'
@@ -439,6 +450,17 @@
         <span class="espaco"></span>
         <button class="btn mini" data-rec-acao="atualizar">↻ Atualizar</button>
       </div>` : '<p class="suave pequeno">Nenhum aluno desta turma com nota abaixo de 10 (só aparecem os já corrigidos).</p>'}`;
+  }
+
+  /** As questões da recuperação com a resposta do aluno (✔/✘), a certa, a explicação e a habilidade. */
+  function htmlRespostasRec(questoes) {
+    return questoes.map((x) => `<div class="cartao" style="margin-bottom:10px;padding:10px 12px;border-left:4px solid ${x.marcada == null ? '#adb5bd' : x.ok ? '#2b8a3e' : '#c92a2a'}">
+      <div class="pequeno suave">Questão ${x.numero} · ${esc(x.habNome)} · ${x.marcada == null ? 'não respondida (valeu zero)' : x.ok ? '✔ acertou' : '✘ errou'}</div>
+      ${x.contexto ? `<div class="pequeno" style="white-space:pre-wrap;margin:4px 0">${esc(x.contexto)}</div>` : ''}
+      <div><strong>${esc(x.enunciado)}</strong></div>
+      <ol type="A" style="margin:6px 0 0;padding-left:22px">${x.opcoes.map((o, k) => `<li style="${k === x.certa ? 'color:#2b8a3e;font-weight:600' : k === x.marcada ? 'color:#c92a2a' : ''}">${esc(o)}${k === x.certa ? ' ✔ resposta certa' : ''}${k === x.marcada && k !== x.certa ? ' ✘ marcada' : ''}${k === x.marcada && k === x.certa ? ' (marcada)' : ''}</li>`).join('')}</ol>
+      ${x.porque ? `<div class="pequeno" style="margin-top:4px">💡 ${esc(x.porque)}</div>` : ''}
+    </div>`).join('');
   }
 
   // ---------- Correção ----------
@@ -673,6 +695,17 @@
       if (ev.target.id === 'rec-todos') document.querySelectorAll('#tda-rec [data-rec]').forEach((c) => (c.checked = ev.target.checked));
     });
     $('tda-rec').addEventListener('click', (ev) => {
+      const vr = ev.target.closest('button[data-rec-respostas]');
+      if (vr) {
+        comBotao(vr, async () => {
+          const x = await chamar('profRespostasRecuperacao', tdaEstado.dados.questionario.id, vr.dataset.recRespostas);
+          $('rr-titulo').textContent = `Respostas de ${x.nome}`;
+          $('rr-resumo').textContent = `${x.acertos} acerto(s) em ${x.respondidas} respondida(s) de ${x.total}${x.concluida ? '' : ' · ainda não terminou'}.`;
+          $('rr-corpo').innerHTML = htmlRespostasRec(x.questoes);
+          $('modal-rec-resp').showModal();
+        });
+        return;
+      }
       const ra = ev.target.closest('button[data-rec-reabrir]');
       if (ra) {
         if (!confirm('Reabrir as atividades deste aluno? As respostas já dadas continuam valendo e a nota da recuperação fica em aberto até ele terminar. Depois, libere com "▶ Liberar agora".')) return;
@@ -761,6 +794,7 @@
     $('tda-imprimir').addEventListener('click', () => imprimirTda(tdaEstado.dados.questionario, false));
     $('tda-imprimir-rubrica').addEventListener('click', () => imprimirTda(tdaEstado.dados.questionario, true));
 
+    $('rr-fechar').addEventListener('click', () => $('modal-rec-resp').close());
     $('mt-rubrica').addEventListener('click', (ev) => {
       const td = ev.target.closest('td[data-crit]');
       if (!td) return;

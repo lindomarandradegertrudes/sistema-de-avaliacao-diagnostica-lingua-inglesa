@@ -167,6 +167,8 @@ function salvarAnexos_(q, arquivos, prefixo) {
 function alunoTdas_(email, turma) {
   const serie = serieDaTurma_(turma);
   const entregas = lerEntregas_();
+  const aberturas = lerAberturas_();
+  const agora = Date.now();
   const respostas = lerRespostas_().filter(function (r) { return r.email === email; });
   const recs = lerRecuperacoes_().filter(function (r) { return r.email === email; });
   return lerQuestionarios_()
@@ -174,15 +176,20 @@ function alunoTdas_(email, turma) {
     .map(function (q) {
       const corr = respostas.filter(function (r) { return r.questionario_id === q.id; })[0];
       const ent = entregas.filter(function (e) { return e.questionario_id === q.id && e.membros.indexOf(email) !== -1; })[0];
+      // TDA com tempo: só está aberta quando o professor abre para a turma (e fecha sozinha).
+      const ab = q.tempo ? aberturas[q.id + '|' + turma] : null;
+      const abertaAgora = q.status === 'aberto' && (!q.tempo || !!(ab && ab.aberto_ate > agora));
       return {
-        id: q.id, titulo: q.titulo, mes: q.mes, modo: q.tda.modo, aberta: q.status === 'aberto',
+        id: q.id, titulo: q.titulo, mes: q.mes, modo: q.tda.modo, aberta: abertaAgora,
+        comTempo: q.tempo > 0, aguardando: q.tempo > 0 && q.status === 'aberto' && !abertaAgora,
+        ate: abertaAgora && q.tempo ? Utilities.formatDate(new Date(ab.aberto_ate), FUSO, 'HH:mm') : '',
         situacao: corr ? 'corrigida' : ent ? 'enviada' : 'pendente',
         nota: corr ? corr.percentual : null,
         nota_tda: corr ? corr.percentual_tda : null,
         recuperacao: recs.some(function (r) { return r.questionario_id === q.id; }),
       };
     })
-    .filter(function (t) { return t.aberta || t.situacao !== 'pendente'; })
+    .filter(function (t) { return t.aberta || t.aguardando || t.situacao !== 'pendente'; })
     .sort(function (a, b) { return b.mes.localeCompare(a.mes); });
 }
 
@@ -201,8 +208,14 @@ function alunoAbrirTda(id) {
     });
   }
   const grupo = q.tda.modo === 'grupo' ? grupoAtualDoAluno_(aluno.email, aluno.turma) : null;
+  const ab = aberturaTda_(q, aluno.turma, 0);
+  const rasc = ab.comTempo ? lerRascunhoEntrega_(q.id, chaveRascunhoEntrega_(q, aluno)) : null;
   return {
-    id: q.id, titulo: q.titulo, aberta: q.status === 'aberto', modo: q.tda.modo, monitorar: q.monitorar, canva: canvaLiberado_(q),
+    id: q.id, titulo: q.titulo, aberta: ab.aberta, modo: q.tda.modo, monitorar: q.monitorar, canva: canvaLiberado_(q),
+    // Com tempo: até que horas está aberta, quanto falta e o rascunho salvo no servidor (continua de qualquer Chromebook).
+    comTempo: ab.comTempo, restanteMs: ab.restanteMs, ate: ab.ate,
+    rascunho: rasc && !rascunhoVazio_(rasc) ? { titulo: rasc.titulo, texto: rasc.formato === 'html' ? limparHtmlTda_(rasc.texto) : rasc.texto, formato: rasc.formato,
+      link: rasc.link, anexos: rasc.anexos.map(function (a) { return { id: a.id, nome: a.nome }; }), atualizado_em: rasc.atualizado_em, atualizado_por: rasc.atualizado_por } : null,
     situacao: q.tda.situacao, produto: q.tda.produto, tarefas: q.tda.tarefas, criterios: q.tda.criterios,
     // A rubrica só é mostrada ao aluno depois da correção, junto com os níveis que ele recebeu.
     rubrica: correcao ? q.tda.rubrica : null,
@@ -222,6 +235,9 @@ function alunoEnviarTda(id, dados) {
   const q = buscarTda_(id);
   if (q.serie !== serieDaTurma_(aluno.turma)) throw new Error('Esta TDA não é da sua série.');
   if (q.status !== 'aberto') throw new Error('Esta TDA não está mais recebendo entregas.');
+  if (q.tempo && !aberturaTda_(q, aluno.turma, TOLERANCIA_ENVIO_MS).aberta) throw new Error('A TDA não está aberta agora: o seu trabalho continua salvo para a próxima aula.');
+  const chaveRasc = q.tempo ? chaveRascunhoEntrega_(q, aluno) : '';
+  const rasc = q.tempo ? lerRascunhoEntrega_(q.id, chaveRasc) : null;
 
   const html = dados.formato === 'html';
   const texto = html ? limparHtmlTda_(dados.texto) : String(dados.texto || '').trim().slice(0, 20000);
@@ -253,7 +269,9 @@ function alunoEnviarTda(id, dados) {
     }
 
     // Bloqueado: os anexos já enviados antes ficam guardados.
-    const anexosMantidos = atual ? atual.anexos.filter(function (a) { return !liberado || manter.indexOf(a.id) !== -1; }) : [];
+    // Na TDA com tempo, os anexos do rascunho (já no Drive) também podem ser mantidos.
+    const disponiveis = (atual ? atual.anexos : []).concat(rasc ? rasc.anexos : []);
+    const anexosMantidos = disponiveis.filter(function (a) { return !liberado || manter.indexOf(a.id) !== -1; });
     if (anexosMantidos.length + novos.length > MAX_ANEXOS) throw new Error('Envie no máximo ' + MAX_ANEXOS + ' anexos.');
     if (!temTexto && !link && !anexosMantidos.length && !novos.length) throw new Error('Escreva sua resposta, cole um link ou anexe um arquivo.');
 
@@ -275,7 +293,119 @@ function alunoEnviarTda(id, dados) {
     if (atual) aba.getRange(atual._linha, 1, 1, linha.length).setValues([linha]);
     else aba.appendRow(linha);
   });
+  // Enviada: o rascunho do servidor fica vazio (a entrega passa a ser a versão em uso).
+  if (rasc) gravarRascunhoEntrega_(q.id, chaveRasc, { titulo: '', texto: '', formato: '', link: '', anexos: [] }, aluno.email);
   return alunoAbrirTda(id);
+}
+
+// ============================================================
+// TDA com tempo (aberta por turma) e rascunho salvo no servidor
+// ============================================================
+
+/** Situação da TDA para a turma: { comTempo, aberta, restanteMs, ate }. tolerancia (ms): salvar/enviar logo depois do fim. */
+function aberturaTda_(q, turma, tolerancia) {
+  if (q.status !== 'aberto') return { comTempo: q.tempo > 0, aberta: false, restanteMs: null, ate: '' };
+  if (!q.tempo) return { comTempo: false, aberta: true, restanteMs: null, ate: '' };
+  const a = lerAberturas_()[q.id + '|' + turma];
+  const agora = Date.now();
+  const aberta = !!(a && a.aberto_ate + (tolerancia || 0) > agora);
+  return { comTempo: true, aberta: aberta, restanteMs: aberta ? Math.max(0, a.aberto_ate - agora) : null,
+    ate: aberta ? Utilities.formatDate(new Date(a.aberto_ate), FUSO, 'HH:mm') : '' };
+}
+
+/** Dono do rascunho: o aluno (individual) ou o grupo ("g:turma:número"), igual à entrega. */
+function chaveRascunhoEntrega_(q, aluno) {
+  const atual = lerEntregas_().filter(function (e) { return e.questionario_id === q.id && e.membros.indexOf(aluno.email) !== -1; })[0];
+  if (atual) return atual.grupo != null ? 'g:' + atual.turma + ':' + atual.grupo : aluno.email;
+  if (q.tda.modo === 'grupo') {
+    const g = grupoAtualDoAluno_(aluno.email, aluno.turma);
+    if (g) return 'g:' + aluno.turma + ':' + g.numero;
+  }
+  return aluno.email;
+}
+
+function lerRascunhoEntrega_(qid, chave) {
+  garantirAba_('RascunhosEntrega');
+  const linhas = lerTabela_('RascunhosEntrega').filter(function (l) { return String(l.questionario_id) === qid && String(l.chave) === chave; });
+  const l = linhas[linhas.length - 1]; // se dois do grupo criaram ao mesmo tempo, vale a última
+  if (!l) return null;
+  let anexos = [];
+  try { anexos = JSON.parse(l.anexos_json || '[]'); } catch (e) { /* ignora */ }
+  return { _linha: l._linha, titulo: String(l.titulo || ''), texto: String(l.texto || ''), formato: String(l.formato || ''), link: String(l.link || ''),
+    anexos: anexos, atualizado_em: String(l.atualizado_em), atualizado_por: String(l.atualizado_por || '') };
+}
+
+function rascunhoVazio_(r) { return !r.titulo && !r.texto && !r.link && !r.anexos.length; }
+
+/**
+ * Grava o rascunho (cria ou atualiza a linha). Sem a trava única: cada rascunho é de um aluno ou grupo,
+ * as linhas nunca são apagadas (enviar só esvazia) e, no grupo, vale o último salvamento.
+ */
+function gravarRascunhoEntrega_(qid, chave, r, email) {
+  const atual = lerRascunhoEntrega_(qid, chave);
+  const linha = linhaDe_('RascunhosEntrega', {
+    questionario_id: qid, chave: chave, titulo: r.titulo, texto: r.texto, formato: r.formato, link: r.link,
+    anexos_json: JSON.stringify(r.anexos || []), atualizado_em: new Date(), atualizado_por: nomesPorEmail_()[email] || email,
+  });
+  const aba = garantirAba_('RascunhosEntrega');
+  if (atual) aba.getRange(atual._linha, 1, 1, linha.length).setValues([linha]);
+  else aba.appendRow(linha);
+}
+
+/** Confere que a TDA com tempo está aberta para a turma do aluno (com a tolerância de envio). */
+function tdaComTempoAberta_(id) {
+  const aluno = alunoAtual_();
+  const q = buscarTda_(id);
+  if (q.serie !== serieDaTurma_(aluno.turma)) throw new Error('Esta TDA não é da sua série.');
+  if (!q.tempo) throw new Error('Esta TDA não tem tempo de abertura.');
+  if (!aberturaTda_(q, aluno.turma, TOLERANCIA_ENVIO_MS).aberta) throw new Error('A TDA não está aberta agora: o rascunho não foi salvo.');
+  return { aluno: aluno, q: q };
+}
+
+/** Salvamento automático do texto, título e link (TDA com tempo). */
+function alunoSalvarRascunhoTda(id, dados) {
+  const x = tdaComTempoAberta_(id);
+  const q = x.q, aluno = x.aluno;
+  dados = dados || {};
+  const html = dados.formato === 'html';
+  const texto = html ? limparHtmlTda_(dados.texto) : String(dados.texto || '').trim().slice(0, 20000);
+  if (texto.length > 49000) throw new Error('O texto ficou muito longo para salvar. Divida em partes ou anexe um arquivo.');
+  const link = canvaLiberado_(q) ? String(dados.link || '').trim().slice(0, 500) : '';
+  const chave = chaveRascunhoEntrega_(q, aluno);
+  const atual = lerRascunhoEntrega_(q.id, chave);
+  gravarRascunhoEntrega_(q.id, chave, {
+    titulo: String(dados.titulo || '').replace(/\s+/g, ' ').trim().slice(0, 200), texto: html && !textoPuroTda_(texto) ? '' : texto,
+    formato: html ? 'html' : '', link: link, anexos: atual ? atual.anexos : [],
+  }, aluno.email);
+  return { salvo_em: Utilities.formatDate(new Date(), FUSO, 'HH:mm') };
+}
+
+/** Anexo escolhido: sobe na hora para a pasta da TDA no Drive e fica no rascunho. */
+function alunoAnexarRascunhoTda(id, arquivo) {
+  const x = tdaComTempoAberta_(id);
+  const q = x.q, aluno = x.aluno;
+  if (!canvaLiberado_(q)) throw new Error('Esta TDA não aceita anexos.');
+  const chave = chaveRascunhoEntrega_(q, aluno);
+  const atual = lerRascunhoEntrega_(q.id, chave) || { titulo: '', texto: '', formato: '', link: '', anexos: [] };
+  if (atual.anexos.length >= MAX_ANEXOS) throw new Error('No máximo ' + MAX_ANEXOS + ' anexos.');
+  const nomes = nomesPorEmail_();
+  const prefixo = aluno.turma + (chave.indexOf('g:') === 0 ? ' – Grupo ' + chave.split(':')[2] : ' – ' + (nomes[aluno.email] || aluno.email));
+  const novos = salvarAnexos_(q, [arquivo], prefixo);
+  // Relê depois do upload (o colega do grupo pode ter salvo enquanto o arquivo subia).
+  const r = lerRascunhoEntrega_(q.id, chave) || atual;
+  r.anexos = r.anexos.concat(novos).slice(0, MAX_ANEXOS);
+  gravarRascunhoEntrega_(q.id, chave, r, aluno.email);
+  return { anexos: r.anexos.map(function (a) { return { id: a.id, nome: a.nome }; }) };
+}
+
+function alunoRemoverAnexoRascunhoTda(id, anexoId) {
+  const x = tdaComTempoAberta_(id);
+  const chave = chaveRascunhoEntrega_(x.q, x.aluno);
+  const r = lerRascunhoEntrega_(x.q.id, chave);
+  if (!r) return { anexos: [] };
+  r.anexos = r.anexos.filter(function (a) { return a.id !== String(anexoId); });
+  gravarRascunhoEntrega_(x.q.id, chave, r, x.aluno.email);
+  return { anexos: r.anexos.map(function (a) { return { id: a.id, nome: a.nome }; }) };
 }
 
 // ============================================================

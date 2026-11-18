@@ -4,6 +4,26 @@ Faça tudo com a sua **conta institucional**.
 
 ---
 
+# ⏱ Abertura com tempo, por turma (questionários e TDAs)
+
+**Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
+
+| Arquivo no editor | O que fazer |
+|---|---|
+| `Codigo`, `Questionarios`, `Tda` | apague tudo e cole as novas versões (.gs) |
+| `Aluno`, `Professor`, `Manual` | apague tudo e cole as novas versões (.html) |
+
+Depois: **Salvar** → **Implantar → Gerenciar implantações → ✏️ → Versão: Nova versão → Implantar** → **F5**.
+
+## Como funciona
+1. **No editor** (questionário ou TDA): **⏱ Tempo de abertura (minutos)**. Os novos vêm com **60**; **0** = sem limite. Os que já existiam ficam sem limite até você mudar.
+2. **Na lista de questionários**, os que têm tempo mostram a situação de cada turma ("⏱ 60 min · 🟢 7A até 10:35") e o botão **▶ Abrir / encerrar por turma**: marque as turmas e clique em **▶ Abrir agora** (abre por N minutos a partir de agora) ou **■ Encerrar agora**. Pode reabrir numa outra aula. **Encerrar tudo** fecha de vez.
+3. **Questionário:** só os alunos das turmas abertas veem; eles têm a contagem regressiva e, quando o tempo acaba, o app **envia sozinho** o que foi marcado (em branco = erro). Quem já respondeu não responde de novo. O envio vale até 2 minutos depois do horário (internet lenta).
+4. **TDA:** fora do horário, o aluno vê "⏳ abre na aula". Aberta, o trabalho é **salvo no servidor** sozinho e os anexos sobem para o Drive na hora. Quando o tempo acaba, **nada é enviado**: o trabalho fica salvo e o aluno **continua na próxima abertura, de qualquer Chromebook**. Em grupo, o rascunho é um só para o grupo (vale o último salvamento).
+5. A planilha ganha a coluna **tempo_min** na aba Questionarios e as abas **Aberturas** e **RascunhosEntrega** (criadas sozinhas).
+
+---
+
 # 🧪 Aluno Teste do professor (grava resultados)
 
 **Antes de colar, deixe cada arquivo totalmente vazio (Ctrl+A, Delete).**
@@ -95,6 +115,8 @@ O Tutor IA (Gemini) e a reescrita foram retirados: a rede bloqueia IA para os al
    - **10 atividades (0 a 10):** 10 das 15 questões do pacote, sorteadas e com as opções embaralhadas para cada aluno. Uma resposta por questão, sem voltar, sem dicas, com monitor de saída de tela. Se a liberação acabar no meio, o que faltou vale zero.
 6. **Acompanhar:** **↻ Atualizar** no painel mostra treinos (✅/⚠️), atividades (📝 7/10), saídas da tela (🚪) e a **Nota final**.
 7. **Nota:** vale a **maior** entre a TDA e a recuperação. Níveis, relatórios e planilha já usam essa nota; a correção da TDA continua mostrando a original. Uma recuperação por TDA.
+
+**👁 Ver respostas:** ao lado de cada aluno que já respondeu alguma das 10 atividades, mostra cada questão com o que ele marcou (✔/✘), a resposta certa, a explicação e a habilidade. O aluno vê a mesma correção assim que termina (e depois pelo botão "👁 Ver as respostas" no cartão da recuperação).
 
 **↩ Reabrir atividades:** se a liberação acabou (ou você encerrou) antes de o aluno responder as 10 questões, aparece este botão ao lado dele. As respostas já dadas continuam valendo, a nota da recuperação fica em aberto e, depois de **▶ Liberar agora**, ele faz só as que faltaram. Pode reabrir quantas vezes precisar; quem respondeu as 10 não pode ser reaberto.
 

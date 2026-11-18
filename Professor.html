@@ -161,6 +161,10 @@
             <label for="ed-conteudo">Conteúdo do mês</label>
             <textarea id="ed-conteudo" rows="4" placeholder="Cole aqui o conteúdo/expectativas trabalhados (ex.: Simple past – verbos regulares; leitura de biografias; preposições in/on/at)."></textarea>
           </div>
+          <div class="campo" style="margin-top:14px">
+            <label for="ed-tempo">⏱ Tempo de abertura (minutos) <span class="suave pequeno">— você abre por turma e ele fecha sozinho; 0 = sem limite</span></label>
+            <input id="ed-tempo" type="number" min="0" max="600" step="5" style="max-width:140px">
+          </div>
           <label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;margin-top:14px">
             <input type="checkbox" id="ed-monitorar" style="width:auto;margin-top:4px">
             <span><strong>Monitorar saídas da tela</strong><br>
@@ -312,6 +316,20 @@
       <button class="btn" type="button" data-fechar>Fechar</button>
     </div>
     <div id="respostas-conteudo" style="max-height:70vh;overflow-y:auto"></div>
+  </dialog>
+
+  <dialog id="modal-abrir" style="width:min(480px, calc(100vw - 32px))">
+    <h2 style="margin-top:0">▶ Abrir por turma</h2>
+    <p style="margin:0"><strong id="ab-titulo"></strong></p>
+    <p class="suave pequeno">Abre agora, por <strong><span id="ab-tempo"></span> minutos</strong>, para as turmas marcadas; depois fecha sozinho.
+      Questionário: quem estiver respondendo quando o tempo acabar tem as marcações enviadas automaticamente (em branco conta como erro); quem já respondeu não responde de novo.
+      TDA: quando o tempo acaba, o trabalho fica salvo (não é enviado) e o aluno continua na próxima abertura, de qualquer Chromebook.</p>
+    <div id="ab-turmas"></div>
+    <div class="rodape-modal">
+      <button class="btn" type="button" id="ab-fechar">Fechar</button>
+      <button class="btn perigo" type="button" id="ab-encerrar">■ Encerrar agora</button>
+      <button class="btn primario" type="button" id="ab-abrir">▶ Abrir agora</button>
+    </div>
   </dialog>
 
   <dialog id="modal-json">
@@ -494,15 +512,22 @@
       $('q-tabela').innerHTML = lista.length ? lista.map((q) => {
         const acaoStatus = q.status === 'rascunho' ? ['aberto', 'Liberar para alunos']
           : q.status === 'aberto' ? ['encerrado', 'Encerrar'] : ['aberto', 'Reabrir'];
+        // Questionário com tempo: abre por turma (▶ Abrir) e fecha sozinho.
+        const comTempo = q.tempo > 0;
+        const abertas = comTempo ? (q.turmas || []).filter((t) => t.aberta) : [];
+        const situacaoTempo = comTempo ? `<div class="pequeno" style="margin-top:4px">⏱ ${q.tempo} min${abertas.length
+          ? ' · ' + abertas.map((t) => `<strong style="color:#2b8a3e">🟢 ${esc(t.turma)} até ${esc(t.ate)}</strong>`).join(' · ') : ' · nenhuma turma aberta agora'}</div>` : '';
         return `<tr>
           <td><strong>${esc(q.titulo)}</strong><div class="suave pequeno">${q.tipo === 'tda' ? (q.tda && q.tda.modo === 'grupo' ? 'em grupo' : 'individual') + ' · rubrica com ' + (q.tda ? q.tda.rubrica.length : 0) + ' critérios' : q.questoes.length + ' questões'}${q.monitorar === false ? ' · <span title="O aluno pode usar outros sites, sem aviso nem registro">sem monitoramento de tela</span>' : ''}</div></td>
           <td>${esc(q.serie)}</td>
           <td>${TIPOS[q.tipo] || esc(q.tipo)}</td>
           <td>${esc(q.mes)}</td>
-          <td><span class="selo ${esc(q.status)}">${STATUS[q.status] || esc(q.status)}</span></td>
+          <td><span class="selo ${esc(q.status)}">${STATUS[q.status] || esc(q.status)}</span>${situacaoTempo}</td>
           <td>${q.respostas}</td>
           <td class="acoes">
-            <button class="btn mini" data-acao="status" data-id="${q.id}" data-novo="${acaoStatus[0]}">${acaoStatus[1]}</button>
+            ${comTempo ? `<button class="btn mini primario" data-acao="abrir-turmas" data-id="${q.id}">▶ Abrir / encerrar por turma</button>
+              ${q.status !== 'rascunho' ? `<button class="btn mini" data-acao="status" data-id="${q.id}" data-novo="${q.status === 'aberto' ? 'encerrado' : 'rascunho'}">${q.status === 'aberto' ? 'Encerrar tudo' : 'Voltar a rascunho'}</button>` : ''}`
+              : `<button class="btn mini" data-acao="status" data-id="${q.id}" data-novo="${acaoStatus[0]}">${acaoStatus[1]}</button>`}
             <button class="btn mini" data-acao="resultados" data-id="${q.id}">Resultados</button>
             <button class="btn mini" data-acao="editar" data-id="${q.id}">Editar</button>
             <button class="btn mini perigo" data-acao="excluir" data-id="${q.id}">Excluir</button>
@@ -517,6 +542,7 @@
       if (!b) return;
       const q = estado.questionarios.find((x) => x.id === b.dataset.id);
       if (b.dataset.acao === 'editar') abrirEditor(q);
+      if (b.dataset.acao === 'abrir-turmas') abrirTurmasModal(q);
       if (b.dataset.acao === 'resultados') comBotao(b, () => (q.tipo === 'tda' ? abrirTda(q.id) : abrirResultados(q.id)));
       if (b.dataset.acao === 'status') {
         if (b.dataset.novo === 'aberto' && !confirm(`Liberar "${q.titulo}" para todos os alunos do ${q.serie} ano?`)) return;
@@ -538,6 +564,32 @@
         });
       }
     });
+
+    // ---------- Abrir / encerrar por turma (questionários com tempo) ----------
+    let questionarioTurmas = null;
+    function abrirTurmasModal(q) {
+      questionarioTurmas = q;
+      $('ab-titulo').textContent = q.titulo;
+      $('ab-tempo').textContent = q.tempo;
+      $('ab-turmas').innerHTML = (q.turmas || []).map((t) => `<label style="display:flex;gap:8px;align-items:center;font-weight:400;padding:4px 0">
+        <input type="checkbox" data-ab-turma="${esc(t.turma)}" style="width:auto">
+        <span style="flex:1">${esc(t.turma)}</span>
+        <span class="pequeno">${t.aberta ? `<strong style="color:#2b8a3e">🟢 aberta até ${esc(t.ate)}</strong>` : '<span class="suave">fechada</span>'}</span></label>`).join('');
+      $('modal-abrir').showModal();
+    }
+    async function acaoTurmas(fn, botao, msg) {
+      const turmas = [...document.querySelectorAll('#ab-turmas [data-ab-turma]:checked')].map((c) => c.dataset.abTurma);
+      if (!turmas.length) { avisar('Marque pelo menos uma turma.', true); return; }
+      comBotao(botao, async () => {
+        estado.questionarios = await chamar(fn, questionarioTurmas.id, turmas);
+        renderQuestionarios();
+        $('modal-abrir').close();
+        avisar(msg + ' ' + turmas.join(', ') + '.');
+      });
+    }
+    $('ab-abrir').addEventListener('click', (ev) => acaoTurmas('profAbrirQuestionarioTurmas', ev.target, 'Aberto por ' + questionarioTurmas.tempo + ' min para'));
+    $('ab-encerrar').addEventListener('click', (ev) => acaoTurmas('profEncerrarQuestionarioTurmas', ev.target, 'Encerrado para'));
+    $('ab-fechar').addEventListener('click', () => $('modal-abrir').close());
 
     // ---------- Importar JSON ----------
     let modoJson = 'lista';
@@ -618,6 +670,7 @@
       $('ed-mes').value = q ? q.mes : new Date().toISOString().slice(0, 7);
       $('ed-conteudo').value = q ? q.conteudo : '';
       $('ed-monitorar').checked = q ? q.monitorar !== false : true;
+      $('ed-tempo').value = q ? (q.tempo || 0) : 60;
       $('ed-qtd').value = q && q.tipo === 'diagnostico' ? 15 : 10;
       $('ed-ia-status').textContent = '';
       preencherTdaEditor(q && q.tda ? q.tda : null);
@@ -693,6 +746,7 @@
         questoes: estado.edicao.questoes,
         tda: $('ed-tipo').value === 'tda' ? lerTdaEditor() : null,
         monitorar: $('ed-monitorar').checked,
+        tempo: Number($('ed-tempo').value || 0),
       };
     }
 

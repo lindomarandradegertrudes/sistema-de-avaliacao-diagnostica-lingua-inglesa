@@ -7,6 +7,11 @@ const NIVEIS = ['Iniciante', 'Básico', 'Intermediário', 'Avançado'];
 const LETRAS_ALT = ['A', 'B', 'C', 'D', 'E'];
 const DIFICULDADES = ['facil', 'media', 'dificil'];
 const STATUS_Q = ['rascunho', 'aberto', 'encerrado'];
+// Abertura com tempo, por turma: novos questionários vêm com 60 min; vazio (os antigos) = sem limite.
+const TEMPO_PADRAO_MIN = 60;
+const TEMPO_MAXIMO_MIN = 600;
+// Envio que chega logo depois do fim (internet lenta, envio automático) ainda vale.
+const TOLERANCIA_ENVIO_MS = 2 * 60 * 1000;
 
 // ============================================================
 // Leitura e validação
@@ -18,6 +23,8 @@ function serieDaTurma_(turma) {
 }
 
 function lerQuestionarios_() {
+  // Acrescenta no cabeçalho da planilha as colunas novas (ex.: tempo_min) na primeira leitura.
+  garantirAba_('Questionarios');
   return lerTabela_('Questionarios').map(function (q) {
     let dados = [];
     try { dados = JSON.parse(q.questoes_json || '[]'); } catch (e) { /* célula corrompida: trata como vazio */ }
@@ -30,6 +37,7 @@ function lerQuestionarios_() {
       criado_em: String(q.criado_em),
       // Vazio (atividades antigas) = monitorada; só 'NÃO' desliga o monitoramento de saídas da tela.
       monitorar: String(q.monitorar || '').toUpperCase().replace('NAO', 'NÃO') !== 'NÃO',
+      tempo: Math.max(0, Number(q.tempo_min) || 0),
       questoes: ehTda || !Array.isArray(dados) ? [] : dados,
       tda: ehTda && !Array.isArray(dados) ? dados : null,
     };
@@ -150,14 +158,34 @@ function gravarResposta_(q, email, turma, resultado, origem, existente) {
 // Área do aluno
 // ============================================================
 
-function pendentesDoAluno_(email, turma) {
+/** tolerancia (ms): no envio, aceita até um pouco depois do fim da abertura. */
+function pendentesDoAluno_(email, turma, tolerancia) {
   const serie = serieDaTurma_(turma);
   const respondidos = lerRespostas_()
     .filter(function (r) { return r.email === email; })
     .map(function (r) { return r.questionario_id; });
+  const aberturas = lerAberturas_();
+  const agora = Date.now();
   return lerQuestionarios_()
     .filter(function (q) { return q.tipo !== 'tda' && q.status === 'aberto' && q.serie === serie && respondidos.indexOf(q.id) === -1; })
-    .map(function (q) { return { id: q.id, titulo: q.titulo, tipo: q.tipo, total: q.questoes.length }; });
+    .map(function (q) {
+      if (!q.tempo) return { id: q.id, titulo: q.titulo, tipo: q.tipo, total: q.questoes.length, restanteMs: null, ate: '' };
+      const a = aberturas[q.id + '|' + turma];
+      if (!a || a.aberto_ate + (tolerancia || 0) <= agora) return null;
+      return { id: q.id, titulo: q.titulo, tipo: q.tipo, total: q.questoes.length, restanteMs: Math.max(0, a.aberto_ate - agora),
+        ate: Utilities.formatDate(new Date(a.aberto_ate), FUSO, 'HH:mm') };
+    })
+    .filter(Boolean);
+}
+
+/** Aberturas por turma: { "questionario|turma": { _linha, aberto_ate (ms) } }. */
+function lerAberturas_() {
+  garantirAba_('Aberturas');
+  const res = {};
+  lerTabela_('Aberturas').forEach(function (l) {
+    res[String(l.questionario_id) + '|' + String(l.turma)] = { _linha: l._linha, aberto_ate: Number(l.aberto_ate) || 0 };
+  });
+  return res;
 }
 
 function alunoAtual_() {
@@ -171,11 +199,11 @@ function alunoAtual_() {
 /** Entrega as questões SEM o gabarito. */
 function alunoAbrirQuestionario(id) {
   const aluno = alunoAtual_();
-  const pendente = pendentesDoAluno_(aluno.email, aluno.turma).some(function (p) { return p.id === id; });
+  const pendente = pendentesDoAluno_(aluno.email, aluno.turma).filter(function (p) { return p.id === id; })[0];
   if (!pendente) throw new Error('Este questionário não está disponível para você.');
   const q = buscarQuestionario_(id);
   return {
-    id: q.id, titulo: q.titulo, monitorar: q.monitorar,
+    id: q.id, titulo: q.titulo, monitorar: q.monitorar, restanteMs: pendente.restanteMs, ate: pendente.ate,
     questoes: q.questoes.map(function (x) {
       return { texto_apoio: x.texto_apoio, enunciado: x.enunciado, alternativas: x.alternativas };
     }),
@@ -188,7 +216,8 @@ function normalizarSaidas_(s) {
   return { vezes: n(s && s.vezes, 1000), segundos: n(s && s.segundos, 24 * 3600) };
 }
 
-function alunoResponder(id, marcadas, saidas) {
+/** automatico: envio feito pelo app quando o tempo acabou (questões em branco contam como erro). */
+function alunoResponder(id, marcadas, saidas, automatico) {
   const aluno = alunoAtual_();
   const q = buscarQuestionario_(id);
   if (!Array.isArray(marcadas) || marcadas.length !== q.questoes.length) throw new Error('Responda todas as questões.');
@@ -196,10 +225,10 @@ function alunoResponder(id, marcadas, saidas) {
     const n = Number(m);
     return m !== null && m !== '' && n >= 0 && n < q.questoes[i].alternativas.length ? n : null;
   });
-  if (normalizadas.some(function (m) { return m === null; })) throw new Error('Responda todas as questões.');
+  if (!automatico && normalizadas.some(function (m) { return m === null; })) throw new Error('Responda todas as questões.');
 
   comTrava_(function () {
-    const pendente = pendentesDoAluno_(aluno.email, aluno.turma).some(function (p) { return p.id === id; });
+    const pendente = pendentesDoAluno_(aluno.email, aluno.turma, TOLERANCIA_ENVIO_MS).some(function (p) { return p.id === id; });
     if (!pendente) throw new Error('Este questionário já foi respondido ou foi encerrado.');
     const resultado = corrigir_(q.questoes, normalizadas);
     if (q.monitorar) resultado.detalhe.saidas = normalizarSaidas_(saidas);
@@ -215,9 +244,18 @@ function alunoResponder(id, marcadas, saidas) {
 function profListarQuestionarios() {
   exigirProfessor_();
   const respostas = lerRespostas_();
+  const aberturas = lerAberturas_();
+  const turmas = listarTurmas_();
+  const agora = Date.now();
   return lerQuestionarios_().map(function (q) {
     delete q._linha;
     q.respostas = respostas.filter(function (r) { return r.questionario_id === q.id; }).length;
+    // Situação da abertura em cada turma da série (questionários com tempo).
+    q.turmas = turmas.filter(function (t) { return t.serie === q.serie; }).map(function (t) {
+      const a = aberturas[q.id + '|' + t.turma];
+      const aberta = !!(a && a.aberto_ate > agora);
+      return { turma: t.turma, aberta: aberta, ate: aberta ? Utilities.formatDate(new Date(a.aberto_ate), FUSO, 'HH:mm') : '' };
+    });
     return q;
   }).sort(function (a, b) { return b.mes.localeCompare(a.mes) || a.serie.localeCompare(b.serie); });
 }
@@ -235,15 +273,16 @@ function profSalvarQuestionario(dados) {
   if (json.length > 49000) throw new Error('Conteúdo grande demais para a planilha. Reduza os textos ou divida em dois.');
 
   const monitorar = dados.monitorar === false ? 'NÃO' : 'SIM';
+  const tempoInformado = dados.tempo == null || dados.tempo === '' ? null : Math.min(Math.max(Math.round(Number(dados.tempo)) || 0, 0), TEMPO_MAXIMO_MIN);
   let id = String(dados.id || '');
   comTrava_(function () {
-    const aba = aba_('Questionarios');
+    const aba = garantirAba_('Questionarios');
     if (!id) {
       id = 'Q' + Utilities.getUuid().replace(/-/g, '').slice(0, 8);
       aba.appendRow(linhaDe_('Questionarios', {
         id: id, tipo: dados.tipo, serie: dados.serie, mes: "'" + mes, titulo: titulo,
         conteudo: String(dados.conteudo || ''), questoes_json: json, status: 'rascunho', form_id: '', criado_em: new Date(),
-        monitorar: monitorar,
+        monitorar: monitorar, tempo_min: tempoInformado == null ? TEMPO_PADRAO_MIN : tempoInformado,
       }));
       return;
     }
@@ -262,7 +301,7 @@ function profSalvarQuestionario(dados) {
     const linha = linhaDe_('Questionarios', {
       id: id, tipo: dados.tipo, serie: dados.serie, mes: "'" + mes, titulo: titulo,
       conteudo: String(dados.conteudo || ''), questoes_json: json, status: atual.status, form_id: '', criado_em: aba.getRange(atual._linha, 10).getValue(),
-      monitorar: monitorar,
+      monitorar: monitorar, tempo_min: tempoInformado == null ? atual.tempo : tempoInformado,
     });
     aba.getRange(atual._linha, 1, 1, linha.length).setValues([linha]);
   });
@@ -317,6 +356,41 @@ function profAlterarStatus(id, status) {
     aba_('Questionarios').getRange(q._linha, CABECALHOS.Questionarios.indexOf('status') + 1).setValue(status);
   });
   return profListarQuestionarios();
+}
+
+/** Abre o questionário (com tempo) para as turmas marcadas, por "tempo" minutos a partir de agora. */
+function profAbrirQuestionarioTurmas(id, turmas) {
+  exigirProfessor_();
+  const q = buscarQuestionario_(id);
+  if (!q.tempo) throw new Error((q.tipo === 'tda' ? 'Esta TDA' : 'Este questionário') + ' está sem limite de tempo: use "Liberar para alunos".');
+  const validas = listarTurmas_().filter(function (t) { return t.serie === q.serie; }).map(function (t) { return t.turma; });
+  const alvo = (turmas || []).map(String).filter(function (t) { return validas.indexOf(t) !== -1; });
+  if (!alvo.length) throw new Error('Marque pelo menos uma turma do ' + q.serie + ' ano.');
+  comTrava_(function () {
+    if (q.status !== 'aberto') aba_('Questionarios').getRange(q._linha, CABECALHOS.Questionarios.indexOf('status') + 1).setValue('aberto');
+    gravarAberturas_(q.id, alvo, Date.now() + q.tempo * 60 * 1000);
+  });
+  return profListarQuestionarios();
+}
+
+/** Encerra agora para as turmas marcadas (quem estava respondendo tem o envio automático do que marcou). */
+function profEncerrarQuestionarioTurmas(id, turmas) {
+  exigirProfessor_();
+  const q = buscarQuestionario_(id);
+  comTrava_(function () { gravarAberturas_(q.id, (turmas || []).map(String), Date.now()); });
+  return profListarQuestionarios();
+}
+
+/** Grava o fim da abertura de cada turma (cria ou atualiza a linha). Chamar dentro de comTrava_. */
+function gravarAberturas_(qid, turmas, ate) {
+  const atuais = lerAberturas_();
+  const aba = garantirAba_('Aberturas');
+  turmas.forEach(function (t) {
+    const a = atuais[qid + '|' + t];
+    const linha = linhaDe_('Aberturas', { questionario_id: qid, turma: t, aberto_ate: ate, aberto_em: new Date() });
+    if (a) aba.getRange(a._linha, 1, 1, linha.length).setValues([linha]);
+    else aba.appendRow(linha);
+  });
 }
 
 function profExcluirQuestionario(id) {

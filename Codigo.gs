@@ -12,7 +12,7 @@ const CABECALHOS = {
   Config: ['chave', 'valor', 'descricao'],
   Turmas: ['turma', 'serie'],
   Alunos: ['email', 'nome', 'turma', 'cadastrado_em', 'atualizado_em'],
-  Questionarios: ['id', 'tipo', 'serie', 'mes', 'titulo', 'conteudo', 'questoes_json', 'status', 'form_id', 'criado_em', 'monitorar'],
+  Questionarios: ['id', 'tipo', 'serie', 'mes', 'titulo', 'conteudo', 'questoes_json', 'status', 'form_id', 'criado_em', 'monitorar', 'tempo_min'],
   Respostas: ['questionario_id', 'email', 'turma', 'pontuacao', 'total', 'percentual', 'acertos_json', 'origem', 'respondido_em'],
   Grupos: ['mes', 'turma', 'grupo', 'email', 'nome', 'nivel', 'media', 'aplicado_em'],
   Entregas: ['questionario_id', 'turma', 'grupo', 'membros', 'email', 'texto', 'link', 'anexos_json', 'enviado_em', 'atualizado_em', 'saidas_json', 'titulo', 'formato'],
@@ -27,6 +27,8 @@ const CABECALHOS = {
   Recuperacoes: ['questionario_id', 'email', 'turma', 'indicado_em', 'liberado_ate', 'dados_json', 'atualizado_em'],
   PacotesRec: ['questionario_id', 'itens_json', 'criado_em'],
   RascunhosTda: ['questionario_id', 'email', 'rascunho_json', 'criado_em'],
+  Aberturas: ['questionario_id', 'turma', 'aberto_ate', 'aberto_em'],
+  RascunhosEntrega: ['questionario_id', 'chave', 'titulo', 'texto', 'formato', 'link', 'anexos_json', 'atualizado_em', 'atualizado_por'],
 };
 
 const CONFIG_PADRAO = [

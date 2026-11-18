@@ -237,6 +237,7 @@
           </div></div>
         <div class="campo" id="tda-anexos-campo"><label for="tda-arquivos">Anexos (foto, PDF, Word, PowerPoint – até 3, máx. 10 MB cada)</label>
           <div id="tda-anexos-atuais"></div>
+          <div id="tda-anexos-rascunho"></div>
           <input id="tda-arquivos" type="file" multiple accept="image/*,.pdf,.doc,.docx,.ppt,.pptx"></div>
         <div class="rodape-modal"><span class="suave pequeno" id="tda-status" style="flex:1"></span>
           <button class="btn primario" type="submit" id="tda-enviar">Enviar</button></div>
@@ -464,6 +465,7 @@
     function render(estado) {
       estadoAtual = estado;
       pararMonitor(false);
+      pararRelogioTda();
       if (estado.teste) { renderTeste(estado); return; }
       if (!estado.aluno) {
         const series = [...new Set(estado.turmas.map((t) => t.serie))];
@@ -481,7 +483,7 @@
       $('pendentes').innerHTML = estado.questionarios.length
         ? estado.questionarios.map((q) => `
             <div class="pendente">
-              <div style="flex:1"><strong>${esc(q.titulo)}</strong><div class="suave pequeno">${q.total} questões</div></div>
+              <div style="flex:1"><strong>${esc(q.titulo)}</strong><div class="suave pequeno">${q.total} questões${q.ate ? ` · ⏱ aberto até <strong>${esc(q.ate)}</strong>` : ''}</div></div>
               <button class="btn primario" data-abrir="${esc(q.id)}">Responder</button>
             </div>`).join('')
         : '<p class="vazio" style="padding:8px 0">Nenhum questionário pendente. 🎉</p>';
@@ -494,7 +496,8 @@
         ? estado.tdas.map((t) => `
             <div class="pendente">
               <div style="flex:1"><strong>${esc(t.titulo)}</strong>
-                <div class="suave pequeno">${t.modo === 'grupo' ? 'Em grupo' : 'Individual'}${t.nota != null ? ' · nota ' + t.nota + '%' : ''}</div></div>
+                <div class="suave pequeno">${t.modo === 'grupo' ? 'Em grupo' : 'Individual'}${t.nota != null ? ' · nota ' + t.nota + '%' : ''}${t.ate
+                  ? ` · ⏱ aberta até <strong>${esc(t.ate)}</strong>` : t.aguardando ? ' · ⏳ abre na aula, quando o professor liberar' : ''}</div></div>
               <span class="selo ${SIT[t.situacao][0]}">${SIT[t.situacao][1]}</span>${t.recuperacao ? ' <span class="selo pendente-s">🔁 Recuperação</span>' : ''}
               <button class="btn ${t.situacao === 'pendente' ? 'primario' : ''}" data-tda="${esc(t.id)}">${t.situacao === 'pendente' ? 'Fazer' : 'Abrir'}</button>
             </div>`).join('')
@@ -654,6 +657,7 @@
       try {
         quizAtual = await chamar('alunoAbrirQuestionario', id);
         renderQuiz();
+        iniciarRelogioQuiz();
         if (quizAtual.monitorar !== false) iniciarMonitor('q:' + quizAtual.id);
       } catch (e) {
         alert(e.message);
@@ -690,8 +694,47 @@
     $('quiz-questoes').addEventListener('change', atualizarProgresso);
 
     $('sair').addEventListener('click', () => {
-      if (confirm('Sair sem enviar? Suas marcações serão perdidas.')) render(estadoAtual);
+      if (confirm('Sair sem enviar? Suas marcações serão perdidas.')) { pararRelogioQuiz(); render(estadoAtual); }
     });
+
+    // ---------- Tempo de abertura: contagem regressiva e envio automático do que foi marcado ----------
+    let relogioQuiz = null;
+    function pararRelogioQuiz() { clearInterval(relogioQuiz); relogioQuiz = null; }
+    function iniciarRelogioQuiz() {
+      pararRelogioQuiz();
+      if (!quizAtual || quizAtual.restanteMs == null) return;
+      const fim = Date.now() + quizAtual.restanteMs;
+      const tick = () => {
+        const falta = fim - Date.now();
+        if (falta <= 0) { pararRelogioQuiz(); enviarQuiz(true); return; }
+        const min = Math.floor(falta / 60000), seg = Math.floor((falta % 60000) / 1000);
+        $('quiz-progresso').textContent = `⏱ ${min}:${String(seg).padStart(2, '0')} · ` + $('quiz-progresso').textContent.replace(/^⏱ [^·]*· /, '');
+      };
+      tick();
+      relogioQuiz = setInterval(tick, 1000);
+    }
+
+    async function enviarQuiz(automatico) {
+      const m = marcadas();
+      $('enviar').disabled = true;
+      try {
+        const resp = await chamar('alunoResponder', quizAtual.id, m, saidasAtuais(), !!automatico);
+        pararRelogioQuiz();
+        pararMonitor(true);
+        quizAtual = null;
+        if (resp && resp.teste) {
+          $('enviado-msg').innerHTML = `Você acertou <strong>${resp.pontuacao} de ${resp.total}</strong> (${resp.percentual}%).<br>
+            <span class="suave pequeno">${resp.acertos.map((a, i) => 'Q' + (i + 1) + (a ? ' ✔' : ' ✘')).join(' · ')}<br>Modo teste: nada foi gravado.</span>`;
+        } else {
+          estadoAtual = resp;
+          $('enviado-msg').textContent = automatico ? '⏱ O tempo acabou: as suas marcações foram enviadas (as em branco contam como erro).' : 'Suas respostas foram enviadas.';
+        }
+        mostrar('enviado');
+      } catch (e) {
+        alert(e.message);
+        if (automatico) { pararMonitor(false); render(estadoAtual); }
+      } finally { $('enviar').disabled = false; }
+    }
 
     $('quiz').addEventListener('submit', async (ev) => {
       ev.preventDefault();
@@ -703,22 +746,7 @@
         return;
       }
       if (!confirm('Enviar as respostas? Depois de enviar não será possível alterar.')) return;
-      $('enviar').disabled = true;
-      try {
-        const resp = await chamar('alunoResponder', quizAtual.id, m, saidasAtuais());
-        pararMonitor(true);
-        quizAtual = null;
-        if (resp && resp.teste) {
-          $('enviado-msg').innerHTML = `Você acertou <strong>${resp.pontuacao} de ${resp.total}</strong> (${resp.percentual}%).<br>
-            <span class="suave pequeno">${resp.acertos.map((a, i) => 'Q' + (i + 1) + (a ? ' ✔' : ' ✘')).join(' · ')}<br>Modo teste: nada foi gravado.</span>`;
-        } else {
-          estadoAtual = resp;
-          $('enviado-msg').textContent = 'Suas respostas foram enviadas.';
-        }
-        mostrar('enviado');
-      } catch (e) {
-        alert(e.message);
-      } finally { $('enviar').disabled = false; }
+      enviarQuiz(false);
     });
 
     $('voltar-inicio').addEventListener('click', () => render(estadoAtual));
@@ -751,7 +779,8 @@
       if (rec.nota != null) {
         const tda = c ? c.percentual : 0;
         return `<p>✅ Você acertou <strong>${rec.nota} de 10</strong>. Nota da recuperação: <strong>${rec.nota}</strong> · nota da TDA: ${nota10Rec(tda)}.<br>
-          Fica valendo: <strong>${nota10Rec(Math.max(tda, rec.nota * 10))}</strong>.${a && a.motivo === 'tempo' ? '<br><span class="suave pequeno">A liberação terminou antes do fim: as questões que faltaram valeram zero.</span>' : ''}</p>`;
+          Fica valendo: <strong>${nota10Rec(Math.max(tda, rec.nota * 10))}</strong>.${a && a.motivo === 'tempo' ? '<br><span class="suave pequeno">A liberação terminou antes do fim: as questões que faltaram valeram zero.</span>' : ''}</p>
+          <button class="btn" type="button" id="rec-ver-respostas">👁 Ver as respostas</button>`;
       }
       if (!rec.liberada) return '<p class="suave">As atividades abrem quando o professor liberar a recuperação na aula.</p>';
       return `<button class="btn primario" id="rec-atividades" type="button">${a ? `▶ Continuar as atividades (${a.respondidas}/${a.total})` : '▶ Começar as 10 atividades'}</button>`;
@@ -813,7 +842,18 @@
           ${v.motivo === 'tempo' ? '<p class="suave pequeno">A liberação terminou antes do fim: as questões que faltaram valeram zero.</p>' : ''}
           <p class="suave pequeno">Fica valendo a maior nota entre a TDA e a recuperação.</p>
           <button class="btn primario" type="button" id="rec-fim-voltar">Voltar para a TDA</button>
-        </div>`;
+        </div>
+        ${(v.correcao || []).length ? `<h2 style="margin:16px 0 8px">✅ Correção das questões</h2>${v.correcao.map((x) => `
+          <div class="cartao questao" style="border-left:4px solid ${x.marcada == null ? '#adb5bd' : x.ok ? '#2b8a3e' : '#c92a2a'}">
+            <span class="num">Questão ${x.numero} · ${x.marcada == null ? 'não respondida (valeu zero)' : x.ok ? '✔ você acertou' : '✘ você errou'}</span>
+            <div class="suave pequeno">📚 ${esc(x.habNome)}</div>
+            ${x.contexto ? `<div class="apoio" style="font-style:normal">${esc(x.contexto)}</div>` : ''}
+            <div class="enunciado"><strong>${esc(x.enunciado)}</strong></div>
+            ${x.opcoes.map((o, k) => `<div class="opcao" style="cursor:default;${k === x.certa ? 'border-color:#2b8a3e;background:#ebfbee' : k === x.marcada ? 'border-color:#c92a2a;background:#fff5f5' : ''}">
+              <span><strong>${LETRAS[k]})</strong> ${esc(o)}${k === x.certa ? ' <strong style="color:#2b8a3e">✔ resposta certa</strong>' : ''}${k === x.marcada && k !== x.certa ? ' <strong style="color:#c92a2a">✘ sua resposta</strong>' : ''}${k === x.marcada && k === x.certa ? ' (sua resposta)' : ''}</span></div>`).join('')}
+            ${x.porque ? `<p class="pequeno" style="margin:8px 0 0">💡 ${esc(x.porque)}</p>` : ''}
+            ${!x.ok && x.hab ? `<div style="margin-top:8px"><button class="btn mini" type="button" data-ficha-rec="${esc(x.hab)}">📖 Abrir a ficha</button></div>` : ''}
+          </div>`).join('')}` : ''}`;
         mostrar('rec-view');
         return;
       }
@@ -840,6 +880,8 @@
     });
     $('rec-corpo').addEventListener('click', async (ev) => {
       if (ev.target.id === 'rec-fim-voltar' || ev.target.id === 'rec-regras-voltar') { voltarDaRecAval(); return; }
+      const fr = ev.target.closest('[data-ficha-rec]');
+      if (fr) { abrirFicha(fr.dataset.fichaRec, fr); return; }
       if (ev.target.id === 'rec-iniciar') {
         const b = ev.target;
         b.disabled = true;
@@ -1013,6 +1055,14 @@
         </div>`);
         const bAval = $('rec-atividades');
         if (bAval) bAval.addEventListener('click', () => comecarAtividadesRec(t, bAval));
+        const bResp = $('rec-ver-respostas');
+        if (bResp) bResp.addEventListener('click', async () => {
+          bResp.disabled = true;
+          try {
+            recAval.id = t.id;
+            renderRecAval(await chamar('alunoRecAvaliacao', t.id));
+          } catch (e) { alert(e.message); bResp.disabled = false; }
+        });
         const bRec = $('rec-comecar');
         if (bRec) bRec.addEventListener('click', async () => {
           bRec.disabled = true;
@@ -1037,7 +1087,19 @@
           ${e.texto ? `<div class="apoio texto-tda" style="font-style:normal">${conteudoEntregaTda(e)}</div>` : ''}
           ${e.link ? `<p>🔗 <a href="${esc(e.link)}" target="_blank" rel="noopener">${esc(e.link)}</a></p>` : ''}
           ${e.anexos.map((a) => `<p>📎 ${esc(a.nome)}</p>`).join('')}
-        </div>` : (!e && !podeEditar && !c ? '<div class="cartao suave">Esta TDA não está mais recebendo entregas.</div>' : '');
+        </div>` : (!e && !podeEditar && !c && !t.comTempo ? '<div class="cartao suave">Esta TDA não está mais recebendo entregas.</div>' : '');
+      // TDA com tempo fechada agora: mostra o que está salvo e quando continua.
+      if (t.comTempo && !podeEditar && !c) {
+        const r = t.rascunho;
+        $('tda-entrega-atual').insertAdjacentHTML('afterbegin', `<div class="cartao" style="border:2px solid #f59f00">
+          <h2>⏳ A TDA abre na aula</h2>
+          <p style="margin-top:0">O professor libera a TDA por um tempo na aula. ${r ? 'Quando ele abrir de novo, você continua de onde parou, em qualquer Chromebook.' : 'Quando ele abrir, você faz o trabalho aqui.'}</p>
+          ${r ? `<p class="suave pequeno">📝 Seu trabalho está salvo (ainda não enviado) · última vez: ${esc(r.atualizado_em)}${r.atualizado_por ? ', por ' + esc(r.atualizado_por) : ''}.</p>
+            ${r.titulo ? `<h3 style="margin:8px 0 0">${esc(r.titulo)}</h3>` : ''}
+            ${r.texto ? `<div class="apoio texto-tda" style="font-style:normal">${conteudoEntregaTda(r)}</div>` : ''}
+            ${r.link ? `<p>🔗 ${esc(r.link)}</p>` : ''}${r.anexos.map((a) => `<p>📎 ${esc(a.nome)}</p>`).join('')}` : ''}
+        </div>`);
+      }
 
       $('tda-form').hidden = !podeEditar;
       if (podeEditar) {
@@ -1051,12 +1113,68 @@
         $('tda-arquivos').value = '';
         $('tda-anexos-atuais').innerHTML = e && e.anexos.length ? e.anexos.map((a) => `
           <label class="anexo-atual"><input type="checkbox" data-manter="${esc(a.id)}" checked> manter 📎 ${esc(a.nome)}</label>`).join('') : '';
+        renderAnexosRascunhoTda(t.comTempo && t.rascunho ? t.rascunho.anexos : []);
         $('tda-enviar').textContent = e ? 'Atualizar entrega' : 'Enviar';
         $('tda-status').textContent = '';
       }
       mostrar('tda-view');
       if (podeEditar && t.monitorar !== false) iniciarMonitor('t:' + t.id); else pararMonitor(false);
+      if (podeEditar && t.comTempo) iniciarRelogioTda(t); else pararRelogioTda();
     }
+
+    // ---------- TDA com tempo: relógio, salvamento no servidor e anexos que sobem na hora ----------
+    let relogioTda = null, salvamentoServidor = null, ultimoSalvo = '';
+    function pararRelogioTda() { clearInterval(relogioTda); relogioTda = null; clearTimeout(salvamentoServidor); }
+    function conteudoFormTda() {
+      return { titulo: $('tda-titulo-trab').value, texto: editorTda.innerText.trim() ? editorTda.innerHTML : '', formato: 'html', link: $('tda-link').value.trim() };
+    }
+    async function salvarNoServidorTda() {
+      clearTimeout(salvamentoServidor);
+      if (!tdaAtual || !tdaAtual.comTempo || $('tda-form').hidden) return;
+      const dados = conteudoFormTda();
+      const chave = JSON.stringify(dados);
+      if (chave === ultimoSalvo) return;
+      try {
+        const r = await chamar('alunoSalvarRascunhoTda', tdaAtual.id, dados);
+        ultimoSalvo = chave;
+        $('tda-rascunho').textContent = '💾 Salvo às ' + r.salvo_em + ' (continua de qualquer Chromebook).';
+      } catch (e) {
+        $('tda-rascunho').textContent = '⚠️ ' + e.message;
+      }
+    }
+    function iniciarRelogioTda(t) {
+      pararRelogioTda();
+      ultimoSalvo = JSON.stringify(conteudoFormTda());
+      const fim = Date.now() + (t.restanteMs || 0);
+      const tick = async () => {
+        const falta = fim - Date.now();
+        if (falta <= 0) {
+          pararRelogioTda();
+          await salvarNoServidorTda();
+          pararMonitor(false);
+          try { renderTda(await chamar('alunoAbrirTda', t.id)); } catch (e) { render(estadoAtual); return; }
+          $('tda-entrega-atual').insertAdjacentHTML('afterbegin', '<div class="cartao" style="background:#fff3bf"><strong>⏱ O tempo da TDA acabou.</strong> Seu trabalho foi salvo (não enviado): você continua quando o professor abrir de novo.</div>');
+          return;
+        }
+        const min = Math.floor(falta / 60000), seg = Math.floor((falta % 60000) / 1000);
+        $('tda-status').textContent = `⏱ Aberta até ${t.ate} · faltam ${min}:${String(seg).padStart(2, '0')}`;
+      };
+      tick();
+      relogioTda = setInterval(tick, 1000);
+    }
+    function renderAnexosRascunhoTda(anexos) {
+      $('tda-anexos-rascunho').innerHTML = anexos.map((a) => `<div class="anexo-atual">📎 ${esc(a.nome)} <span class="suave pequeno">(salvo)</span>
+        <button class="btn mini" type="button" data-rasc-remover="${esc(a.id)}">✕ tirar</button></div>`).join('');
+      tdaAnexosRascunho = anexos;
+    }
+    let tdaAnexosRascunho = [];
+    $('tda-anexos-rascunho').addEventListener('click', async (ev) => {
+      const b = ev.target.closest('[data-rasc-remover]');
+      if (!b) return;
+      b.disabled = true;
+      try { renderAnexosRascunhoTda((await chamar('alunoRemoverAnexoRascunhoTda', tdaAtual.id, b.dataset.rascRemover)).anexos); }
+      catch (e) { alert(e.message); b.disabled = false; }
+    });
 
     // Abrir o seletor de arquivos tira o foco da página, mas não é saída da atividade.
     $('tda-arquivos').addEventListener('click', () => (monitor.seletorArquivo = true));
@@ -1068,7 +1186,20 @@
       liberarSaidaParaLink('🎨 O Canva abriu em outra aba. Copie o link (Compartilhar › Copiar link) e volte para colar acima.');
       window.open(['https:', '', 'www.canva.com', ''].join('/'), '_blank', 'noopener');
     });
-    $('tda-arquivos').addEventListener('change', () => (monitor.seletorArquivo = false));
+    $('tda-arquivos').addEventListener('change', async () => {
+      monitor.seletorArquivo = false;
+      if (!tdaAtual || !tdaAtual.comTempo) return;
+      const arquivos = [...$('tda-arquivos').files];
+      $('tda-arquivos').value = '';
+      for (const a of arquivos) {
+        if (a.size > 10 * 1024 * 1024 && !/^image\//.test(a.type)) { alert(`O arquivo "${a.name}" passa de 10 MB.`); continue; }
+        $('tda-rascunho').textContent = `Enviando "${a.name}" para o Drive…`;
+        try {
+          renderAnexosRascunhoTda((await chamar('alunoAnexarRascunhoTda', tdaAtual.id, await lerArquivo(a))).anexos);
+          $('tda-rascunho').textContent = `📎 "${a.name}" salvo.`;
+        } catch (e) { alert(e.message); $('tda-rascunho').textContent = ''; }
+      }
+    });
 
     // ---------- Editor de texto da TDA (parecido com o Word, sem corretor) ----------
     const editorTda = $('tda-editor');
@@ -1119,19 +1250,28 @@
         } catch (e) { /* sem armazenamento: segue sem rascunho */ }
       }, 700);
     }
-    editorTda.addEventListener('input', () => { atualizarContagemTda(); salvarRascunhoTda(); });
-    $('tda-titulo-trab').addEventListener('input', salvarRascunhoTda);
-    $('tda-link').addEventListener('input', salvarRascunhoTda);
+    // TDA com tempo: também salva no servidor, alguns segundos depois de parar de digitar.
+    function agendarServidorTda() {
+      if (!tdaAtual || !tdaAtual.comTempo) return;
+      clearTimeout(salvamentoServidor);
+      salvamentoServidor = setTimeout(salvarNoServidorTda, 8000);
+    }
+    editorTda.addEventListener('input', () => { atualizarContagemTda(); salvarRascunhoTda(); agendarServidorTda(); });
+    $('tda-titulo-trab').addEventListener('input', () => { salvarRascunhoTda(); agendarServidorTda(); });
+    $('tda-link').addEventListener('input', () => { salvarRascunhoTda(); agendarServidorTda(); });
 
     /** Preenche o formulário com o rascunho (se houver) ou com a entrega já enviada. */
     function preencherEditorTda(t, e) {
-      const r = lerRascunhoTda(t.id);
+      // TDA com tempo: vale o rascunho do servidor (de qualquer Chromebook); senão, o deste navegador.
+      const servidor = t.comTempo && t.rascunho ? { titulo: t.rascunho.titulo, html: t.rascunho.texto, link: t.rascunho.link } : null;
+      const r = servidor || lerRascunhoTda(t.id);
       $('tda-titulo-trab').value = r ? (r.titulo || '') : (e ? e.titulo || '' : '');
       editorTda.innerHTML = r ? limparHtmlTda(r.html) : (e && e.texto ? conteudoEntregaTda(e) : '');
       $('tda-link').value = t.canva ? (r ? (r.link || '') : (e ? e.link : '')) : '';
       $('tda-link-campo').hidden = !t.canva;
       $('tda-anexos-campo').hidden = !t.canva;
-      $('tda-rascunho').textContent = r ? '📝 Rascunho recuperado deste computador (ainda não enviado).' : '';
+      $('tda-rascunho').textContent = servidor ? `📝 Trabalho salvo recuperado (${t.rascunho.atualizado_em}${t.rascunho.atualizado_por ? ', por ' + t.rascunho.atualizado_por : ''}). Ainda não enviado.`
+        : r ? '📝 Rascunho recuperado deste computador (ainda não enviado).' : '';
       atualizarContagemTda();
     }
 
@@ -1167,7 +1307,8 @@
     $('tda-form').addEventListener('submit', async (ev) => {
       ev.preventDefault();
       const arquivos = tdaAtual.canva ? [...$('tda-arquivos').files] : [];
-      const manter = [...document.querySelectorAll('#tda-anexos-atuais [data-manter]')].filter((c) => c.checked).map((c) => c.dataset.manter);
+      const manter = [...document.querySelectorAll('#tda-anexos-atuais [data-manter]')].filter((c) => c.checked).map((c) => c.dataset.manter)
+        .concat(tdaAtual.comTempo ? tdaAnexosRascunho.map((a) => a.id) : []);
       if (manter.length + arquivos.length > 3) { alert('Envie no máximo 3 anexos no total.'); return; }
       const grande = arquivos.find((a) => a.size > 10 * 1024 * 1024 && !/^image\//.test(a.type));
       if (grande) { alert(`O arquivo "${grande.name}" passa de 10 MB.`); return; }
@@ -1186,6 +1327,7 @@
         });
         zerarSaidas(); // o servidor soma as saídas de cada envio
         apagarRascunhoTda(t.id);
+        pararRelogioTda();
         renderTda(t);
         alert(t.simulado ? 'Modo teste: a entrega foi conferida, mas não foi gravada.' : 'Entrega enviada! ✅');
       } catch (e) {
