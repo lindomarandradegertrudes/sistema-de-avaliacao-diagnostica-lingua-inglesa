@@ -247,9 +247,11 @@ function profListarQuestionarios() {
   const aberturas = lerAberturas_();
   const turmas = listarTurmas_();
   const agora = Date.now();
+  const reais = alunosReaisPorSerie_();
   return lerQuestionarios_().map(function (q) {
     delete q._linha;
-    q.respostas = respostas.filter(function (r) { return r.questionario_id === q.id; }).length;
+    // Só alunos reais cadastrados hoje na série: não contam o Aluno Teste nem respostas "órfãs" (aluno apagado ou de outra série).
+    q.respostas = respostas.filter(function (r) { return r.questionario_id === q.id && reais[q.serie] && reais[q.serie][r.email]; }).length;
     // Situação da abertura em cada turma da série (questionários com tempo).
     q.turmas = turmas.filter(function (t) { return t.serie === q.serie; }).map(function (t) {
       const a = aberturas[q.id + '|' + t.turma];
@@ -287,7 +289,9 @@ function profSalvarQuestionario(dados) {
       return;
     }
     const atual = buscarQuestionario_(id);
-    const temRespostas = lerRespostas_().some(function (r) { return r.questionario_id === id; });
+    // Só respostas de alunos reais (cadastrados hoje na série) travam a edição; as do Aluno Teste e as órfãs não.
+    const reais = alunosReaisPorSerie_()[atual.serie] || {};
+    const temRespostas = lerRespostas_().some(function (r) { return r.questionario_id === id && reais[r.email]; });
     if (temRespostas && atual.tipo !== dados.tipo) throw new Error('Já há respostas: o tipo não pode mudar.');
     if (temRespostas && !ehTda && JSON.stringify(atual.questoes) !== json) {
       throw new Error('Este questionário já tem respostas: as questões não podem mais ser alteradas.');
@@ -379,6 +383,20 @@ function profEncerrarQuestionarioTurmas(id, turmas) {
   const q = buscarQuestionario_(id);
   comTrava_(function () { gravarAberturas_(q.id, (turmas || []).map(String), Date.now()); });
   return profListarQuestionarios();
+}
+
+/** { série: { email: true } } dos alunos reais cadastrados (sem o Aluno Teste). */
+function alunosReaisPorSerie_() {
+  const serieDe = {};
+  listarTurmas_().forEach(function (t) { serieDe[t.turma] = t.serie; });
+  const res = {};
+  lerTabela_('Alunos').forEach(function (a) {
+    const email = String(a.email).toLowerCase();
+    const serie = serieDe[String(a.turma)];
+    if (!serie || ehEmailAlunoTeste_(email) || ehTurmaTeste_(a.turma)) return;
+    (res[serie] = res[serie] || {})[email] = true;
+  });
+  return res;
 }
 
 /** Grava o fim da abertura de cada turma (cria ou atualiza a linha). Chamar dentro de comTrava_. */
